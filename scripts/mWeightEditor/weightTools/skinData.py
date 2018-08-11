@@ -36,6 +36,10 @@ class DataOfSkin(object):
         self.rowCount = 0
         self.columnCount = 0
 
+        self.usedDeformersIndices = []
+        self.hideColumnIndices = []
+        self.meshIsUsed = False
+
         self.UNDOstack = []
 
     def orderMelList(self, listInd, onlyStr=True):
@@ -451,10 +455,14 @@ class DataOfSkin(object):
 
     def getAllData(self):
         sel = cmds.ls(selection=True)
-        self.theSkinCluster, self.deformedShape = self.getSkinClusterFromSel(sel)
+        theSkinCluster, deformedShape = self.getSkinClusterFromSel(sel)
+        if not theSkinCluster:
+            return False
+
+        self.theSkinCluster, self.deformedShape = theSkinCluster, deformedShape
         self.raw2dArray = None
 
-        if not self.theSkinCluster:
+        if not theSkinCluster:
             self.usedDeformersIndices = []
             self.hideColumnIndices = []
             self.vertices = []
@@ -490,6 +498,8 @@ class DataOfSkin(object):
         self.columnCount = self.nbDrivers
 
         self.getZeroColumns()
+
+        return True
 
     def rebuildRawSkin(self):
         if self.meshIsUsed:
