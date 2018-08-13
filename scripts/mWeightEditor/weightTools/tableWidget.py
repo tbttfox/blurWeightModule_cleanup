@@ -1,5 +1,6 @@
 from Qt import QtGui, QtCore, QtWidgets
 from functools import partial
+from maya import cmds
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -21,6 +22,9 @@ class TableModel(QtCore.QAbstractTableModel):
         return self.datatable.columnCount
 
     def columnNames(self):
+        return self.datatable.shortDriverNames
+
+    def fullColumnNames(self):
         return self.datatable.driverNames
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
@@ -80,7 +84,7 @@ class TableModel(QtCore.QAbstractTableModel):
             return None
 
     def getColumnText(self, col):
-        return self.datatable.driverNames[col]
+        return self.datatable.shortDriverNames[col]
 
     def flags(self, index):
         if not index.isValid():
@@ -149,6 +153,17 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
 
 
 class MyHeaderView(QtWidgets.QHeaderView):
+    _colors = [
+        (161, 105, 48),
+        (159, 161, 48),
+        (104, 161, 48),
+        (48, 161, 93),
+        (48, 161, 161),
+        (48, 103, 161),
+        (111, 48, 161),
+        (161, 48, 105),
+    ]
+
     def __init__(self, colWidth=10, parent=None):
         super(MyHeaderView, self).__init__(QtCore.Qt.Horizontal, parent)
         self.colWidth = colWidth
@@ -157,6 +172,7 @@ class MyHeaderView(QtWidgets.QHeaderView):
         self._metrics = QtGui.QFontMetrics(self._font)
         self._descent = self._metrics.descent()
         self._margin = 5
+        self._colorDrawHeight = 20
         self.setSectionsClickable(True)
         self.setHighlightSections(True)
         self.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
@@ -173,6 +189,26 @@ class MyHeaderView(QtWidgets.QHeaderView):
         outClick = event.pos().x() > self.colWidth * nbShown
         if outClick:
             self.parent().clearSelection()
+        elif self.height() - event.pos().y() < 20:
+            index = self.visualIndexAt(event.pos().x())
+            self.setColor(event.pos(), index)
+
+    def color(self, ind):
+        return self._colors[
+            cmds.getAttr(self.model().fullColumnNames()[ind] + ".objectColor")
+        ]
+
+    def setColor(self, pos, index):
+        menu = ColorMenu(self)
+
+        pos = self.mapToGlobal(pos)  # + QtCore.QPoint(30,310)
+        menu.exec_(pos)
+
+        color = menu.color()
+        if color is None:
+            return
+        else:
+            cmds.setAttr(self.model().fullColumnNames()[index] + ".objectColor", color)
 
     def showMenu(self, pos):
         popMenu = QtWidgets.QMenu(self)
@@ -236,14 +272,21 @@ class MyHeaderView(QtWidgets.QHeaderView):
 
         painter.setBrush(QtGui.QBrush(QtGui.QColor(130, 130, 130)))
         painter.drawRect(x + 1, y - 1, rect.height() - 1, rect.width())
+
+        theColor = self.color(index)
+        painter.setBrush(QtGui.QBrush(QtGui.QColor(*theColor)))
+        painter.drawRect(x + 1, y - 1, 20, rect.width())
+
         painter.drawText(
-            -rect.height() + self._margin,
+            -rect.height() + self._margin + self._colorDrawHeight,
             rect.left() + (rect.width() + self._descent) / 2,
             data,
         )
 
     def sizeHint(self):
-        return QtCore.QSize(10, self._get_text_width() + 2 * self._margin)
+        return QtCore.QSize(
+            10, self._get_text_width() + 2 * self._margin + self._colorDrawHeight
+        )
 
     def _get_text_width(self):
         allMetrics = [
@@ -274,3 +317,39 @@ class TableView(QtWidgets.QTableView):
         self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
 
         # self.setUniformRowHeights (True)
+
+
+# -------------------------------------------------------------------------------
+# COLOR
+# -------------------------------------------------------------------------------
+class ColorMenu(QtWidgets.QMenu):
+    _colors = [
+        (161, 105, 48),
+        (159, 161, 48),
+        (104, 161, 48),
+        (48, 161, 93),
+        (48, 161, 161),
+        (48, 103, 161),
+        (111, 48, 161),
+        (161, 48, 105),
+    ]
+
+    def __init__(self, parent):
+        super(ColorMenu, self).__init__(parent)
+
+        self._color = None
+
+        self.setFixedWidth(20)
+
+        for index, color in enumerate(self._colors):
+            pixmap = QtGui.QPixmap(12, 12)
+            pixmap.fill(QtGui.QColor(*color))
+            act = self.addAction("")
+            act.setIcon(QtGui.QIcon(pixmap))
+            act.triggered.connect(partial(self.pickColor, index))
+
+    def pickColor(self, index):
+        self._color = index
+
+    def color(self):
+        return self._color
