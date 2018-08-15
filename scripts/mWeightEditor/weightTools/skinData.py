@@ -146,7 +146,7 @@ class DataOfSkin(object):
 
         # GET the sub ARRAY ---------------------------------------------------------------------------------
         self.sub2DArrayToSet = self.raw2dArray[Mtop : Mbottom + 1,]
-        self.orig2dArray = self.sub2DArrayToSet.copy()
+        self.orig2dArray = np.copy(self.sub2DArrayToSet)
 
         # Sum of lock and mask selection --------------------------------------------------------------------
         self.sumMasks = ~np.add(~maskSelection, lockedMask)
@@ -158,7 +158,6 @@ class DataOfSkin(object):
         # ---------------------------------------------------------------------------------------------
         # NOW Prepare for settingSkin Cluster ---------------------------------------------------------
         # ---------------------------------------------------------------------------------------------
-
         self.influenceIndices = OpenMaya.MIntArray()
         self.influenceIndices.setLength(self.nbDrivers)
         for i in range(self.nbDrivers):
@@ -407,14 +406,14 @@ class DataOfSkin(object):
 
     def actuallySetValue(
         self,
-        new2dArrayDiv,
+        theValues,
         sub2DArrayToSet,
         userComponents,
         influenceIndices,
         shapePath,
         sknFn,
     ):
-        arrayForSetting = np.copy(new2dArrayDiv)
+        arrayForSetting = np.copy(theValues)
         doubles = arrayForSetting.flatten()
         count = doubles.size
         tempArrayForSize = OpenMaya.MDoubleArray()
@@ -437,7 +436,7 @@ class DataOfSkin(object):
         )
 
         # do the stting in the 2dArray -----
-        np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), new2dArrayDiv)
+        np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), theValues)
         self.computeSumArray()
 
     def callUndo(self):
@@ -445,6 +444,7 @@ class DataOfSkin(object):
             print("UNDO")
             undoArgs = self.UNDOstack.pop()
             self.actuallySetValue(*undoArgs)
+
         else:
             print("No more undo")
 
