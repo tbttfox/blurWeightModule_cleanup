@@ -336,7 +336,7 @@ class DataOfSkin(object):
             self.sknFn,
         )
 
-    def setSkinData(self, val, percent=False, autoPrune=False):
+    def setSkinData(self, val, percent=False, autoPrune=False, average=False):
         # if percent : print "percent"
         with GlobalContext(message="setSkinData", doPrint=False):
             new2dArray = np.copy(self.orig2dArray)
@@ -356,18 +356,24 @@ class DataOfSkin(object):
             # add the values ------------------------------------------------------------------------------------------------
             theMask = sumMasksUpdate if val < 0.0 else self.sumMasks
 
-            if percent:
+            if not average and percent:  # percent Add
                 addValues = np.ma.array(selectArr, mask=~theMask, fill_value=0)
                 sum_addValues = addValues.sum(axis=1)
                 toMult = (sum_addValues + val) / sum_addValues
                 addValues = addValues * toMult[:, np.newaxis]
-            else:
+            elif not average:  # regular add -------------------
                 valuesToAdd = val / self.nbIndicesSettable[:, np.newaxis]
                 addValues = (
                     np.ma.array(selectArr, mask=~theMask, fill_value=0) + valuesToAdd
                 )
-            addValues = addValues.clip(min=0, max=1.0)
+            else:  # ----- average ---------
+                theMask = sumMasksUpdate
+                addValues = np.ma.array(selectArr, mask=~theMask, fill_value=0)
+                sumCols_addValues = addValues.mean(axis=0)
+                theTiling = np.tile(sumCols_addValues, (addValues.shape[0], 1))
+                addValues = np.ma.array(theTiling, mask=~theMask, fill_value=0)
 
+            addValues = addValues.clip(min=0, max=1.0)
             # normalize the sum to the max value unLocked -------------------------------------------------------------------
             sum_addValues = addValues.sum(axis=1)
             addValuesNormalized = (
@@ -387,8 +393,8 @@ class DataOfSkin(object):
                 addValuesNormalized,
                 where=sum_remainingData[:, np.newaxis] == 0.0,
             )
-
             sum_addValues = addValues.sum(axis=1)
+
             # non selected not locked Rest ---------------------------------------------------------------------------------------------
             restVals = self.toNormalizeToSum - sum_addValues
             toMult = restVals / sum_remainingData

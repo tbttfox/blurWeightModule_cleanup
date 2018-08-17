@@ -313,7 +313,9 @@ class SkinWeightWin(QtWidgets.QDialog):
         self.absBTN.toggled.connect(self.changeAddAbs)
         self.addPercBTN.toggled.connect(self.changeAddPerc)
         self.pruneWghtBTN.clicked.connect(self.pruneWeights)
-        self.normalizeBTN.clicked.connect(self.normalize)
+        self.normalizeBTN.clicked.connect(self.doNormalize)
+
+        self.averageBTN.clicked.connect(self.doAverage)
 
         # self.addPercBTN.setEnabled(False)
 
@@ -335,7 +337,7 @@ class SkinWeightWin(QtWidgets.QDialog):
         self._tm.endResetModel()
         self.retrieveSelection()
 
-    def normalize(self):
+    def doNormalize(self):
         chunks = self.getRowColumnsSelected()
         if not chunks:
             chunks = [
@@ -352,6 +354,11 @@ class SkinWeightWin(QtWidgets.QDialog):
 
         self._tm.endResetModel()
         self.retrieveSelection()
+
+    def doAverage(self):
+        self.prepareToSetValue()
+        self.doAddValue(0, forceAbsolute=False, average=True)
+        self.dataOfSkin.postSkinSet()
 
     def changeAddAbs(self, checked):
         self.widgetAbs.setVisible(False)
@@ -394,13 +401,16 @@ class SkinWeightWin(QtWidgets.QDialog):
             newSel, QtCore.QItemSelectionModel.ClearAndSelect
         )
 
-    def doAddValue(self, val, forceAbsolute=False):
+    def doAddValue(self, val, forceAbsolute=False, average=False):
         self.storeSelection()
         self._tm.beginResetModel()
 
         if self.valueSetter.addMode and not forceAbsolute:
             self.dataOfSkin.setSkinData(
-                val, percent=self.addPercentage, autoPrune=self.autoPrune
+                val,
+                percent=self.addPercentage,
+                autoPrune=self.autoPrune,
+                average=average,
             )
         else:
             self.dataOfSkin.absoluteVal(val)
