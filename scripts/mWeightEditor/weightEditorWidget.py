@@ -265,7 +265,10 @@ class SkinWeightWin(QtWidgets.QDialog):
 
         # -----------------------------------------------------------
         self.refreshBTN.clicked.connect(self.refreshBtn)
+
         self.smoothBTN.clicked.connect(self.smooth)
+        self.smoothBTN.clicked.connect(self.refreshBtn)
+
         self.absBTN.toggled.connect(self.changeAddAbs)
         self.addPercBTN.toggled.connect(self.changeAddPerc)
         self.pruneWghtBTN.clicked.connect(self.pruneWeights)
@@ -292,7 +295,22 @@ class SkinWeightWin(QtWidgets.QDialog):
         self.retrieveSelection()
 
     def normalize(self):
+        chunks = self.getRowColumnsSelected()
+        if not chunks:
+            chunks = [
+                (0, self.dataOfSkin.rowCount - 1, 0, self.dataOfSkin.columnCount - 1)
+            ]
+        actualyVisibleColumns = []
+
+        self.storeSelection()
+        self._tm.beginResetModel()
+
+        self.dataOfSkin.prepareValuesforSetSkinData(chunks, actualyVisibleColumns)
         self.dataOfSkin.normalize()
+        self.dataOfSkin.postSkinSet()
+
+        self._tm.endResetModel()
+        self.retrieveSelection()
 
     def changeAddAbs(self, checked):
         self.widgetAbs.setVisible(False)
