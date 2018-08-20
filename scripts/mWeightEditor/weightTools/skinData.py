@@ -93,10 +93,10 @@ class DataOfSkin(object):
         else:
             return listInds
 
-    def getIndicesFromSelection(self, sel):
+    def getIndicesFromSelection(self, sel, asList=True):
         selectedVertices = [el for el in sel if ".vtx[" in el]
         indices = [
-            el.split(".vtx[")[-1][:-1] for el in selectedVertices if ".vtx" in el
+            el.split(".vtx[")[-1][:-1] for el in selectedVertices if ".vtx[" in el
         ]
 
         for toSearch in [".f[", ".e["]:
@@ -108,7 +108,7 @@ class DataOfSkin(object):
                 kwargs["fe"] = True
             convertedVertices = cmds.polyListComponentConversion(selection, **kwargs)
             indices += [
-                el.split(".vtx[")[-1][:-1] for el in convertedVertices if ".vtx" in el
+                el.split(".vtx[")[-1][:-1] for el in convertedVertices if ".vtx[" in el
             ]
 
         allIndices = set()
@@ -118,7 +118,37 @@ class DataOfSkin(object):
                 allIndices.update(list(range(nmbs[0], nmbs[1] + 1)))
             else:
                 allIndices.add(int(index))
-        return sorted(list(allIndices))
+        if asList:
+            return sorted(list(allIndices))
+        else:
+            return allIndices
+
+    def getHalfVerticesOfSelection(self):
+        selectedVertices = cmds.ls(selection=True)
+        vertsIndices = self.getIndicesFromSelection(selectedVertices, asList=False)
+
+        cmds.ConvertSelectionToVertexPerimeter()
+        borderOfSelection = cmds.ls(selection=True)
+
+        newSel = cmds.polyListComponentConversion(
+            cmds.polyListComponentConversion(borderOfSelection, fromVertex=1, toEdge=1),
+            fromEdge=1,
+            toVertex=1,
+        )
+        newSelIndices = self.getIndicesFromSelection(newSel, asList=False)
+        listOfIndices = [newSelIndices]
+        breakPoint = 50
+        while not vertsIndices.issubset(newSelIndices):
+            newSel = cmds.polyListComponentConversion(
+                cmds.polyListComponentConversion(newSel, fromVertex=1, toEdge=1),
+                fromEdge=1,
+                toVertex=1,
+            )
+            newSelIndices = self.getIndicesFromSelection(newSel, asList=False)
+            listOfIndices.append(newSelIndices)
+            breakPoint -= 1
+            if breakPoint == 0:
+                break
 
     def getMObject(self, nodeName, returnDagPath=True):
         # We expect here the fullPath of a shape mesh
@@ -339,7 +369,9 @@ class DataOfSkin(object):
             self.sknFn,
         )
 
-    def setSkinData(self, val, percent=False, autoPrune=False, average=False):
+    def setSkinData(
+        self, val, percent=False, autoPrune=False, average=False, autoPruneValue=0.0001
+    ):
         # if percent : print "percent"
         with GlobalContext(message="setSkinData", doPrint=False):
             new2dArray = np.copy(self.orig2dArray)
@@ -370,6 +402,7 @@ class DataOfSkin(object):
                     np.ma.array(selectArr, mask=~theMask, fill_value=0) + valuesToAdd
                 )
             else:  # ----- average ---------
+                print("average")
                 theMask = sumMasksUpdate
                 addValues = np.ma.array(selectArr, mask=~theMask, fill_value=0)
                 sumCols_addValues = addValues.mean(axis=0)
@@ -410,10 +443,10 @@ class DataOfSkin(object):
                     remainingValues,
                     remainingValues.mask,
                     remainingValues.sum(axis=1),
-                    0.0001,
+                    autoPruneValue,
                 )
                 self.pruneOnArray(
-                    addValues, addValues.mask, addValues.sum(axis=1), 0.0001
+                    addValues, addValues.mask, addValues.sum(axis=1), autoPruneValue
                 )
 
             # add with the mask ---------------------------------------------------------------------------------------------
