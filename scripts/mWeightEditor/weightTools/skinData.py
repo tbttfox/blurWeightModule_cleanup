@@ -193,6 +193,8 @@ class DataOfSkin(object):
         self.maskColumns[:, hiddenColumns] = False
         # get the mask of the locks ------------------------------------------
         self.lockedMask = np.tile(self.lockedColumns, (nbRows, 1))
+
+        # self.selectedVertices = [self.vertices[ind+Mtop] for ind in range(nbRows) ]
         lockedRows = [
             ind
             for ind in range(nbRows)
@@ -305,6 +307,54 @@ class DataOfSkin(object):
             self.shapePath,
             self.sknFn,
         )
+
+    def reassignLocally(self, chunks, space="world"):
+        # print "reassignLocally"
+        # 0 get orig shape ----------------------------------------------------------------
+        (inMesh,) = cmds.listConnections(
+            self.theSkinCluster + ".input[0].inputGeometry",
+            source=True,
+            destination=False,
+            plugs=False,
+            connections=False,
+            skipConversionNodes=True,
+        )
+        origShape = cmds.ls(cmds.listHistory(inMesh), type="shape")[0]
+        # print origShape
+        # 1 get origin points position ------------------------------------------------------------
+        origMesh = OpenMaya.MFnMesh(self.getMObject(origShape, returnDagPath=True))
+        theSpace = (
+            OpenMaya.MSpace.kObject if space == "local" else OpenMaya.MSpace.kWorld
+        )
+        with GlobalContext():
+            vertPoints = OpenMaya.MPointArray()
+            origMesh.getPoints(vertPoints, theSpace)
+            # getRawPoints
+        # 2 get deformers origin position (bindMatrixInverse) -------------------------------
+        depNode = OpenMaya.MFnDependencyNode(self.skinClusterObj)
+        bindPreMatrixArrayPlug = depNode.findPlug("bindPreMatrix", True)
+        mObj = OpenMaya.MObject()
+        lstPositions = []
+        for ind in range(bindPreMatrixArrayPlug.numElements()):
+            preMatrixPlug = bindPreMatrixArrayPlug.elementByLogicalIndex(ind)
+            matFn = OpenMaya.MFnMatrixData(preMatrixPlug.asMObject())
+            mat = matFn.matrix()
+            position = OpenMaya.MPoint(0, 0, 0) * mat.inverse()
+            lstPositions.append(position)
+            # [res.x, res.y, res.z]
+        # 3 compute the distances
+
+        # better make an np array for that ----------------
+
+        # get the selected Vertices
+        theSelectedVertices = set()
+        for top, bottom, left, right in chunks:
+            theSelectedVertices.update(list(range(top, bottom + 1)))
+        theVertices = [self.vertices[ind] for ind in theSelectedVertices]
+
+        for vertInd in theVertices:
+            thePt = vertPoints[vertInd]
+            theDst = thePt.distanceTo(lstPositions[0])
 
     def absoluteVal(self, val):
         with GlobalContext(message="absoluteVal", doPrint=False):
@@ -764,6 +814,7 @@ class DataOfSkin(object):
             if cmds.objExists(self.driverNames[column])
         ]
         cmds.select(toSel)
+        cmds.selectMode(object=True)
 
     def selectVerts(self, selectedIndices):
         selectedVertices = set([self.vertices[ind] for ind in selectedIndices])
