@@ -170,18 +170,20 @@ class DataOfSkin(object):
         for top, bottom, left, right in chunks:
             lstTopBottom.append(top)
             lstTopBottom.append(bottom)
-        Mtop, Mbottom = min(lstTopBottom), max(lstTopBottom)
+        self.Mtop, Mbottom = min(lstTopBottom), max(lstTopBottom)
         # nb rows selected -------------
-        nbRows = Mbottom - Mtop + 1
+        nbRows = Mbottom - self.Mtop + 1
 
         # GET the sub ARRAY ---------------------------------------------------------------------------------
-        self.sub2DArrayToSet = self.raw2dArray[Mtop : Mbottom + 1,]
+        self.sub2DArrayToSet = self.raw2dArray[self.Mtop : Mbottom + 1,]
         self.orig2dArray = np.copy(self.sub2DArrayToSet)
 
         # GET the mask ARRAY ---------------------------------------------------------------------------------
         maskSelection = np.full(self.orig2dArray.shape, False, dtype=bool)
         for top, bottom, left, right in chunks:
-            maskSelection[top - Mtop : bottom - Mtop + 1, left : right + 1] = True
+            maskSelection[
+                top - self.Mtop : bottom - self.Mtop + 1, left : right + 1
+            ] = True
 
         maskOppSelection = ~maskSelection
         # remove from mask hiddenColumns indices ------------------------------------------------
@@ -193,12 +195,10 @@ class DataOfSkin(object):
         self.maskColumns[:, hiddenColumns] = False
         # get the mask of the locks ------------------------------------------
         self.lockedMask = np.tile(self.lockedColumns, (nbRows, 1))
-
-        # self.selectedVertices = [self.vertices[ind+Mtop] for ind in range(nbRows) ]
         lockedRows = [
             ind
             for ind in range(nbRows)
-            if self.vertices[ind + Mtop] in self.lockedVertices
+            if self.vertices[ind + self.Mtop] in self.lockedVertices
         ]
         self.lockedMask[lockedRows] = True
 
@@ -225,7 +225,9 @@ class DataOfSkin(object):
         fnComponent = OpenMaya.MFnSingleIndexedComponent()
         self.userComponents = fnComponent.create(componentType)
 
-        indicesVertices = [self.vertices[indRow] for indRow in range(Mtop, Mbottom + 1)]
+        indicesVertices = [
+            self.vertices[indRow] for indRow in range(self.Mtop, Mbottom + 1)
+        ]
         for ind in indicesVertices:
             fnComponent.addElement(ind)
 
@@ -308,53 +310,84 @@ class DataOfSkin(object):
             self.sknFn,
         )
 
-    def reassignLocally(self, chunks, space="world"):
+    def reassignLocally(self, space="world"):
         # print "reassignLocally"
-        # 0 get orig shape ----------------------------------------------------------------
-        (inMesh,) = cmds.listConnections(
-            self.theSkinCluster + ".input[0].inputGeometry",
-            source=True,
-            destination=False,
-            plugs=False,
-            connections=False,
-            skipConversionNodes=True,
-        )
-        origShape = cmds.ls(cmds.listHistory(inMesh), type="shape")[0]
-        # print origShape
-        # 1 get origin points position ------------------------------------------------------------
-        origMesh = OpenMaya.MFnMesh(self.getMObject(origShape, returnDagPath=True))
-        theSpace = (
-            OpenMaya.MSpace.kObject if space == "local" else OpenMaya.MSpace.kWorld
-        )
-        with GlobalContext():
+        with GlobalContext(message="reassignLocally", doPrint=True):
+            # 0 get orig shape ----------------------------------------------------------------
+            (inMesh,) = cmds.listConnections(
+                self.theSkinCluster + ".input[0].inputGeometry",
+                source=True,
+                destination=False,
+                plugs=False,
+                connections=False,
+                skipConversionNodes=True,
+            )
+            origShape = cmds.ls(cmds.listHistory(inMesh), type="shape")[0]
+
+            # 1 get origin points position -------------------------------------------------------------------
+            origMesh = OpenMaya.MFnMesh(self.getMObject(origShape, returnDagPath=True))
+            theSpace = (
+                OpenMaya.MSpace.kObject if space == "local" else OpenMaya.MSpace.kWorld
+            )
             vertPoints = OpenMaya.MPointArray()
             origMesh.getPoints(vertPoints, theSpace)
             # getRawPoints
-        # 2 get deformers origin position (bindMatrixInverse) -------------------------------
-        depNode = OpenMaya.MFnDependencyNode(self.skinClusterObj)
-        bindPreMatrixArrayPlug = depNode.findPlug("bindPreMatrix", True)
-        mObj = OpenMaya.MObject()
-        lstPositions = []
-        for ind in range(bindPreMatrixArrayPlug.numElements()):
-            preMatrixPlug = bindPreMatrixArrayPlug.elementByLogicalIndex(ind)
-            matFn = OpenMaya.MFnMatrixData(preMatrixPlug.asMObject())
-            mat = matFn.matrix()
-            position = OpenMaya.MPoint(0, 0, 0) * mat.inverse()
-            lstPositions.append(position)
-            # [res.x, res.y, res.z]
-        # 3 compute the distances
 
-        # better make an np array for that ----------------
+            # 2 get deformers origin position (bindMatrixInverse) ---------------------------------------------
+            depNode = OpenMaya.MFnDependencyNode(self.skinClusterObj)
+            bindPreMatrixArrayPlug = depNode.findPlug("bindPreMatrix", True)
+            mObj = OpenMaya.MObject()
+            lstDriverPrePosition = []
+            for ind in range(bindPreMatrixArrayPlug.numElements()):
+                preMatrixPlug = bindPreMatrixArrayPlug.elementByLogicalIndex(ind)
+                matFn = OpenMaya.MFnMatrixData(preMatrixPlug.asMObject())
+                mat = matFn.matrix()
+                position = OpenMaya.MPoint(0, 0, 0) * mat.inverse()
+                lstDriverPrePosition.append(position)
+                # [res.x, res.y, res.z]
 
-        # get the selected Vertices
-        theSelectedVertices = set()
-        for top, bottom, left, right in chunks:
-            theSelectedVertices.update(list(range(top, bottom + 1)))
-        theVertices = [self.vertices[ind] for ind in theSelectedVertices]
+            # 3 make an array of distances -----------------------------------------------------------------------
+            selectArr = np.copy(self.orig2dArray)
+            theMask = self.sumMasks
 
-        for vertInd in theVertices:
-            thePt = vertPoints[vertInd]
-            theDst = thePt.distanceTo(lstPositions[0])
+            addValues = np.ma.array(selectArr, mask=~theMask, fill_value=0)
+
+            rows = addValues.shape[0]
+            cols = addValues.shape[1]
+            for x in range(0, rows):
+                indexVertex = self.vertices[x + self.Mtop]
+                thePt = vertPoints[indexVertex]
+                for y in range(0, cols):
+                    if theMask[x, y]:
+                        theDst = thePt.distanceTo(lstDriverPrePosition[y])
+                        addValues[x, y] = theDst
+
+            # 4 normalize it  ----------------------------------------------------------------------------------------
+            addValues = addValues.max(axis=1)[:, np.newaxis] / addValues
+            sum_addValues = addValues.sum(axis=1)
+            addValuesNormalized = (
+                addValues
+                / sum_addValues[:, np.newaxis]
+                * self.toNormalizeToSum[:, np.newaxis]
+            )
+
+            # 5 copy values  ----------------------------------------------------------------------------------------
+            new2dArray = np.copy(self.orig2dArray)
+            np.copyto(new2dArray, addValuesNormalized, where=theMask)
+
+            # 6 zero rest array--------------------------------------------------------------------------------------
+            ZeroVals = np.full(self.orig2dArray.shape, 0.0)
+            np.copyto(new2dArray, ZeroVals, where=self.rmMasks)
+
+        # set Value ------------------------------------------------
+        self.actuallySetValue(
+            new2dArray,
+            self.sub2DArrayToSet,
+            self.userComponents,
+            self.influenceIndices,
+            self.shapePath,
+            self.sknFn,
+        )
 
     def absoluteVal(self, val):
         with GlobalContext(message="absoluteVal", doPrint=False):
