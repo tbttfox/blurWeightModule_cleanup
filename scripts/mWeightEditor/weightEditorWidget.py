@@ -587,6 +587,7 @@ class SkinWeightWin(QtWidgets.QDialog):
         if not resultData:
             self.highlightSelectedDeformers()
         self._tv.HHeaderView.selEmptied.emit(False)
+        self._tv.repaint()
 
     def setColumnVisSize(self):
         if self.dataOfSkin.columnCount:
