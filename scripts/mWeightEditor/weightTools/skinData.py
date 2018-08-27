@@ -29,6 +29,79 @@ class DataOfSkin(object):
     def __init__(self, useShortestNames=False):
         self.useShortestNames = useShortestNames
         self.clearData()
+        sel = cmds.ls(selection=True)
+        hil = cmds.ls(hilite=True)
+        self.createDisplayLocator()
+        cmds.select(sel)
+        cmds.hilite(hil)
+
+    def createDisplayLocator(self):
+        self.pointsDisplayTrans = None
+        if not cmds.pluginInfo("pointsDisplay", query=True, loaded=True):
+            cmds.loadPlugin("pointsDisplay")
+
+        self.pointsDisplayTrans = cmds.createNode(
+            "transform", name="MSkinWeightEditorDisplay"
+        )
+        pointsDisplayNode = cmds.createNode(
+            "pointsDisplay", parent=self.pointsDisplayTrans
+        )
+        meshConnected = cmds.createNode("mesh", parent=self.pointsDisplayTrans)
+        cmds.setAttr(meshConnected + ".v", False)
+        cmds.setAttr(meshConnected + ".ihi", False)
+        cmds.connectAttr(
+            meshConnected + ".outMesh", pointsDisplayNode + ".inMesh", force=True
+        )
+        cmds.setAttr(pointsDisplayNode + ".pointWidth", 6)
+        cmds.setAttr(pointsDisplayNode + ".inputColor", 0.0, 1.0, 1.0)
+
+        for nd in [self.pointsDisplayTrans, pointsDisplayNode, meshConnected]:
+            cmds.setAttr(nd + ".hiddenInOutliner", True)
+
+    def deleteDisplayLocator(self):
+        if cmds.objExists(self.pointsDisplayTrans):
+            cmds.delete(self.pointsDisplayTrans)
+
+    def connectDisplayLocator(self):
+        if cmds.objExists(self.pointsDisplayTrans):
+            self.updateDisplayVerts([])
+            (meshConnected,) = cmds.listRelatives(
+                self.pointsDisplayTrans, path=True, type="mesh"
+            )
+            inConn = cmds.listConnections(
+                meshConnected + ".inMesh",
+                source=True,
+                destination=False,
+                plugs=True,
+                skipConversionNodes=True,
+            )
+            if inConn:
+                cmds.disconnectAttr(inConn[0], meshConnected + ".inMesh")
+            if cmds.nodeType(self.deformedShape) == "mesh":
+                cmds.connectAttr(
+                    self.deformedShape + ".outMesh",
+                    meshConnected + ".inMesh",
+                    force=True,
+                )
+
+    def updateDisplayVerts(self, rowsSel):
+        if cmds.objExists(self.pointsDisplayTrans):
+            (pointsDisplayNode,) = cmds.listRelatives(
+                self.pointsDisplayTrans, path=True, type="pointsDisplay"
+            )
+            if rowsSel:
+                selVertices = self.orderMelList([self.vertices[ind] for ind in rowsSel])
+                inList = ["vtx[{0}]".format(el) for el in selVertices]
+            else:
+                inList = []
+            if cmds.objExists(pointsDisplayNode):
+                cmds.setAttr(
+                    pointsDisplayNode + ".inputComponents",
+                    *([len(inList)] + inList),
+                    type="componentList",
+                )
+
+    ###################################################################################
 
     def orderMelList(self, listInd, onlyStr=True):
         # listInd = [49, 60, 61, 62, 80, 81, 82, 83, 100, 101, 102, 103, 113, 119, 120, 121, 138, 139, 140, 158, 159, 178, 179, 198, 230, 231, 250, 251, 252, 270, 271, 272, 273, 274, 291, 292, 293, 319, 320, 321, 360,361,362]
@@ -71,6 +144,8 @@ class DataOfSkin(object):
             return listIndString
         else:
             return listInds
+
+            # print selVertices
 
     def getIndicesFromSelection(self, sel, asList=True):
         selectedVertices = [el for el in sel if ".vtx[" in el]
@@ -875,6 +950,8 @@ class DataOfSkin(object):
         if not theSkinCluster:
             self.clearData()
             return False
+
+        self.connectDisplayLocator()
 
         # get orig vertices -------------------------------
         self.driverNames, self.skinningMethod, self.normalizeWeights = (
