@@ -1,6 +1,7 @@
 # https://github.com/chadmv/cmt/blob/master/scripts/cmt/deform/skinio.py
 
 from maya import OpenMayaUI, OpenMaya, OpenMayaAnim
+from functools import partial
 
 # import shiboken2 as shiboken
 import time, datetime
@@ -274,6 +275,13 @@ class DataOfSkin(object):
         # cmds.xform (origShape+".vtx [152]", q=True,ws=True, t=True )
 
     def prepareValuesforSetSkinData(self, chunks, actualyVisibleColumns):
+        # first check if connected  ---------------------------------------------------
+        self.getConnectedBlurskinDisplay()
+        if self.blurSkinNode:
+            cmds.disconnectAttr(
+                self.blurSkinNode + ".weightList", self.theSkinCluster + ".weightList"
+            )
+
         # MASK selection array -----------------------------------
         lstTopBottom = []
         for top, bottom, left, right in chunks:
@@ -331,7 +339,7 @@ class DataOfSkin(object):
         for i in range(self.nbDrivers):
             self.influenceIndices.set(i, i)
 
-        indicesVertices = [
+        self.indicesVertices = [
             self.vertices[indRow] for indRow in range(self.Mtop, self.Mbottom + 1)
         ]
         self.indicesWeights = np.array(
@@ -345,7 +353,7 @@ class DataOfSkin(object):
             componentType = OpenMaya.MFn.kSurfaceCVComponent
             fnComponent = OpenMaya.MFnDoubleIndexedComponent()
             self.userComponents = fnComponent.create(componentType)
-            for indVtx in indicesVertices:
+            for indVtx in self.indicesVertices:
                 indexV = indVtx % self.numCVsInV_
                 indexU = indVtx / self.numCVsInV_
                 fnComponent.addElement(indexU, indexV)
@@ -356,7 +364,7 @@ class DataOfSkin(object):
                 componentType = OpenMaya.MFn.kMeshVertComponent
             fnComponent = OpenMaya.MFnSingleIndexedComponent()
             self.userComponents = fnComponent.create(componentType)
-            for ind in indicesVertices:
+            for ind in self.indicesVertices:
                 fnComponent.addElement(ind)
 
         lengthArray = self.nbDrivers * (bottom - top + 1)
@@ -724,6 +732,21 @@ class DataOfSkin(object):
         cmds.setAttr(self.theSkinCluster + ".normalizeWeights", self.normalizeWeights)
         self.storeUndoStack()
 
+        # if connected  ---------------------------------------------------
+        if self.blurSkinNode:
+            # set the vertices
+            if self.indicesVertices:
+                selVertices = self.orderMelList(self.indicesVertices)
+                inList = ["vtx[{0}]".format(el) for el in selVertices]
+                if cmds.objExists(self.blurSkinNode):
+                    cmds.setAttr(
+                        self.blurSkinNode + ".inputComponents",
+                        *([len(inList)] + inList),
+                        type="componentList",
+                    )
+
+            # cmds.evalDeferred (partial(cmds.connectAttr, self.blurSkinNode+".weightList", self.theSkinCluster+".weightList", f=True))
+
     def storeUndoStack(self):
         # add to the Undo stack -----------------------------------------
         undoArray = np.copy(self.orig2dArray)
@@ -787,7 +810,6 @@ class DataOfSkin(object):
             print("UNDO")
             undoArgs = self.UNDOstack.pop()
             self.actuallySetValue(*undoArgs)
-
         else:
             print("No more undo")
 
@@ -933,7 +955,8 @@ class DataOfSkin(object):
         self.computeSumArray()
 
     def computeSumArray(self):
-        self.sumArray = self.raw2dArray.sum(axis=1)
+        if self.raw2dArray != None:
+            self.sumArray = self.raw2dArray.sum(axis=1)
 
     def getShortNames(self):
         self.shortDriverNames = []
@@ -974,6 +997,18 @@ class DataOfSkin(object):
         self.fullShapeIsUsed = False
 
         self.UNDOstack = []
+
+    def getConnectedBlurskinDisplay(self):
+        self.blurSkinNode = ""
+        if cmds.objExists(self.theSkinCluster):
+            inConn = cmds.listConnections(
+                self.theSkinCluster + ".weightList",
+                source=True,
+                destination=False,
+                type="blurSkinDisplay",
+            )
+            if inConn:
+                self.blurSkinNode = inConn[0]
 
     def getAllData(self):
         sel = cmds.ls(selection=True)
