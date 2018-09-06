@@ -284,7 +284,8 @@ class DataOfSkin(object):
         nbRows = self.Mbottom - self.Mtop + 1
 
         # GET the sub ARRAY ---------------------------------------------------------------------------------
-        self.sub2DArrayToSet = self.raw2dArray[self.Mtop : self.Mbottom + 1,]
+        # self.sub2DArrayToSet = self.raw2dArray [self.Mtop:self.Mbottom+1,]
+        self.sub2DArrayToSet = self.display2dArray[self.Mtop : self.Mbottom + 1,]
         self.orig2dArray = np.copy(self.sub2DArrayToSet)
 
         # GET the mask ARRAY ---------------------------------------------------------------------------------
@@ -747,7 +748,10 @@ class DataOfSkin(object):
         sknFn,
     ):
         with GlobalContext(message="actuallySetValue", doPrint=False):
-            arrayForSetting = np.copy(theValues)
+            if self.softOn:
+                arrayForSetting = np.copy(theValues[self.opposite_sortedIndices])
+            else:
+                arrayForSetting = np.copy(theValues)
             doubles = arrayForSetting.flatten()
             count = doubles.size
             tempArrayForSize = OpenMaya.MDoubleArray()
@@ -915,8 +919,14 @@ class DataOfSkin(object):
             arr = np.ctypeslib.as_array(cta)
             self.raw2dArray = np.copy(arr)
             self.raw2dArray = np.reshape(self.raw2dArray, (-1, self.nbDrivers))
+        # ---- reorder --------------------------------------------
+        if self.softOn:  # order with indices
+            self.display2dArray = self.raw2dArray[self.sortedIndices]
+        else:
+            self.display2dArray = self.raw2dArray
 
         # now find the zeroColumns ------------------------------------
+
         myAny = np.any(self.raw2dArray, axis=0)
         self.usedDeformersIndices = np.where(myAny)[0]
         self.hideColumnIndices = np.where(~myAny)[0]
@@ -948,6 +958,10 @@ class DataOfSkin(object):
         self.rowText = []
         self.skinningMethod = ""
         self.normalizeWeights = []
+
+        # for soft order ----------------
+        self.sortedIndices = []
+        self.opposite_sortedIndices = []
 
         self.lockedColumns = []
         self.lockedVertices = []
@@ -999,19 +1013,25 @@ class DataOfSkin(object):
                 self.vertices, self.verticesWeight = res
                 arr = np.argsort(self.verticesWeight)
                 self.sortedIndices = arr[::-1]
-                """
-                self.vertices = [self.vertices[ind] for ind in sortedIndices]
-                self.verticesWeight = [self.verticesWeight[ind] for ind in sortedIndices]
-                """
+                self.opposite_sortedIndices = np.argsort(self.sortedIndices)
+                # do the sorting
+                self.vertices = [self.vertices[ind] for ind in self.sortedIndices]
+                self.verticesWeight = [
+                    self.verticesWeight[ind] for ind in self.sortedIndices
+                ]
             else:
                 self.vertices = res
                 self.verticesWeight = [1.0] * len(self.vertices)
+                self.sortedIndices = list(range(len(self.vertices)))
+                self.opposite_sortedIndices = list(range(len(self.vertices)))
 
             if not self.vertices:
                 self.vertices = cmds.getAttr(
                     "{0}.weightList".format(self.theSkinCluster), multiIndices=True
                 )
                 self.verticesWeight = [1.0] * len(self.vertices)
+                self.sortedIndices = list(range(len(self.vertices)))
+                self.opposite_sortedIndices = list(range(len(self.vertices)))
                 self.softOn = 0
                 self.fullShapeIsUsed = True
                 self.rawSkinValues = self.exposeSkinData(self.theSkinCluster)
@@ -1122,12 +1142,12 @@ class DataOfSkin(object):
         )
 
     def getValue(self, row, column):
-        # return self.raw2dArray [row][column] if self.raw2dArray !=None else self.rawSkinValues [row*self.nbDrivers+column]
         return (
-            self.raw2dArray[row][column]
+            self.display2dArray[row][column]
             if column < self.nbDrivers
             else self.sumArray[row]
         )
+        # return self.raw2dArray [row][column] if column < self.nbDrivers else self.sumArray [row]
 
     def setValue(self, row, column, value):
         vertexIndex = self.vertices[row]
