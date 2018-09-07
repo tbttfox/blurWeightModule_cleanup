@@ -52,35 +52,41 @@ class BrushFunctions:
     def addColorNode(self):
         sel = cmds.ls(selection=True, transforms=True)
         msh = cmds.listRelatives(sel, type="mesh")
-        cmds.setAttr(msh[0] + ".displayColors", True)
 
         hist = cmds.listHistory(sel, levels=0, pruneDagObjects=True)
         if hist:
             skinClusters = cmds.ls(hist, type="skinCluster")
             if skinClusters:
                 skinCluster = skinClusters[0]
-                skinConn, inConn = cmds.listConnections(
-                    skinCluster + ".input[0].inputGeometry",
-                    source=True,
-                    destination=False,
-                    plugs=True,
-                    connections=True,
-                    skipConversionNodes=False,
-                )
+                return self.doAddColorNode(msh[0], skinCluster)
+        return ""
 
-                self.bsd = cmds.createNode("blurSkinDisplay")
+    def doAddColorNode(self, msh, skinCluster):
+        cmds.setAttr(msh + ".displayColors", True)
 
-                cmds.connectAttr(inConn, self.bsd + ".inMesh", force=True)
-                cmds.connectAttr(self.bsd + ".outMesh", skinConn, force=True)
+        skinConn, inConn = cmds.listConnections(
+            skinCluster + ".input[0].inputGeometry",
+            source=True,
+            destination=False,
+            plugs=True,
+            connections=True,
+            skipConversionNodes=False,
+        )
 
-                cmds.evalDeferred(
-                    partial(
-                        cmds.connectAttr,
-                        self.bsd + ".weightList",
-                        skinCluster + ".weightList",
-                        f=True,
-                    )
-                )
+        self.bsd = cmds.createNode("blurSkinDisplay")
+
+        cmds.connectAttr(inConn, self.bsd + ".inMesh", force=True)
+        cmds.connectAttr(self.bsd + ".outMesh", skinConn, force=True)
+
+        cmds.evalDeferred(
+            partial(
+                cmds.connectAttr,
+                self.bsd + ".weightList",
+                skinCluster + ".weightList",
+                f=True,
+            )
+        )
+
         return self.bsd
 
     def setPaintMode(self, mode):
