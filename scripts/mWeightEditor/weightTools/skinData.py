@@ -1010,7 +1010,7 @@ class DataOfSkin(object):
             if inConn:
                 self.blurSkinNode = inConn[0]
 
-    def getAllData(self):
+    def getAllData(self, displayLocator=True):
         sel = cmds.ls(selection=True)
         theSkinCluster, deformedShape = self.getSkinClusterFromSel(sel)
         if not theSkinCluster:
@@ -1033,7 +1033,8 @@ class DataOfSkin(object):
             self.clearData()
             return False
 
-        self.connectDisplayLocator()
+        if displayLocator:
+            self.connectDisplayLocator()
 
         # get orig vertices -------------------------------
         self.driverNames, self.skinningMethod, self.normalizeWeights = (
