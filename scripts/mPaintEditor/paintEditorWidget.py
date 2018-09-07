@@ -16,6 +16,11 @@ from mWeightEditor.tools.spinnerSlider import ValueSetting, ButtonWithValue
 from tools.brushFunctions import BrushFunctions
 
 
+class ValueSettingPE(ValueSetting):
+    def doSet(self, theVal):
+        self.mainWindow.value = theVal
+
+
 def getIcon(iconNm):
     fileVar = os.path.realpath(__file__)
     uiFolder, filename = os.path.split(fileVar)
@@ -161,6 +166,10 @@ class SkinPaintWin(QtWidgets.QDialog):
         if vals:
             self.move(vals[0], vals[1])
             self.resize(vals[2], vals[3])
+        if len(vals) > 4:
+            self.changeCommand(vals[4])
+            thebtn = self.__dict__[self.commandArray[vals[4]] + "_btn"]
+            thebtn.setChecked(True)
 
     def addCallBacks(self):
         self.refreshSJ = cmds.scriptJob(event=["SelectionChanged", self.refresh])
@@ -172,10 +181,36 @@ class SkinPaintWin(QtWidgets.QDialog):
         """
 
     def deleteCallBacks(self):
-        self.brushFunctions.deleteTheJobs(toSearch="function callAfterPaint")
+        self.brushFunctions.deleteTheJobs()
         # self.dataOfSkin.deleteDisplayLocator ()
         cmds.scriptJob(kill=self.refreshSJ, force=True)
         # for callBck in self.close_callback : OpenMaya.MSceneMessage.removeCallback(callBck)
+
+    commandIndex = -1
+    value = 1.0
+    commandArray = ["add", "rmv", "addPerc", "abs", "smooth", "sharpen"]
+
+    def storePrevCommandValue(self):
+        if self.commandIndex != -1:
+            nmPrev = self.commandArray[self.commandIndex]
+            cmds.optionVar(floatValue=[nmPrev + "_SkinPaintWin", self.value])
+            return nmPrev
+        return "-1"
+
+    def changeCommand(self, newCommand):
+        nmPrev = self.storePrevCommandValue()
+
+        nmNew = self.commandArray[newCommand]
+        optionVarName = nmNew + "_SkinPaintWin"
+        newCommandValue = (
+            cmds.optionVar(query=optionVarName)
+            if cmds.optionVar(exists=optionVarName)
+            else 1.0
+        )
+
+        # print nmPrev, " = ",self.value, "  | ", nmNew ," = ", newCommandValue
+        self.commandIndex = newCommand
+        self.doAddValue(newCommandValue)
 
     def closeEvent(self, event):
         self.deleteCallBacks()
@@ -184,11 +219,13 @@ class SkinPaintWin(QtWidgets.QDialog):
         cmds.optionVar(clearArray="SkinPaintWindow")
         for el in pos.x(), pos.y(), size.width(), size.height():
             cmds.optionVar(intValueAppend=("SkinPaintWindow", el))
-
+        cmds.optionVar(intValueAppend=("SkinPaintWindow", self.commandIndex))
+        self.storePrevCommandValue()
         # self.headerView.deleteLater()
         super(SkinPaintWin, self).closeEvent(event)
 
     def doAddValue(self, val):
+        self.value = val
         self.valueSetter.theProgress.applyVal(val)
 
     def addButtonsDirectSet(self, lstBtns):
@@ -262,6 +299,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             step=1,
             clickable=False,
             minHeight=20,
+            addSpace=False,
         )
         self.depthBTN = ButtonWithValue(
             self.buttonWidg,
@@ -273,15 +311,18 @@ class SkinPaintWin(QtWidgets.QDialog):
             step=1,
             clickable=False,
             minHeight=20,
+            addSpace=False,
         )
         self.smoothOption_lay.addWidget(self.repeatBTN)
         self.smoothOption_lay.addWidget(self.depthBTN)
 
         self.uiInfluenceTREE.itemSelectionChanged.connect(self.influenceSelChanged)
 
-        for ind, nm in enumerate(["add", "rmv", "addPerc", "abs", "smooth", "sharpen"]):
+        for ind, nm in enumerate(self.commandArray):
             thebtn = self.__dict__[nm + "_btn"]
             thebtn.clicked.connect(partial(self.brushFunctions.setPaintMode, ind))
+            thebtn.clicked.connect(partial(self.changeCommand, ind))
+
         self.smooth_btn.toggled.connect(self.updateOptionEnable)
         self.sharpen_btn.toggled.connect(self.updateOptionEnable)
         self.updateOptionEnable(True)
@@ -289,7 +330,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         for nm in ["lock", "refresh", "pinSelection"]:
             self.__dict__[nm + "_btn"].setText("")
 
-        self.valueSetter = ValueSetting(self)
+        self.valueSetter = ValueSettingPE(self)
         self.valueSetter.setAddMode(False, autoReset=False)
         Hlayout = QtWidgets.QHBoxLayout(self)
         Hlayout.setContentsMargins(0, 0, 0, 0)
@@ -315,6 +356,9 @@ class SkinPaintWin(QtWidgets.QDialog):
     # artAttrSkinPaintCtx
     # --------------------------------------------------------------
     def pickMaxInfluence(self):
+        currContext = cmds.currentCtx()
+        self.inPainting = currContext == "artAttrContext"
+
         ctxArgs = {
             "title": "Select vertex influence",
             #'finalCommandScript ':"python (\"finishTheSelection()\");",
@@ -374,11 +418,20 @@ class SkinPaintWin(QtWidgets.QDialog):
                         self.uiInfluenceTREE.setCurrentItem(itemDeformer)
                     # theCommand = "selectMode -object;ArtPaintSkinWeightsToolOptions;setSmoothSkinInfluence {0};artSkinRevealSelected artAttrSkinPaintCtx;".format (maxInfluence)
                     # cmds.evalDeferred( partial ( mel.eval ,theCommand))
-                    cmds.evalDeferred(
-                        partial(
-                            mel.eval, "changeSelectMode -hierarchical;setToolTo $gMove;"
+                    if self.inPainting:
+                        cmds.evalDeferred(
+                            partial(
+                                mel.eval,
+                                "changeSelectMode -hierarchical;ArtPaintAttrTool;",
+                            )
                         )
-                    )
+                    else:
+                        cmds.evalDeferred(
+                            partial(
+                                mel.eval,
+                                "changeSelectMode -hierarchical;setToolTo $gMove;",
+                            )
+                        )
 
     def selectedInfluences(self):
         return [item.influence() for item in self.uiInfluenceTREE.selectedItems()]
