@@ -20,6 +20,10 @@ class ValueSettingPE(ValueSetting):
     def doSet(self, theVal):
         self.mainWindow.value = theVal
 
+    def postSet(self):
+        if cmds.currentCtx() == "artAttrContext":
+            cmds.artAttrCtx("artAttrContext", edit=True, value=self.mainWindow.value)
+
 
 def getIcon(iconNm):
     fileVar = os.path.realpath(__file__)
@@ -208,9 +212,9 @@ class SkinPaintWin(QtWidgets.QDialog):
             else 1.0
         )
 
-        # print nmPrev, " = ",self.value, "  | ", nmNew ," = ", newCommandValue
+        print(nmPrev, " = ", self.value, "  | ", nmNew, " = ", newCommandValue)
         self.commandIndex = newCommand
-        self.doAddValue(newCommandValue)
+        self.setBrushValue(newCommandValue)
 
     def closeEvent(self, event):
         self.deleteCallBacks()
@@ -224,7 +228,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         # self.headerView.deleteLater()
         super(SkinPaintWin, self).closeEvent(event)
 
-    def doAddValue(self, val):
+    def setBrushValue(self, val):
         self.value = val
         self.valueSetter.theProgress.applyVal(val)
 
@@ -237,9 +241,7 @@ class SkinPaintWin(QtWidgets.QDialog):
 
         for theVal in lstBtns:
             newBtn = QtWidgets.QPushButton("{0:.0f}".format(theVal))
-
-            newBtn.clicked.connect(partial(self.doAddValue, theVal / 100.0))
-
+            newBtn.clicked.connect(partial(self.setBrushValue, theVal / 100.0))
             carryWidgLayoutlayout.addWidget(newBtn)
         theCarryWidget.setMaximumSize(self.maxWidthCentralWidget, 14)
 
@@ -259,6 +261,14 @@ class SkinPaintWin(QtWidgets.QDialog):
             self.pinSelection_btn.setIcon(_icons["pinOff"])
         self.unPin = not val
 
+    def transferValues(self):
+        self.brushFunctions.setPaintMode(self.commandIndex)
+        cmds.artAttrCtx("artAttrContext", edit=True, value=self.value)
+        self.brushFunctions.setSmoothOptions(
+            self.repeatBTN.precision, self.depthBTN.precision
+        )
+        self.influenceSelChanged()
+
     def enterPaint(self):
         self.brushFunctions.setColorsOnJoints()
         if self.dataOfSkin.theSkinCluster:
@@ -268,11 +278,15 @@ class SkinPaintWin(QtWidgets.QDialog):
                     self.dataOfSkin.deformedShape, self.dataOfSkin.theSkinCluster
                 )
             self.brushFunctions.enterPaint()
+            self.transferValues()
 
     def updateOptionEnable(self, toggleValue):
         setOn = self.smooth_btn.isChecked() or self.sharpen_btn.isChecked()
         for btn in [self.repeatBTN, self.depthBTN]:
             btn.setEnabled(setOn)
+
+    def smoothValueUpdate(self, val, nm):
+        print(nm, val)
 
     def createWindow(self):
         self.unLock = True
@@ -316,6 +330,13 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.smoothOption_lay.addWidget(self.repeatBTN)
         self.smoothOption_lay.addWidget(self.depthBTN)
 
+        self.repeatBTN._valueChanged.connect(
+            partial(self.smoothValueUpdate, "smoothRepeat")
+        )
+        self.depthBTN._valueChanged.connect(
+            partial(self.smoothValueUpdate, "smoothDepth")
+        )
+
         self.uiInfluenceTREE.itemSelectionChanged.connect(self.influenceSelChanged)
 
         for ind, nm in enumerate(self.commandArray):
@@ -336,7 +357,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         Hlayout.setContentsMargins(0, 0, 0, 0)
         Hlayout.setSpacing(0)
         Hlayout.addWidget(self.valueSetter)
-        self.valueSetter.setMaximumWidth(self.maxWidthCentralWidget)
+        self.valueSetter.setMaximumSize(self.maxWidthCentralWidget, 18)
 
         self.widgetAbs = self.addButtonsDirectSet(
             [0, 10, 25, 100.0 / 3, 50, 200 / 3.0, 75, 90, 100]
@@ -358,6 +379,11 @@ class SkinPaintWin(QtWidgets.QDialog):
     def pickMaxInfluence(self):
         currContext = cmds.currentCtx()
         self.inPainting = currContext == "artAttrContext"
+        self.softOn = cmds.softSelect(query=True, softSelectEnabled=True)
+        if self.softOn:
+            cmds.softSelect(edit=True, softSelectEnabled=False)
+        self.currentSel = cmds.select(clear=True)
+        # cmds.select (cl=True)
 
         ctxArgs = {
             "title": "Select vertex influence",
@@ -433,6 +459,9 @@ class SkinPaintWin(QtWidgets.QDialog):
                             )
                         )
 
+        if self.softOn:
+            cmds.softSelect(edit=True, softSelectEnabled=True)
+
     def selectedInfluences(self):
         return [item.influence() for item in self.uiInfluenceTREE.selectedItems()]
 
@@ -452,15 +481,17 @@ class SkinPaintWin(QtWidgets.QDialog):
         # self.retrieveSelection ()
 
     def refresh(self, force=False):
-        self.dataOfSkin.getAllData(displayLocator=False)
-        self.brushFunctions.bsd = self.dataOfSkin.getConnectedBlurskinDisplay()
-        self.uiInfluenceTREE.clear()
-        for nm in self.dataOfSkin.driverNames:  # .shortDriverNames :
-            jointItem = InfluenceTreeWidgetItem(nm)
-            # jointItem =  QtWidgets.QTreeWidgetItem()
-            # jointItem.setText (1, nm)
+        print("refresh CALLED")
+        resultData = self.dataOfSkin.getAllData(displayLocator=False)
+        if resultData:
+            self.brushFunctions.bsd = self.dataOfSkin.getConnectedBlurskinDisplay()
+            self.uiInfluenceTREE.clear()
+            for nm in self.dataOfSkin.driverNames:  # .shortDriverNames :
+                jointItem = InfluenceTreeWidgetItem(nm)
+                # jointItem =  QtWidgets.QTreeWidgetItem()
+                # jointItem.setText (1, nm)
 
-            self.uiInfluenceTREE.addTopLevelItem(jointItem)
+                self.uiInfluenceTREE.addTopLevelItem(jointItem)
 
 
 # -------------------------------------------------------------------------------
