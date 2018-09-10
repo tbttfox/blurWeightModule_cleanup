@@ -153,12 +153,12 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 return True
             elif event.key() == QtCore.Qt.Key_N:
                 self.NPressed = True
-
             elif event.key() == QtCore.Qt.Key_Escape:
                 print("CLOSING")
                 event.ignore()
                 self.close()
                 return True
+
             shiftPressed = event.modifiers() == QtCore.Qt.ShiftModifier
             ctrlPressed = event.modifiers() == QtCore.Qt.ControlModifier
             altPressed = event.modifiers() == QtCore.Qt.AltModifier

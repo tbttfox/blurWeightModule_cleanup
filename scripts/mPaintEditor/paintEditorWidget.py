@@ -10,6 +10,7 @@ from functools import partial
 from maya import cmds, mel, OpenMaya
 import blurdev
 import os
+import re
 from studio.gui.resource import Icons
 from mWeightEditor.tools.skinData import DataOfSkin
 from mWeightEditor.tools.spinnerSlider import ValueSetting, ButtonWithValue
@@ -38,10 +39,10 @@ _icons = {
     "unlock": Icons.getIcon(r"icons8\Android_L\PNG\48\Very_Basic\unlock-48"),
     "pinOn": getIcon("pinOn"),
     "pinOff": getIcon("pinOff"),
-    "gauss": getIcon("circleGauss"),
+    "gaussian": getIcon("circleGauss"),
     "poly": getIcon("circlePoly"),
     "solid": getIcon("circleSolid"),
-    "rect": getIcon("rect"),
+    "square": getIcon("rect"),
     "refresh": Icons.getIcon("refresh"),
 }
 styleSheet = """
@@ -247,17 +248,28 @@ class SkinPaintWin(QtWidgets.QDialog):
 
     def setBrushValue(self, val):
         self.value = val
+        # print self.value
         self.valueSetter.theProgress.applyVal(val)
+        self.valueSetter.setVal(val * 100)
 
     def addButtonsDirectSet(self, lstBtns):
         theCarryWidget = QtWidgets.QWidget()
 
         carryWidgLayoutlayout = QtWidgets.QHBoxLayout(theCarryWidget)
-        carryWidgLayoutlayout.setContentsMargins(40, 0, 0, 0)
+        carryWidgLayoutlayout.setContentsMargins(0, 0, 0, 0)
         carryWidgLayoutlayout.setSpacing(0)
 
         for theVal in lstBtns:
-            newBtn = QtWidgets.QPushButton("{0:.0f}".format(theVal))
+            nm = (
+                "{0:.0f}".format(theVal)
+                if theVal == int(theVal)
+                else "{0:.2f}".format(theVal)
+            )
+            if theVal == 0.25:
+                nm = "1/4"
+            if theVal == 0.5:
+                nm = "1/2"
+            newBtn = QtWidgets.QPushButton(nm)
             newBtn.clicked.connect(partial(self.setBrushValue, theVal / 100.0))
             carryWidgLayoutlayout.addWidget(newBtn)
         theCarryWidget.setMaximumSize(self.maxWidthCentralWidget, 14)
@@ -285,6 +297,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             self.repeatBTN.precision, self.depthBTN.precision
         )
         self.influenceSelChanged()
+        self.brushFunctions.togglePostSetting(self.postSet_cb.isChecked())
 
     def changeOfValue(self):
         if cmds.currentCtx() == "artAttrContext":
@@ -326,6 +339,9 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.pinSelection_btn.toggled.connect(self.changePin)
         self.pickVertex_btn.clicked.connect(self.pickMaxInfluence)
         self.undo_btn.clicked.connect(self.brushFunctions.callUndo)
+        self.undo_btn.clicked.connect(self.brushFunctions.callUndo)
+        self.postSet_cb.toggled.connect(self.brushFunctions.togglePostSetting)
+        self.searchInfluences_le.textChanged.connect(self.filterInfluences)
 
         self.repeatBTN = ButtonWithValue(
             self.buttonWidg,
@@ -367,9 +383,13 @@ class SkinPaintWin(QtWidgets.QDialog):
             thebtn.clicked.connect(partial(self.brushFunctions.setPaintMode, ind))
             thebtn.clicked.connect(partial(self.changeCommand, ind))
 
-        for ind, nm in enumerate(["gauss", "poly", "solid", "rect"]):
+        # "gaussian", "poly", "solid" and "square"
+        for ind, nm in enumerate(["gaussian", "poly", "solid", "square"]):
             thebtn = self.__dict__[nm + "_btn"]
             thebtn.setText("")
+            thebtn.clicked.connect(partial(self.brushFunctions.setStampProfile, nm))
+            # "gaussian", "poly", "solid" and "square"
+
             thebtn.setIcon(_icons[nm])
 
         self.smooth_btn.toggled.connect(self.updateOptionEnable)
@@ -379,7 +399,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         for nm in ["lock", "refresh", "pinSelection"]:
             self.__dict__[nm + "_btn"].setText("")
 
-        self.valueSetter = ValueSettingPE(self)
+        self.valueSetter = ValueSettingPE(self, precision=2)
         self.valueSetter.setAddMode(False, autoReset=False)
         Hlayout = QtWidgets.QHBoxLayout(self)
         Hlayout.setContentsMargins(0, 0, 0, 0)
@@ -387,7 +407,9 @@ class SkinPaintWin(QtWidgets.QDialog):
         Hlayout.addWidget(self.valueSetter)
         self.valueSetter.setMaximumSize(self.maxWidthCentralWidget, 18)
 
-        self.widgetAbs = self.addButtonsDirectSet([0, 1, 2, 5, 10, 25, 50, 75, 100])
+        self.widgetAbs = self.addButtonsDirectSet(
+            [0, 0.25, 0.5, 1, 2, 5, 10, 25, 50, 75, 100]
+        )
 
         Hlayout2 = QtWidgets.QHBoxLayout(self)
         Hlayout2.setContentsMargins(0, 0, 0, 0)
@@ -514,23 +536,29 @@ class SkinPaintWin(QtWidgets.QDialog):
         else:
             print("clear influence")
 
+    def filterInfluences(self, newText):
+        for nm, it in self.uiInfluenceTREE.dicWidgName.items():
+            it.setHidden(re.search(newText, nm, re.IGNORECASE) == None)
+
     def refreshBtn(self):
         # self.storeSelection ()
         self.refresh(force=True)
         # self.retrieveSelection ()
 
     def refresh(self, force=False):
-        print("refresh CALLED")
+        # print "refresh CALLED"
         resultData = self.dataOfSkin.getAllData(displayLocator=False)
         if resultData:
             self.brushFunctions.bsd = self.dataOfSkin.getConnectedBlurskinDisplay()
             self.uiInfluenceTREE.clear()
+            self.uiInfluenceTREE.dicWidgName = {}
+
             for nm in self.dataOfSkin.driverNames:  # .shortDriverNames :
                 jointItem = InfluenceTreeWidgetItem(nm)
                 # jointItem =  QtWidgets.QTreeWidgetItem()
                 # jointItem.setText (1, nm)
-
                 self.uiInfluenceTREE.addTopLevelItem(jointItem)
+                self.uiInfluenceTREE.dicWidgName[nm] = jointItem
 
 
 # -------------------------------------------------------------------------------
