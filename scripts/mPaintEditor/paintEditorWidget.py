@@ -674,7 +674,7 @@ class SkinPaintWin(QtWidgets.QDialog):
 
     def filterInfluences(self, newText):
         self.pinSelection_btn.setChecked(False)
-        newTexts = newText.split(" ")
+        newTexts = [el for el in newText.split(" ") if el]
         for nm, it in self.uiInfluenceTREE.dicWidgName.items():
             foundText = False
             for txt in newTexts:
