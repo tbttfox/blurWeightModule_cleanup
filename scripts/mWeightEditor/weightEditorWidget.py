@@ -21,7 +21,6 @@ _icons = {
     "unlock": Icons.getIcon(r"icons8\Android_L\PNG\48\Very_Basic\unlock-48"),
 }
 
-
 styleSheet = """
 QWidget {
     background:  #aba8a6;
@@ -43,7 +42,7 @@ QPushButton {
     color:  black;
 }
 QPushButton:checked{
-    background-color: rgb(80, 80, 80);
+    background-color: rgb(100, 100, 100);
     color:white;
     border: none; 
 }
@@ -52,7 +51,7 @@ QPushButton:hover{
     border-style: outset;  
 }
 QPushButton:pressed {
-    background-color: rgb(100, 100, 100);
+    background-color: rgb(130, 130, 130);
     color:white;
     border-style: inset;
 }
@@ -60,7 +59,6 @@ QPushButton:disabled {
     font:italic;
     color:grey;
     }
-
 TableView {
      selection-background-color: #a0a0ff;
      background : #aba8a6;
