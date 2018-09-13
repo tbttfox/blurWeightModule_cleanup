@@ -425,10 +425,6 @@ class SkinPaintWin(QtWidgets.QDialog):
         for btn in [self.repeatBTN, self.depthBTN]:
             btn.setEnabled(setOn)
 
-    def smoothValueUpdate(self, nm, val):
-        # print nm, val
-        self.brushFunctions.setBSDAttr(nm, val)
-
     def changeMultiSolo(self, val):
         res = cmds.polyColorSet(query=True, allColorSets=True)
         if "multiColorsSet" in res and "soloColorsSet" in res:
@@ -497,11 +493,14 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.smoothOption_lay.addWidget(self.repeatBTN)
         self.smoothOption_lay.addWidget(self.depthBTN)
 
+        self.autoExpand_cb.toggled.connect(
+            partial(self.brushFunctions.setBSDAttr, "autoExpand")
+        )
         self.repeatBTN._valueChanged.connect(
-            partial(self.smoothValueUpdate, "smoothRepeat")
+            partial(self.brushFunctions.setBSDAttr, "smoothRepeat")
         )
         self.depthBTN._valueChanged.connect(
-            partial(self.smoothValueUpdate, "smoothDepth")
+            partial(self.brushFunctions.setBSDAttr, "smoothDepth")
         )
 
         # self.uiInfluenceTREE.itemSelectionChanged.connect(self.influenceSelChanged)
