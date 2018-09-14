@@ -209,7 +209,7 @@ class BrushFunctions:
                         node + ".wl", source=False, destination=True
                     )
                     if not outConn:
-                        print("RECONNECT WEIGHTLIST")
+                        print("RECONNECT WEIGHTLIST from callAfterPaint - scriptJob")
                         outMeshConn = cmds.listConnections(
                             node + ".outMesh",
                             source=False,
