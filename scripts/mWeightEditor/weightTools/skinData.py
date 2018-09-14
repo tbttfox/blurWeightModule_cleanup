@@ -1021,14 +1021,22 @@ class DataOfSkin(object):
 
         return ""
 
-    def getAllData(self, displayLocator=True, getskinWeights=True):
+    preSel = ""
+
+    def getAllData(self, displayLocator=True, getskinWeights=True, force=True):
         sel = cmds.ls(selection=True)
+
         theSkinCluster, deformedShape = self.getSkinClusterFromSel(sel)
         if not theSkinCluster:
             return False
+        # check if reloading is necessary
+        isPreloaded = sel == self.preSel  # same selection as before
+        self.preSel = sel
+        # self.theSkinCluster == theSkinCluster and self.deformedShape == deformedShape
+        if not force and isPreloaded:
+            return False
 
         self.theSkinCluster, self.deformedShape = theSkinCluster, deformedShape
-
         self.shapeShortName = (
             cmds.listRelatives(deformedShape, parent=True)[0]
             .split(":")[-1]
