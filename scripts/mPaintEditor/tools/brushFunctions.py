@@ -1,16 +1,3 @@
-"""
-pth = r'C:\\Users\guillaume\Documents\DEV\Maya\cpp\blurSkin\testSetColors.py'
-execfile (pth, globals(),  globals())
-setColorsOnJoints ()
-#setColorsOnSel ()
-bsd = addColorNode ()
-cmds.setAttr( bsd+".influenceIndex", 10)
-
-
-enterPaint (bsd)
-deleteTheJobs (toSearch = "function CallAfterPaint")
-"""
-
 from maya import cmds, mel
 from functools import partial
 
@@ -37,7 +24,9 @@ class BrushFunctions:
 
         for jnt in cmds.ls(type="joint"):
             theInd = cmds.getAttr(jnt + ".objectColor")
-            cmds.setAttr(jnt + ".wireColorRGB", *_colors[theInd])
+            currentCol = cmds.getAttr(jnt + ".wireColorRGB")[0]
+            if currentCol == (0.0, 0.0, 0.0):
+                cmds.setAttr(jnt + ".wireColorRGB", *_colors[theInd])
             for destConn in (
                 cmds.listConnections(
                     jnt + ".objectColorRGB",
@@ -68,8 +57,8 @@ class BrushFunctions:
         return ""
 
     def doAddColorNode(self, msh, skinCluster):
-        print(msh, skinCluster)
-        print("doAddColorNode")
+        # print msh, skinCluster
+        # print "doAddColorNode"
         cmds.setAttr(msh + ".displayColors", True)
 
         skinConn, inConn = cmds.listConnections(
@@ -117,6 +106,10 @@ class BrushFunctions:
     def setInfluenceIndex(self, infl):
         if cmds.objExists(self.bsd):
             cmds.setAttr(self.bsd + ".influenceIndex", infl)
+
+    def setColor(self, index, col):
+        if cmds.objExists(self.bsd):
+            cmds.setAttr("{0}.influenceColor[{1}]".format(self.bsd, index), *col)
 
     def setBSDAttr(self, attr, val):
         # print attr, val
