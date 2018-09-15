@@ -15,7 +15,7 @@ import numpy as np
 from studio.gui.resource import Icons
 from mWeightEditor.tools.skinData import DataOfSkin
 from mWeightEditor.tools.spinnerSlider import ValueSetting, ButtonWithValue
-from mWeightEditor.tools.utils import GlobalContext, toggleBlockSignals
+from mWeightEditor.tools.utils import GlobalContext, toggleBlockSignals, deleteTheJobs
 from tools.brushFunctions import BrushFunctions
 from tools.catchEventsUI import CatchEventsWidget
 
@@ -281,8 +281,9 @@ class SkinPaintWin(QtWidgets.QDialog):
         """
 
     def deleteCallBacks(self):
-        self.brushFunctions.deleteTheJobs()
-        cmds.scriptJob(kill=self.refreshSJ, force=True)
+        deleteTheJobs("BrushFunctions.callAfterPaint")
+        deleteTheJobs("SkinPaintWin.refreshCallBack")
+        # cmds.scriptJob( kill=self.refreshSJ, force=True)
         # for callBck in self.close_callback : OpenMaya.MSceneMessage.removeCallback(callBck)
 
     commandIndex = -1
@@ -432,8 +433,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.influenceSelChanged()
         self.brushFunctions.togglePostSetting(self.postSet_cb.isChecked())
 
-        self.changeMultiSolo(self.multi_rb.isChecked())
-
+        # self.changeMultiSolo(self.multi_rb.isChecked ())
         # self.brushFunctions.setColor (self.postSet_cb.isChecked())
 
     def updateOptionEnable(self, toggleValue):
@@ -747,6 +747,15 @@ class SkinPaintWin(QtWidgets.QDialog):
             for item in allItems:
                 item.setLocked(item in selectedItems, autoHide=autoHide)
 
+        if typeOfLock in [
+            "clearLocks",
+            "lockSel",
+            "unlockSel",
+            "lockAllButSel",
+            "unlockAllButSel",
+        ]:
+            self.brushFunctions.setBSDAttr("getLockWeights", True)
+
     def influenceSelChanged(self):
         influences = self.selectedInfluences()
         if len(influences) > 0:
@@ -765,14 +774,18 @@ class SkinPaintWin(QtWidgets.QDialog):
 
     def filterInfluences(self, newText):
         self.pinSelection_btn.setChecked(False)
-        newTexts = [el for el in newText.split(" ") if el]
-        for nm, it in self.uiInfluenceTREE.dicWidgName.items():
-            foundText = False
-            for txt in newTexts:
-                foundText = re.search(txt, nm, re.IGNORECASE) != None
-                if foundText:
-                    break
-            it.setHidden(not foundText)
+        if newText:
+            newTexts = [el for el in newText.split(" ") if el]
+            for nm, it in self.uiInfluenceTREE.dicWidgName.items():
+                foundText = False
+                for txt in newTexts:
+                    foundText = re.search(txt, nm, re.IGNORECASE) != None
+                    if foundText:
+                        break
+                it.setHidden(not foundText)
+        else:
+            for nm, item in self.uiInfluenceTREE.dicWidgName.items():
+                item.setHidden(not self.showZeroDeformers and item.isZeroDfm)
 
     def refreshBtn(self):
         self.refresh(force=True)
