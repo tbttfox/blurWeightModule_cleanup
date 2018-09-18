@@ -1,9 +1,63 @@
 from Qt import QtGui, QtCore, QtWidgets
+from Qt import QtCompat
 from Qt.QtWidgets import QApplication, QSplashScreen, QDialog, QMainWindow
 from maya import OpenMaya, OpenMayaUI, OpenMayaAnim, cmds, mel
 from functools import partial
-
+import os
 from mWeightEditor.tools.utils import GlobalContext
+
+
+def callMarkingMenu():
+    if cmds.popupMenu("tempMM", exists=True):
+        cmds.deleteUI("tempMM")
+
+    res = mel.eval("findPanelPopupParent")
+    cmds.popupMenu(
+        "tempMM",
+        button=1,
+        ctrlModifier=False,
+        altModifier=False,
+        allowOptionBoxes=True,
+        parent=res,
+        markingMenu=True,
+    )
+
+    kwArgs = {
+        "label": "add",
+        "divider": False,
+        "subMenu": False,
+        "tearOff": False,
+        "optionBox": False,
+        "enable": True,
+        "data": 0,
+        "radialPosition": "N",
+        "allowOptionBoxes": True,
+        "postMenuCommandOnce": False,
+        "enableCommandRepeat": True,
+        "echoCommand": False,
+        "italicized": False,
+        "boldFont": True,
+        "sourceType": "mel",
+        "longDivider": True,
+    }
+
+    lstCommands = [
+        ("add", "N", "add"),
+        ("smooth", "W", "smooth"),
+        ("absolute", "E", "abs"),
+        ("addPercent", "NW", "addPerc"),
+        ("remove", "S", "rmv"),
+        ("locks Verts", "SE", "locks"),
+    ]
+    for ind, (txt, posi, btn) in enumerate(lstCommands):
+        kwArgs["radialPosition"] = posi
+        kwArgs["label"] = txt
+        kwArgs["command"] = (
+            'python("import __main__;__main__.paintEditor.' + btn + '_btn.click()")'
+        )
+        # kwArgs ["command"] =  "print \"hi\""
+        cmds.menuItem("menuEditorMenuItem{0}".format(ind + 1), **kwArgs)
+    mel.eval("setParent -m ..;")
 
 
 def rootWindow():
@@ -371,6 +425,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
     verbose = False
     filterInstalled = False
     displayLabel = None
+    EventFilterWidgetReceiver = None
 
     def __init__(self, connectedWindow=None, thePaintContextName="artAttrContext"):
         super(CatchEventsWidget, self).__init__(rootWindow())
@@ -379,8 +434,15 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.mainWindow = connectedWindow
         self.NPressed = False
         self.brushValUpdate = False
+
+        self.OPressed = False
+        self.markingMenuShown = False
+
         self.CtrlOrShiftPressed = False
         self.CtrlOrShiftPaint = False
+        self.rootWin = rootWindow()
+        ptr = OpenMayaUI.MQtUtil.mainWindow()
+        self.mainMaya = QtCompat.wrapInstance(int(ptr), QtWidgets.QWidget)
         # self.setAttribute (QtCore.Qt.WA_MouseNoMask, True)
 
     def open(self):
@@ -399,13 +461,24 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.removeFilters()
 
     def installFilters(self):
+        listModelPanels = [
+            el
+            for el in cmds.getPanel(visiblePanels=True)
+            if cmds.getPanel(typeOf=el) == "modelPanel"
+        ]
+        ptr = OpenMayaUI.MQtUtil.findControl(listModelPanels[0])
+        model_panel_4 = QtCompat.wrapInstance(int(ptr), QtWidgets.QWidget)
+        self.EventFilterWidgetReceiver = model_panel_4.parent().parent()
+
         self.filterInstalled = True
+        # self.EventFilterWidgetReceiver.installEventFilter(self)
         QApplication.instance().installEventFilter(self)
 
     def removeFilters(self):
         self.hide()
         self.filterInstalled = False
         QApplication.instance().removeEventFilter(self)
+        # self.EventFilterWidgetReceiver.removeEventFilter(self)
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.MouseMove:  # move
@@ -422,7 +495,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     self.CtrlOrShiftPaint = True
 
             return super(CatchEventsWidget, self).eventFilter(obj, event)
-
+        # retun in mouseMove
         if (
             event.type()
             in [QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease]
@@ -435,8 +508,25 @@ class CatchEventsWidget(QtWidgets.QWidget):
                         self.deleteDisplayLabel()
                         event.ignore()
                         return True
-                if event.type() == QtCore.QEvent.MouseButtonRelease:  # click release
-                    if self.brushValUpdate:  # update the brush
+                    elif self.OPressed:
+                        if not self.markingMenuShown:
+                            callMarkingMenu()
+                            self.markingMenuShown = True
+                            self.closingNextPressMarkingMenu = False
+                            # print "-- callMarkingMenu --"
+                    elif self.closingNextPressMarkingMenu:
+                        if cmds.popupMenu("tempMM", exists=True):
+                            cmds.deleteUI("tempMM")
+                        self.markingMenuShown = False
+                        self.OPressed = False
+                        self.closingNextPressMarkingMenu = False
+
+                elif event.type() == QtCore.QEvent.MouseButtonRelease:  # click release
+                    if self.markingMenuShown:
+                        # print "Closing markingMenu !!"
+                        self.closingNextPressMarkingMenu = True
+
+                    if self.brushValUpdate:  # update the brush size
                         self.brushValUpdate = False
                         self.mainWindow.changeOfValue()
                     if self.CtrlOrShiftPaint:  # change to regular paint
@@ -483,8 +573,10 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 QApplication.instance().postEvent(obj, theMouseEvent)
                 event.ignore()
                 return True
+            return super(CatchEventsWidget, self).eventFilter(obj, event)
+        # return in mouseButton Press or Release
 
-        elif event.type() == QtCore.QEvent.KeyRelease:
+        if event.type() == QtCore.QEvent.KeyRelease:
             if event.key() in [QtCore.Qt.Key_Shift, QtCore.Qt.Key_Control]:
                 if self.verbose:
                     print("custom SHIFT released")
@@ -497,8 +589,62 @@ class CatchEventsWidget(QtWidgets.QWidget):
             elif event.key() == QtCore.Qt.Key_N:
                 self.NPressed = False  # the value of the brush
 
+            elif event.key() == QtCore.Qt.Key_O:
+                # delete marking menu
+                # self.OPressed = False
+                # self.markingMenuShown = False
+                # if self.markingMenuShown :
+
+                # if cmds.popupMenu( "tempMM", exists=True): cmds.deleteUI ("tempMM")
+                if obj is self.EventFilterWidgetReceiver and self.OPressed:
+                    # print "  OReleased"
+                    self.OPressed = False
+                    event.ignore()
+                    return True
+                return super(CatchEventsWidget, self).eventFilter(obj, event)
+
+            return super(CatchEventsWidget, self).eventFilter(obj, event)
+
         if event.type() == QtCore.QEvent.KeyPress:
-            if event.key() == QtCore.Qt.Key_Control:
+            if event.key() == QtCore.Qt.Key_O:
+                """
+                active_view = OpenMayaUI.M3dView.active3dView()
+                sw = active_view.widget()
+                res = QtCompat.wrapInstance(  long(sw),QtWidgets.QWidget  )
+
+                listModelPanels = [ el for el in cmds.getPanel (vis=True) if cmds.getPanel (to=el) == "modelPanel" ]
+                ptr = OpenMayaUI.MQtUtil.findControl(listModelPanels [0])
+                model_panel_4 = QtCompat.wrapInstance(long(ptr), QtWidgets.QWidget)
+
+                if res is obj : print "ViewPort"
+                elif res is self.mainMaya : print
+                elif obj is self.mainMaya : print "self.mainMaya"
+                elif obj is self : print "self"
+                elif obj is self.parent() : print "self Prt"
+                elif obj is self.parent().parent() : print "self Prt Prt"
+                elif obj is self.rootWin : print "self.rootWin"
+                elif obj is model_panel_4 : print "model_panel_4"
+                elif obj is model_panel_4.parent() : print "model_panel_4 Prt"
+                elif obj is model_panel_4.parent().parent() : print "model_panel_4 Prt PRT"
+                else : print obj
+                """
+                if obj is self.EventFilterWidgetReceiver:
+                    self.OPressed = True
+                    # print "  OPressed"
+                    return True
+                if self.OPressed:
+                    event.ignore()
+                    return True
+                else:
+                    return super(CatchEventsWidget, self).eventFilter(obj, event)
+                # delete marking menu
+                #
+                # self.markingMenuShown = False
+                # print "set self.markingMenuShown False  OPressed"
+                # event.accept ()
+                # return True
+
+            elif event.key() == QtCore.Qt.Key_Control:
                 if self.verbose:
                     print("custom CONTROL pressed")
                 event.ignore()
@@ -577,8 +723,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 event.ignore()
                 return True
             return super(CatchEventsWidget, self).eventFilter(obj, event)
-        else:
-            return super(CatchEventsWidget, self).eventFilter(obj, event)
+        return super(CatchEventsWidget, self).eventFilter(obj, event)
 
     def createDisplayLabel(self, vertexPicking=True):
         if not self.displayLabel:
