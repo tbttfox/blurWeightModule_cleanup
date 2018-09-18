@@ -175,6 +175,7 @@ class SkinPaintWin(QtWidgets.QDialog):
 
         self.addCallBacks()
         self.buildRCMenu()
+        self.createColorPicker()
         self.uiInfluenceTREE.clear()
         self.refresh()
 
@@ -183,7 +184,44 @@ class SkinPaintWin(QtWidgets.QDialog):
                 connectedWindow=self, thePaintContextName=thePaintContextName
             )
 
+    def colorSelected(self, color):
+        values = [color.red() / 255.0, color.green() / 255.0, color.blue() / 255.0]
+        item = self.colorDialog.item
+        nm = item._influence
+        ind = item._index
+        # print ind,nm, values
+        self.brushFunctions.setColor(ind, values)
+        item.setColor(values)
+        # cmds.displayRGBColor ("userDefined{0}".format (theUserDefinedIndex),*values)
+
+    def createColorPicker(self):
+        self.colorDialog = QtWidgets.QColorDialog()
+        # self.colorDialog .colorSelected.connect ( self.colorSelected )
+        self.colorDialog.currentColorChanged.connect(self.colorSelected)
+
+        self.colorDialog.setWindowFlags(QtCore.Qt.Tool)
+        self.colorDialog.setWindowTitle("pick color")
+        self.colorDialog.setWindowModality(QtCore.Qt.ApplicationModal)
+
     def buildRCMenu(self):
+        self.mainPopMenu = QtWidgets.QMenu(self)
+        self.subMenuSoloColor = self.mainPopMenu.addMenu("solo color")
+        self.soloColorIndex = (
+            cmds.optionVar(query="soloColor_SkinPaintWin")
+            if cmds.optionVar(exists="soloColor_SkinPaintWin")
+            else 0
+        )
+        for ind, colType in enumerate(["white", "lava", "influence"]):
+            theFn = partial(self.updateSoloColor, ind)
+            act = self.subMenuSoloColor.addAction(colType, theFn)
+            act.setCheckable(True)
+            act.setChecked(self.soloColorIndex == ind)
+
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.showMainMenu)
+
+        # ------------------------------
+
         self.popMenu = QtWidgets.QMenu(self.uiInfluenceTREE)
         """
         chbox = QtWidgets.QCheckBox("auto Prune", self.popMenu)
@@ -238,6 +276,16 @@ class SkinPaintWin(QtWidgets.QDialog):
 
     def showMenu(self, pos):
         self.popMenu.exec_(self.uiInfluenceTREE.mapToGlobal(pos))
+
+    def showMainMenu(self, pos):
+        self.mainPopMenu.exec_(self.mapToGlobal(pos))
+
+    def updateSoloColor(self, ind):
+        self.soloColorIndex = ind
+        self.brushFunctions.setBSDAttr("soloColType", self.soloColorIndex)
+        cmds.optionVar(intValue=["soloColor_SkinPaintWin", ind])
+        for i in range(3):
+            self.subMenuSoloColor.actions()[i].setChecked(i == ind)
 
     def showZeroDefmChecked(self, checked):
         cmds.optionVar(intValue=["showZeroDeformers", checked])
@@ -432,6 +480,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         )
         self.influenceSelChanged()
         self.brushFunctions.togglePostSetting(self.postSet_cb.isChecked())
+        self.brushFunctions.setBSDAttr("soloColType", self.soloColorIndex)
 
         # self.changeMultiSolo(self.multi_rb.isChecked ())
         # self.brushFunctions.setColor (self.postSet_cb.isChecked())
@@ -699,17 +748,20 @@ class SkinPaintWin(QtWidgets.QDialog):
             elif column == 0:
                 pos = QtGui.QCursor().pos() - QtCore.QPoint(355, 100)
                 theColor = [el / 255.0 for el in item.color()]
-                cmds.colorEditor(
-                    mini=True, position=[pos.x(), pos.y()], rgbValue=theColor
-                )
+                self.colorDialog.item = item
+                self.colorDialog.move(pos)
+                self.colorDialog.show()
+                """
+                cmds.colorEditor(mini=True, position=[pos.x(), pos.y()], rgbValue = theColor)
                 if cmds.colorEditor(query=True, result=True):
-                    values = cmds.colorEditor(query=True, rgbValue=True)
+                    values = cmds.colorEditor(query=True, rgb=True)
                     nm = item._influence
                     ind = item._index
-                    # print ind,nm, values
-                    self.brushFunctions.setColor(ind, values)
-                    item.setColor(values)
-                    # cmds.displayRGBColor ("userDefined{0}".format (theUserDefinedIndex),*values)
+                    #print ind,nm, values
+                    self.brushFunctions.setColor (ind, values)
+                    item.setColor (values)
+                    #cmds.displayRGBColor ("userDefined{0}".format (theUserDefinedIndex),*values)
+                """
 
     def influenceClicked(self, item, column):
         text = item.text(1)
