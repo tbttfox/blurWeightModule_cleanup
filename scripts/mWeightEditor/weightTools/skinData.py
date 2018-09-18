@@ -978,6 +978,7 @@ class DataOfSkin(object):
         self.usedDeformersIndices = []
         self.theSkinCluster, self.deformedShape, self.shapeShortName = "", "", ""
         self.isNurbsSurface = False
+        self.blurSkinNode = ""
 
         self.vertices = []
         self.verticesWeight = []
@@ -1214,6 +1215,11 @@ class DataOfSkin(object):
             self.lockedVertices,
             type="Int32Array",
         )
+        if not self.blurSkinNode or not cmds.objExists(self.blurSkinNode):
+            self.getConnectedBlurskinDisplay()
+        if self.blurSkinNode and cmds.objExists(self.blurSkinNode):
+            cmds.setAttr(self.blurSkinNode + ".getLockWeights", True)
+            # update
 
     def getValue(self, row, column):
         return (
