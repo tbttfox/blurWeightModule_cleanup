@@ -22,6 +22,12 @@ from tools.catchEventsUI import CatchEventsWidget, rootWindow
 thePaintContextName = "BlurSkinartAttrContext"
 
 
+def deleteNodesOnSave():
+    nodeToDelete = cmds.ls(type="blurSkinDisplay")
+    if nodeToDelete:
+        cmds.delete(nodeToDelete)
+
+
 class ValueSettingPE(ValueSetting):
     def doSet(self, theVal):
         self.mainWindow.value = theVal
@@ -272,7 +278,6 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.customContextMenuRequested.connect(self.showMainMenu)
 
         # ------------------------------
-
         self.popMenu = QtWidgets.QMenu(self.uiInfluenceTREE)
         """
         chbox = QtWidgets.QCheckBox("auto Prune", self.popMenu)
@@ -372,6 +377,13 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.refreshSJ = cmds.scriptJob(
             event=["SelectionChanged", self.refreshCallBack]
         )
+        # create callBack to end
+        import __main__
+
+        if "PEW_preSaveCallback" not in __main__.__dict__:
+            __main__.PEW_preSaveCallback = OpenMaya.MSceneMessage.addCallback(
+                OpenMaya.MSceneMessage.kBeforeSave, deleteNodesOnSave
+            )
         """
         #self.listJobEvents =[refreshSJ] 
         sceneUpdateCallback = OpenMaya.MSceneMessage.addCallback(OpenMaya.MSceneMessage.kBeforeNew, self.deselectAll )  #kSceneUpdate
@@ -512,8 +524,6 @@ class SkinPaintWin(QtWidgets.QDialog):
             self.setBrushValue(currentVal)
 
     def enterPaint(self):
-        self.show()
-        self.brushFunctions.setColorsOnJoints()
         if self.dataOfSkin.theSkinCluster:
             self.brushFunctions.bsd = self.dataOfSkin.getConnectedBlurskinDisplay()
             if not self.brushFunctions.bsd:
@@ -570,6 +580,10 @@ class SkinPaintWin(QtWidgets.QDialog):
 
         self.delete_btn.setIcon(_icons["del"])
         self.delete_btn.setText("")
+        # self.delete_btn.clicked.connect (self.paintEnd )
+        self.delete_btn.clicked.connect(
+            lambda: mel.eval("SelectToolOptionsMarkingMenu")
+        )
         self.delete_btn.clicked.connect(self.brushFunctions.deleteNode)
 
         self.pinSelection_btn.setIcon(_icons["pinOff"])
@@ -934,6 +948,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             )
         if resultData:
             # print "- refreshing -"
+            self.brushFunctions.setColorsOnJoints()
             self.brushFunctions.bsd = self.dataOfSkin.getConnectedBlurskinDisplay()
             self.uiInfluenceTREE.clear()
             self.uiInfluenceTREE.dicWidgName = {}
@@ -957,8 +972,11 @@ class SkinPaintWin(QtWidgets.QDialog):
 
         self.setStyleSheet(styleSheet)
         self.changeMultiSolo(-1)
+        self.dataOfSkin.getConnectedBlurskinDisplay(disconnectWeightList=True)
+        # self.brushFunctions.deleteNode ()
 
     def paintStart(self):
+        # self.enterPaint ( withBrushFn = False)
         self.EVENTCATCHER.open()  # adEventFilters ()
         for btnName in ["pickVertex_btn", "pickInfluence_btn"]:
             self.__dict__[btnName].setEnabled(True)
