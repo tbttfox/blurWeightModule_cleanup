@@ -345,6 +345,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
 
     def __init__(self, colWidth=10, parent=None):
         super(HorizHeaderView, self).__init__(QtCore.Qt.Horizontal, parent)
+
         self.getColors()
         self.colWidth = colWidth
         self._font = QtGui.QFont("Myriad Pro", 10)
@@ -496,6 +497,13 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         if len(hideColumnIndices) > 0:
             columnNames = model.columnNames()
             popMenu.addSeparator()
+            hideZeroColumnsAction = popMenu.addAction("hide zero columns")
+            hideZeroColumnsAction.setCheckable(True)
+            hideZeroColumnsAction.setChecked(self.parent().parent().hideZeroColumn)
+            hideZeroColumnsAction.toggled.connect(
+                self.parent().parent().toggleZeroColumn
+            )
+
             subMenuFollow = popMenu.addMenu("show Columns")
             for ind in hideColumnIndices:
                 # newAction = subMenuFollow .addAction(columnNames [ind])
@@ -515,7 +523,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         popMenu.exec_(self.mapToGlobal(pos))
 
     def toggledColumn(self, ind, ColumnName, checked):
-        print(checked, ind, ColumnName)
+        # print checked, ind, ColumnName
         # theShow -----------------
         if not checked:
             self.parent().hideColumn(ind)
