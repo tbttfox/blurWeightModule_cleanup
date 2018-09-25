@@ -87,14 +87,7 @@ class BrushFunctions:
         cmds.connectAttr(inConn, self.bsd + ".inMesh", force=True)
         cmds.connectAttr(self.bsd + ".outMesh", skinConn, force=True)
 
-        cmds.evalDeferred(
-            partial(
-                cmds.connectAttr,
-                self.bsd + ".weightList",
-                skinCluster + ".weightList",
-                f=True,
-            )
-        )
+        # cmds.evalDeferred  (partial (cmds.connectAttr, self.bsd+".weightList", skinCluster+".weightList", f=True))
         cmds.makePaintable(self.bsd, "paintAttr")
 
         return self.bsd
