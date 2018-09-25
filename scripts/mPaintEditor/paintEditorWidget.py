@@ -444,7 +444,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.setBrushValue(newCommandValue)
 
     def closeEvent(self, event):
-        mel.eval("SelectToolOptionsMarkingMenu")
+        mel.eval("setToolTo $gMove;")
         self.brushFunctions.deleteNode()
 
         self.deleteCallBacks()
@@ -579,10 +579,69 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.brushFunctions.setBSDAttr("colorType", int(not val))
 
     def addInfluences(self):
-        cmds.confirmDialog(message="addInfluences")
+        sel = cmds.ls(selection=True, transforms=True)
+        skn = self.dataOfSkin.theSkinCluster
+        allInfluences = cmds.skinCluster(skn, query=True, influence=True)
+        toAdd = [x for x in sel if x not in allInfluences]
+        if toAdd:
+            res = cmds.confirmDialog(
+                title="add Influences",
+                message="add Influences :\n - {0}".format("\n - ".join(toAdd)),
+                button=["Yes", "No"],
+                defaultButton="Yes",
+                cancelButton="No",
+                dismissString="No",
+            )
+            if res == "Yes":
+                self.delete_btn.click()
+                cmds.skinCluster(
+                    skn, edit=True, lockWeights=False, weight=0.0, addInfluence=toAdd
+                )
+                cmds.evalDeferred(self.selectRefresh)
 
     def removeInfluences(self):
-        cmds.confirmDialog(message="removeInfluences")
+        skn = self.dataOfSkin.theSkinCluster
+
+        toRemove = [item._influence for item in self.uiInfluenceTREE.selectedItems()]
+        removeable = []
+        non_removable = []
+        for nm in toRemove:
+            columnIndex = self.dataOfSkin.driverNames.index(nm)
+            res = self.dataOfSkin.display2dArray[:, columnIndex]
+            notNormalizable = np.where(res >= 1.0)[0]
+            if notNormalizable.size == 0:
+                removeable.append(nm)
+            else:
+                non_removable.append((nm, notNormalizable.tolist()))
+
+        message = ""
+        toRmvStr = "\n - ".join(removeable)
+        message += "remove Influences :\n - {0}".format(toRmvStr)
+        if non_removable:
+            toNotRmvStr = "\n - ".join([el for el, vtx in non_removable])
+            message += "\n\n\ncannot remove Influences :\n - {0}".format(toNotRmvStr)
+            for nm, vtx in non_removable:
+                selVertices = self.dataOfSkin.orderMelList(vtx)
+                inList = [
+                    "{1}.vtx[{0}]".format(el, self.dataOfSkin.deformedShape)
+                    for el in selVertices
+                ]
+                print(nm, "\n", inList, "\n")
+
+        res = cmds.confirmDialog(
+            title="remove Influences",
+            message=message,
+            button=["Yes", "No"],
+            defaultButton="Yes",
+            cancelButton="No",
+            dismissString="No",
+        )
+        if res == "Yes":
+            self.delete_btn.click()
+            cmds.skinCluster(skn, edit=True, removeInfluence=toRemove)
+            cmds.skinCluster(skn, edit=True, forceNormalizeWeights=True)
+            cmds.evalDeferred(self.selectRefresh)
+            # res = self.dataOfSkin.display2dArray  [:,5]
 
     def removeUnusedInfluences(self):
         skn = self.dataOfSkin.theSkinCluster
@@ -593,9 +652,10 @@ class SkinPaintWin(QtWidgets.QDialog):
             )
             zeroInfluences = list(allInfluences - weightedInfluences)
             if zeroInfluences:
-                toRmvStr = "\n".join(zeroInfluences)
+                toRmvStr = "\n - ".join(zeroInfluences)
                 res = cmds.confirmDialog(
-                    message="removeUnusedInfluences :\n{0}".format(toRmvStr),
+                    title="remove Influences",
+                    message="remove Unused Influences :\n - {0}".format(toRmvStr),
                     button=["Yes", "No"],
                     defaultButton="Yes",
                     cancelButton="No",
@@ -604,7 +664,7 @@ class SkinPaintWin(QtWidgets.QDialog):
                 if res == "Yes":
                     self.delete_btn.click()
                     cmds.skinCluster(skn, edit=True, removeInfluence=zeroInfluences)
-                    cmds.evalDeferred(self.refreshBtn)
+                    cmds.evalDeferred(self.selectRefresh)
 
     def randomColors(self):
         cmds.confirmDialog(message="randomColors")
@@ -643,9 +703,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.delete_btn.setIcon(_icons["del"])
         self.delete_btn.setText("")
         # self.delete_btn.clicked.connect (self.paintEnd )
-        self.delete_btn.clicked.connect(
-            lambda: mel.eval("SelectToolOptionsMarkingMenu")
-        )
+        self.delete_btn.clicked.connect(lambda: mel.eval("setToolTo $gMove;"))
         self.delete_btn.clicked.connect(self.brushFunctions.deleteNode)
 
         self.pinSelection_btn.setIcon(_icons["pinOff"])
@@ -1003,6 +1061,10 @@ class SkinPaintWin(QtWidgets.QDialog):
                 item.setHidden(not self.showZeroDeformers and item.isZeroDfm)
 
     def refreshBtn(self):
+        self.refresh(force=True)
+
+    def selectRefresh(self):
+        cmds.select(self.dataOfSkin.deformedShape)
         self.refresh(force=True)
 
     def prepareToGetHighestInfluence(self):
