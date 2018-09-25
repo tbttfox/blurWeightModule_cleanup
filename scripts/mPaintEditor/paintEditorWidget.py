@@ -90,6 +90,10 @@ QWidget:disabled {
     font:italic;
     color:grey;
 }
+QLineEdit{
+    background-color:  #bfbcba;
+    color:black;
+}
 QMenu::item:disabled {
     color:grey;
     font: italic;
@@ -194,12 +198,6 @@ class SkinPaintWin(QtWidgets.QDialog):
 
     colWidth = 30
     maxWidthCentralWidget = 230
-
-    def getSkinClusterValues(self, skinCluster):
-        driverNames = cmds.skinCluster(skinCluster, query=True, influence=True)
-        skinningMethod = cmds.getAttr(skinCluster + ".skinningMethod")
-        normalizeWeights = cmds.getAttr(skinCluster + ".normalizeWeights")
-        return (driverNames, skinningMethod, normalizeWeights)
 
     #####################################################################################
     EVENTCATCHER = None
@@ -446,6 +444,9 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.setBrushValue(newCommandValue)
 
     def closeEvent(self, event):
+        mel.eval("SelectToolOptionsMarkingMenu")
+        self.brushFunctions.deleteNode()
+
         self.deleteCallBacks()
         pos = self.pos()
         size = self.size()
@@ -927,8 +928,8 @@ class SkinPaintWin(QtWidgets.QDialog):
         text = item.text(1)
         # print "CLICKED " + text
         if text in self.dataOfSkin.driverNames:
-            ind = self.dataOfSkin.driverNames.index(text)
-            # ind = item._index
+            # ind = self.dataOfSkin.driverNames.index (text)
+            ind = item._index
             self.brushFunctions.setInfluenceIndex(ind)
 
     def applyLock(self, typeOfLock):
@@ -1012,13 +1013,16 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.dataOfSkin.getZeroColumns()
 
     def getHighestInfluence(self, vtxIndex):
-        self.highestInfluence = np.argmax(self.dataOfSkin.raw2dArray[vtxIndex])
-        return self.dataOfSkin.driverNames[self.highestInfluence]
+        highestDriver = np.argmax(self.dataOfSkin.raw2dArray[vtxIndex])
+        self.highestInfluence = self.dataOfSkin.indicesJoints[highestDriver]
+        return self.dataOfSkin.driverNames[highestDriver]
 
     def selectPickedInfluence(self):
-        if self.highestInfluence != -1:
+        if self.highestInfluence in self.dataOfSkin.indicesJoints:
+            highestDriver = self.dataOfSkin.indicesJoints.index(self.highestInfluence)
+            # print self.highestInfluence, highestDriver
             self.uiInfluenceTREE.setCurrentItem(
-                self.uiInfluenceTREE.topLevelItem(self.highestInfluence)
+                self.uiInfluenceTREE.topLevelItem(highestDriver)
             )
             self.brushFunctions.setInfluenceIndex(int(self.highestInfluence))
 
@@ -1055,7 +1059,8 @@ class SkinPaintWin(QtWidgets.QDialog):
             for ind, nm in enumerate(
                 self.dataOfSkin.driverNames
             ):  # .shortDriverNames :
-                jointItem = InfluenceTreeWidgetItem(nm, ind)
+                theIndexJnt = self.dataOfSkin.indicesJoints[ind]
+                jointItem = InfluenceTreeWidgetItem(nm, theIndexJnt)
                 # jointItem =  QtWidgets.QTreeWidgetItem()
                 # jointItem.setText (1, nm)
                 self.uiInfluenceTREE.addTopLevelItem(jointItem)

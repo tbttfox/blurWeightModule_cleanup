@@ -429,7 +429,10 @@ class LabelDisplayInfluence(QtWidgets.QLabel):
                     and jnt_y > y - self.radiusIntersect
                     and jnt_y < y + self.radiusIntersect
                 ):
-                    self.mainWindow.highestInfluence = ind
+                    # self.mainWindow.highestInfluence = ind
+                    self.mainWindow.highestInfluence = (
+                        self.mainWindow.dataOfSkin.indicesJoints[ind]
+                    )
                     txt = nd
                     break
 
