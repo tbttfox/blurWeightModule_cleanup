@@ -696,6 +696,8 @@ class SkinPaintWin(QtWidgets.QDialog):
                     cmds.evalDeferred(self.selectRefresh)
 
     def randomColors(self):
+        self.delete_btn.click()
+
         golden_ratio_conjugate = 0.618033988749895
         s, v = 0.5, 0.95
         colors = []
@@ -708,7 +710,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             theCol = QtGui.QColor.fromHsvF (h,s,v)
             values = [theCol.redF(), theCol.greenF(), theCol.blueF()]
             """
-            values = generate_new_color(colors, pastel_factor=0.3)
+            values = generate_new_color(colors, pastel_factor=0.2)
             colors.append(values)
 
             # print ind,nm, values
