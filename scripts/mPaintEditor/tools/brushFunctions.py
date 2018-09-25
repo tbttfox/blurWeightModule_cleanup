@@ -157,6 +157,10 @@ class BrushFunctions:
         msh = cmds.ls(
             cmds.listHistory(self.bsd, allFuture=True, future=True), type="mesh"
         )[0]
+
+        cmds.setAttr(msh + ".displayColorChannel", "Diffuse", type="string")
+        cmds.setAttr(msh + ".materialBlend", 0)
+
         (prt,) = cmds.listRelatives(msh, parent=True, path=True)
 
         sel = cmds.ls(selection=True)
