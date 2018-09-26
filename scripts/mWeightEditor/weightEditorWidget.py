@@ -420,6 +420,14 @@ class SkinWeightWin(QtWidgets.QDialog):
         self.botLayout.insertWidget(5, self.percentBTN)
         self.percentBTN.setMaximumWidth(30)
 
+        self.problemVertsBTN = ButtonWithValue(
+            self, usePow=False, name="problemVerts", minimumValue=2, defaultValue=4
+        )
+        self.topLayout.addWidget(self.problemVertsBTN)
+
+        self.problemVertsBTN.clicked.connect(self.selProbVerts)
+        self.problemVerts_btn.deleteLater()
+
         for nm in ["copy", "paste", "swap"]:
             self.__dict__[nm + "BTN"].setEnabled(False)
             self.__dict__[nm + "BTN"].hide()
@@ -451,6 +459,17 @@ class SkinWeightWin(QtWidgets.QDialog):
             self._tv.selEmptied.connect(theUI.setEnabled)
 
         cmds.evalDeferred(self.deferredBtns)
+
+    def selProbVerts(self):
+        vtx = self.dataOfSkin.fixAroundVertices(
+            tolerance=self.problemVertsBTN.precision
+        )
+        selVertices = self.dataOfSkin.orderMelList(vtx)
+        inList = [
+            "{1}.vtx[{0}]".format(el, self.dataOfSkin.deformedShape)
+            for el in selVertices
+        ]
+        cmds.select(inList)
 
     def deferredBtns(self):
         for nm in ["abs", "add", "addPerc"]:
