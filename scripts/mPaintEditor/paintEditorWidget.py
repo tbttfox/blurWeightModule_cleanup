@@ -249,7 +249,9 @@ class SkinPaintWin(QtWidgets.QDialog):
             if cmds.optionVar(exists="useShortestNames")
             else True
         )
-        self.dataOfSkin = DataOfSkin(useShortestNames=self.useShortestNames)
+        self.dataOfSkin = DataOfSkin(
+            useShortestNames=self.useShortestNames, createDisplayLocator=False
+        )
 
         self.brushFunctions = BrushFunctions(
             self, thePaintContextName=thePaintContextName
@@ -1104,7 +1106,9 @@ class SkinPaintWin(QtWidgets.QDialog):
     def filterInfluences(self, newText):
         self.pinSelection_btn.setChecked(False)
         if newText:
-            newTexts = [el for el in newText.split(" ") if el]
+            newTexts = newText.split(" ")
+            while "" in newTexts:
+                newTexts.remove("")
             for nm, it in self.uiInfluenceTREE.dicWidgName.items():
                 foundText = False
                 for txt in newTexts:
