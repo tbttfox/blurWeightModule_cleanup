@@ -549,11 +549,16 @@ class SkinWeightWin(QtWidgets.QDialog):
         self.addPercentage = checked
 
     def smooth(self):
+        self.dataOfSkin.getConnectedBlurskinDisplay(disconnectWeightList=True)
         cmds.blurSkinCmd(
             command="smooth",
             repeat=self.smoothBTN.precision,
             percentMvt=self.percentBTN.precision,
         )
+        if self.dataOfSkin.blurSkinNode and cmds.objExists(
+            self.dataOfSkin.blurSkinNode
+        ):
+            cmds.delete(self.dataOfSkin.blurSkinNode)
 
     def prepareToSetValue(self):
         # with GlobalContext (message = "prepareValuesforSetSkinData"):
