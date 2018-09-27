@@ -129,6 +129,13 @@ class BrushFunctions:
         ):
             cmds.setAttr(self.bsd + "." + attr, val)
 
+    def getBSDAttr(self, attr):
+        # print attr, val
+        if cmds.objExists(self.bsd) and cmds.attributeQuery(
+            attr, node=self.bsd, exists=True
+        ):
+            return cmds.getAttr(self.bsd + "." + attr)
+
     def setSmoothOptions(self, repeatVal, depthVal):
         if cmds.objExists(self.bsd):
             cmds.setAttr(self.bsd + ".smoothRepeat", repeatVal)

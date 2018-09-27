@@ -437,6 +437,7 @@ class SkinPaintWin(QtWidgets.QDialog):
     def deleteCallBacks(self):
         deleteTheJobs("BrushFunctions.callAfterPaint")
         deleteTheJobs("SkinPaintWin.refreshCallBack")
+        deleteTheJobs("SkinPaintWin.updateMirrorCB")
         # cmds.scriptJob( kill=self.refreshSJ, force=True)
         # for callBck in self.close_callback : OpenMaya.MSceneMessage.removeCallback(callBck)
 
@@ -816,6 +817,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.mirrorActive_cb.toggled.connect(
             partial(self.brushFunctions.setBSDAttr, "mirrorActive")
         )
+        self.mirrorActive_cb.toggled.connect(self.checkIfSameValue)
         self.mirrorStore_btn.clicked.connect(self.getMirrorInfluenceArray)
 
         self.soloColorIndex = (
@@ -889,7 +891,13 @@ class SkinPaintWin(QtWidgets.QDialog):
         for nm in ["lock", "refresh", "pinSelection"]:
             self.__dict__[nm + "_btn"].setText("")
 
-        for btnName in ["pickVertex_btn", "pickInfluence_btn", "mirrorStore_btn"]:
+        self.uiToActivateWithPaint = [
+            "pickVertex_btn",
+            "pickInfluence_btn",
+            "mirrorStore_btn",
+            "mirrorActive_cb",
+        ]
+        for btnName in self.uiToActivateWithPaint:
             self.__dict__[btnName].setEnabled(False)
 
         self.valueSetter = ValueSettingPE(self, precision=2)
@@ -914,6 +922,25 @@ class SkinPaintWin(QtWidgets.QDialog):
         dialogLayout.insertLayout(1, Hlayout2)
         dialogLayout.insertSpacing(1, 10)
 
+    def updateMirrorCB(self):
+        mirrorActive = self.brushFunctions.getBSDAttr("mirrorActive")
+        with toggleBlockSignals([self.mirrorActive_cb]):
+            self.mirrorActive_cb.setChecked(False)
+
+    def checkIfSameValue(self, val):
+        attr = "mirrorActive"
+        deleteTheJobs("SkinPaintWin.updateMirrorCB")
+        if cmds.objExists(self.brushFunctions.bsd) and cmds.attributeQuery(
+            attr, node=self.brushFunctions.bsd, exists=True
+        ):
+            cmds.scriptJob(
+                runOnce=True,
+                attributeChange=[
+                    self.brushFunctions.bsd + "." + attr,
+                    self.updateMirrorCB,
+                ],
+            )
+
     def storeMirrorOptions(self):
         cmds.optionVar(clearArray="mirrorOptions")
         cmds.optionVar(stringValueAppend=("mirrorOptions", self.uiLeftNamesLE.text()))
@@ -928,7 +955,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         if not cmds.attributeQuery("symmetricVertices", node=msh, exists=True):
             selectionShapes = mirrorFn.getShapesSelected(intermediateObject=True)
             _symData = mirrorFn.SymData()
-            _symData.computeSymetry(selectionShapes[-1])
+            _symData.computeSymetry(selectionShapes[-1], displayInfo=False)
 
         leftInfluence = self.uiLeftNamesLE.text()
         rightInfluence = self.uiRightNamesLE.text()
@@ -1234,7 +1261,7 @@ class SkinPaintWin(QtWidgets.QDialog):
 
     def paintEnd(self):
         self.EVENTCATCHER.fermer()  # removeFilters ()
-        for btnName in ["pickVertex_btn", "pickInfluence_btn", "mirrorStore_btn"]:
+        for btnName in self.uiToActivateWithPaint:
             self.__dict__[btnName].setEnabled(False)
 
         self.setStyleSheet(styleSheet)
@@ -1253,7 +1280,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             self.transferValues()
 
         self.EVENTCATCHER.open()
-        for btnName in ["pickVertex_btn", "pickInfluence_btn", "mirrorStore_btn"]:
+        for btnName in self.uiToActivateWithPaint:
             self.__dict__[btnName].setEnabled(True)
         self.setStyleSheet(styleSheet + "SkinPaintWin {border : 2px solid red}")
         self.changeMultiSolo(self.multi_rb.isChecked())
