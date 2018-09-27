@@ -812,6 +812,10 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.maxColor_sb.valueChanged.connect(
             partial(self.brushFunctions.setBSDAttr, "maxColor")
         )
+        self.mirrorActive_cb.toggled.connect(
+            partial(self.brushFunctions.setBSDAttr, "mirrorActive")
+        )
+        self.mirrorStore_btn.clicked.connect(self.getMirrorInfluenceArray)
 
         self.soloColorIndex = (
             cmds.optionVar(query="soloColor_SkinPaintWin")
@@ -899,6 +903,16 @@ class SkinPaintWin(QtWidgets.QDialog):
         dialogLayout.insertLayout(1, Hlayout)
         dialogLayout.insertLayout(1, Hlayout2)
         dialogLayout.insertSpacing(1, 10)
+
+    def getMirrorInfluenceArray(self):
+        leftInfluence = self.uiLeftNamesLE.text()
+        rightInfluence = self.uiRightNamesLE.text()
+        driverNames_oppIndices = self.dataOfSkin.getArrayOppInfluences(
+            leftInfluence=leftInfluence, rightInfluence=rightInfluence
+        )
+        if not driverNames_oppIndices:
+            return
+        self.brushFunctions.setMirrorInfluences(driverNames_oppIndices)
 
     # --------------------------------------------------------------
     # artAttrSkinPaintCtx
