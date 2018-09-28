@@ -512,7 +512,9 @@ class DataOfSkin(object):
             self.sknFn,
         )
 
-    def getArrayOppInfluences(self, leftInfluence="*_L_*", rightInfluence="*_R_*"):
+    def getArrayOppInfluences(
+        self, leftInfluence="*_L_*", rightInfluence="*_R_*", useRealIndices=False
+    ):
         leftSpl = leftInfluence.split(" ")
         rightSpl = rightInfluence.split(" ")
         while "" in leftSpl:
@@ -523,9 +525,13 @@ class DataOfSkin(object):
             return []
 
         oppDriverNames = {}
-        driverNames_oppIndices = [-1] * len(self.driverNames)
+        # useRealIndices is for when the array is sparse (some defomers have been deleted)
+        count = max(self.indicesJoints) + 1 if useRealIndices else len(self.driverNames)
+        driverNames_oppIndices = [-1] * count
 
-        for indInfluence, influence in enumerate(self.driverNames):
+        for ind, influence in enumerate(self.driverNames):
+            indInfluence = self.indicesJoints[ind] if useRealIndices else ind
+
             if driverNames_oppIndices[indInfluence] != -1:
                 continue
             oppInfluence = influence
@@ -544,7 +550,11 @@ class DataOfSkin(object):
             if oppInfluence in self.driverNames and oppInfluence != influence:
                 oppDriverNames[influence] = oppInfluence
                 oppDriverNames[oppInfluence] = influence
+
                 oppInfluenceIndex = self.driverNames.index(oppInfluence)
+                if useRealIndices:
+                    oppInfluenceIndex = self.indicesJoints[oppInfluenceIndex]
+
                 driverNames_oppIndices[indInfluence] = oppInfluenceIndex
                 driverNames_oppIndices[oppInfluenceIndex] = indInfluence
             else:
@@ -569,9 +579,9 @@ class DataOfSkin(object):
             if not cmds.attributeQuery(att, node=prt, exists=True):
                 return
         symmetricVertices = cmds.getAttr(prt + ".symmetricVertices")
-        rightVertices = cmds.getAttr(prt + ".rightVertices")
-        leftVertices = cmds.getAttr(prt + ".leftVertices")
-        centerVertices = cmds.getAttr(prt + ".centerVertices")
+        # rightVertices = cmds.getAttr (prt+".rightVertices")
+        # leftVertices = cmds.getAttr (prt+".leftVertices")
+        # centerVertices = cmds.getAttr (prt+".centerVertices")
 
         with GlobalContext(message="mirrorArray", doPrint=self.verbose):
             driverNames_oppIndices = self.getArrayOppInfluences(
@@ -1185,7 +1195,6 @@ class DataOfSkin(object):
 
     def clearData(self):
         self.AllWght = []
-        self.usedDeformersIndices = []
         self.theSkinCluster, self.deformedShape, self.shapeShortName = "", "", ""
         self.isNurbsSurface = False
         self.blurSkinNode = ""
