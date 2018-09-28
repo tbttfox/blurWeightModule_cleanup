@@ -77,6 +77,7 @@ _icons = {
     "lock": Icons.getIcon(r"icons8\Android_L\PNG\48\Very_Basic\lock-48"),
     "unlock": Icons.getIcon(r"icons8\Android_L\PNG\48\Very_Basic\unlock-48"),
     "del": Icons.getIcon(r"icons8\office\PNG\16\Editing\delete_sign-16"),
+    "fromScene": Icons.getIcon(r"arrow-045"),
     "pinOn": getIcon("pinOn"),
     "pinOff": getIcon("pinOff"),
     "gaussian": getIcon("circleGauss"),
@@ -356,6 +357,11 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.popMenu.addAction(unLockSel)
 
         self.popMenu.addSeparator()
+        resetBindPose = self.popMenu.addAction(
+            "reset bindPreMatrix", self.resetBindPreMatrix
+        )
+        self.popMenu.addAction(resetBindPose)
+        self.popMenu.addSeparator()
         self.showZeroDeformers = (
             cmds.optionVar(query="showZeroDeformers")
             if cmds.optionVar(exists="showZeroDeformers")
@@ -615,6 +621,15 @@ class SkinPaintWin(QtWidgets.QDialog):
     def addInfluences(self):
         sel = cmds.ls(selection=True, transforms=True)
         skn = self.dataOfSkin.theSkinCluster
+        prt = (
+            cmds.listRelatives(self.dataOfSkin.deformedShape, path=-True, parent=True)[
+                0
+            ]
+            if not cmds.nodeType(self.dataOfSkin.deformedShape) == "transform"
+            else self.dataOfSkin.deformedShape
+        )
+        if prt in sel:
+            sel.remove(prt)
         allInfluences = cmds.skinCluster(skn, query=True, influence=True)
         toAdd = [x for x in sel if x not in allInfluences]
         if toAdd:
@@ -631,7 +646,34 @@ class SkinPaintWin(QtWidgets.QDialog):
                 cmds.skinCluster(
                     skn, edit=True, lockWeights=False, weight=0.0, addInfluence=toAdd
                 )
+                toSelect = list(
+                    range(
+                        self.uiInfluenceTREE.topLevelItemCount(),
+                        self.uiInfluenceTREE.topLevelItemCount() + len(toAdd),
+                    )
+                )
                 cmds.evalDeferred(self.selectRefresh)
+                cmds.evalDeferred(partial(self.reselectIndices, toSelect))
+
+    def fromScene(self):
+        sel = cmds.ls(selection=True, transforms=True)
+        for ind in range(self.uiInfluenceTREE.topLevelItemCount()):
+            item = self.uiInfluenceTREE.topLevelItem(ind)
+            toSel = item._influence in sel
+            item.setSelected(toSel)
+            if toSel:
+                self.uiInfluenceTREE.scrollToItem(item)
+
+    def reselectIndices(self, toSelect):
+        count = self.uiInfluenceTREE.topLevelItemCount()
+        # if toSelect[-1] < count: self.uiInfluenceTREE.topLevelItem (ind).setCurrentItem(self.uiInfluenceTREE.topLevelItem(toSelect[-1]))
+        for ind in toSelect:
+            if ind < count:
+                self.uiInfluenceTREE.topLevelItem(ind).setSelected(True)
+                self.uiInfluenceTREE.scrollToItem(
+                    self.uiInfluenceTREE.topLevelItem(ind)
+                )
+        # self.uiInfluenceTREE.scrollToBottom()
 
     def removeInfluences(self):
         skn = self.dataOfSkin.theSkinCluster
@@ -845,6 +887,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.addInfluences_btn.clicked.connect(self.addInfluences)
         self.removeInfluences_btn.clicked.connect(self.removeInfluences)
         self.removeUnusedInfluences_btn.clicked.connect(self.removeUnusedInfluences)
+        self.fromScene_btn.clicked.connect(self.fromScene)
         self.randomColors_btn.clicked.connect(self.randomColors)
 
         if cmds.optionVar(exists="mirrorOptions"):
@@ -860,6 +903,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             ("removeInfluences", "minus"),
             ("removeUnusedInfluences", "removeUnused"),
             ("randomColors", "randomColor"),
+            ("fromScene", "fromScene"),
         ]:
             theBtn = self.__dict__[btn + "_btn"]
             theBtn.setText("")
@@ -1157,6 +1201,11 @@ class SkinPaintWin(QtWidgets.QDialog):
         ]:
             self.brushFunctions.setBSDAttr("getLockWeights", True)
 
+    def resetBindPreMatrix(self):
+        selectedItems = self.uiInfluenceTREE.selectedItems()
+        for item in selectedItems:
+            item.resetBindPose()
+
     def influenceSelChanged(self):
         influences = self.selectedInfluences()
         if len(influences) > 0:
@@ -1254,7 +1303,9 @@ class SkinPaintWin(QtWidgets.QDialog):
             ):  # .shortDriverNames :
                 theIndexJnt = self.dataOfSkin.indicesJoints[ind]
                 theCol = self.uiInfluenceTREE.getDeformerColor(nm)
-                jointItem = InfluenceTreeWidgetItem(nm, theIndexJnt, theCol)
+                jointItem = InfluenceTreeWidgetItem(
+                    nm, theIndexJnt, theCol, self.dataOfSkin.theSkinCluster
+                )
                 # jointItem =  QtWidgets.QTreeWidgetItem()
                 # jointItem.setText (1, nm)
                 self.uiInfluenceTREE.addTopLevelItem(jointItem)
@@ -1353,10 +1404,11 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
             col = cmds.displayRGBColor("userDefined{0}".format(i), query=True)
             self._colors.append([int(el * 255) for el in col])
 
-    def __init__(self, influence, index, col):
+    def __init__(self, influence, index, col, skinCluster):
         super(InfluenceTreeWidgetItem, self).__init__(["", influence])
         self._influence = influence
         self._index = index
+        self._skinCluster = skinCluster
         self.regularBG = col  # self.background(1)
         self.setBackground(1, self.regularBG)
         self.darkBG = QtGui.QBrush(QtGui.QColor(120, 120, 120))
@@ -1370,6 +1422,18 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
             self.setBackground(1, self.darkBG)
         else:
             self.setBackground(1, self.regularBG)
+
+    def resetBindPose(self):
+        inConn = cmds.listConnections(
+            self._skinCluster + ".bindPreMatrix[{0}]".format(self._index)
+        )
+        if not inConn:
+            mat = cmds.getAttr(self._influence + ".worldInverseMatrix")
+            cmds.setAttr(
+                self._skinCluster + ".bindPreMatrix[{0}]".format(self._index),
+                mat,
+                type="matrix",
+            )
 
     """
     def setColor(self, index):        
