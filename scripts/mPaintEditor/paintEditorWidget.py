@@ -198,6 +198,7 @@ class HelpWidget(QtWidgets.QTreeWidget):
             ("markingMenu ", "0"),
             ("pick Vertex ", "ALT + D"),
             ("pick influence", "D"),
+            ("Toggle Mirror Mode", "ALT + M"),
             ("Toggle Solo Mode", "ALT + S"),
             ("Toggle Wireframe", "ALT + W"),
             ("Toggle Xray", "ALT + X"),
@@ -814,11 +815,10 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.maxColor_sb.valueChanged.connect(
             partial(self.brushFunctions.setBSDAttr, "maxColor")
         )
-        self.mirrorActive_cb.toggled.connect(
-            partial(self.brushFunctions.setBSDAttr, "mirrorActive")
-        )
+
+        self.mirrorActive_cb.toggled.connect(self.toggleMirror)
         self.mirrorActive_cb.toggled.connect(self.checkIfSameValue)
-        self.mirrorStore_btn.clicked.connect(self.getMirrorInfluenceArray)
+        # self.mirrorStore_btn.clicked.connect (self.getMirrorInfluenceArray)
 
         self.soloColorIndex = (
             cmds.optionVar(query="soloColor_SkinPaintWin")
@@ -894,7 +894,6 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.uiToActivateWithPaint = [
             "pickVertex_btn",
             "pickInfluence_btn",
-            "mirrorStore_btn",
             "mirrorActive_cb",
         ]
         for btnName in self.uiToActivateWithPaint:
@@ -926,6 +925,11 @@ class SkinPaintWin(QtWidgets.QDialog):
         mirrorActive = self.brushFunctions.getBSDAttr("mirrorActive")
         with toggleBlockSignals([self.mirrorActive_cb]):
             self.mirrorActive_cb.setChecked(False)
+
+    def toggleMirror(self, val):
+        if val:
+            self.getMirrorInfluenceArray()
+        self.brushFunctions.setBSDAttr("mirrorActive", val)
 
     def checkIfSameValue(self, val):
         attr = "mirrorActive"
