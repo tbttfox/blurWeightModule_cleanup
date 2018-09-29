@@ -635,6 +635,21 @@ class DataOfSkin(object):
                 type="componentList",
             )
 
+    def undoSymetry(self):
+        tmpUndoValues = OpenMaya.MDoubleArray()
+        if self.undoMirrorValues:
+            prevValues, userComponents, influenceIndices = self.undoMirrorValues.pop()
+            self.sknFn.setWeights(
+                self.shapePath,
+                userComponents,
+                influenceIndices,
+                prevValues,
+                False,
+                tmpUndoValues,
+            )
+        else:
+            print("NO MORE SYM UNDO")
+
     def reassignLocally(self):
         # print "reassignLocally"
         with GlobalContext(message="reassignLocally", doPrint=True):
@@ -997,7 +1012,9 @@ class DataOfSkin(object):
                 np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), theValues)
                 self.computeSumArray()
             else:
-                return UndoValues
+                self.undoMirrorValues.append(
+                    [UndoValues, userComponents, influenceIndices]
+                )
 
     def callUndo(self):
         if self.UNDOstack:
@@ -1228,6 +1245,7 @@ class DataOfSkin(object):
         self.fullShapeIsUsed = False
 
         self.UNDOstack = []
+        self.undoMirrorValues = []
 
     def getConnectedBlurskinDisplay(self, disconnectWeightList=False):
         self.blurSkinNode = ""
