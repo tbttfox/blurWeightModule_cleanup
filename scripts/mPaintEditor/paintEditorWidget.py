@@ -254,6 +254,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.dataOfSkin = DataOfSkin(
             useShortestNames=self.useShortestNames, createDisplayLocator=False
         )
+        self.dataOfSkin.softOn = False
 
         self.brushFunctions = BrushFunctions(
             self, thePaintContextName=thePaintContextName
@@ -283,7 +284,17 @@ class SkinPaintWin(QtWidgets.QDialog):
         # print ind,nm, values
         self.brushFunctions.setColor(ind, values)
         item.setColor(values)
+
+        self.refreshWeightEditor(getLocks=False)
         # cmds.displayRGBColor ("userDefined{0}".format (theUserDefinedIndex),*values)
+
+    def refreshWeightEditor(self, getLocks=True):
+        import __main__
+
+        if "weightEditor" in __main__.__dict__ and __main__.weightEditor.isVisible():
+            if getLocks:
+                __main__.weightEditor.dataOfSkin.getLocksInfo()
+            __main__.weightEditor._tv.repaint()
 
     def createColorPicker(self):
         self.colorDialog = QtWidgets.QColorDialog()
@@ -802,6 +813,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         # self.delete_btn.clicked.connect (self.paintEnd )
         self.delete_btn.clicked.connect(lambda: mel.eval("setToolTo $gMove;"))
         self.delete_btn.clicked.connect(self.brushFunctions.deleteNode)
+        self.delete_btn.clicked.connect(partial(self.mirrorActive_cb.setChecked, False))
 
         self.pinSelection_btn.setIcon(_icons["pinOff"])
         self.pinSelection_btn.toggled.connect(self.changePin)
@@ -909,6 +921,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             theBtn.setText("")
             theBtn.setIcon(_icons[icon])
 
+        self.locks_btn.clicked.connect(lambda: self.locks_btn.setText("locks"))
         for ind, nm in enumerate(self.commandArray):
             thebtn = self.__dict__[nm + "_btn"]
             thebtn.clicked.connect(partial(self.brushFunctions.setPaintMode, ind))
@@ -1202,6 +1215,7 @@ class SkinPaintWin(QtWidgets.QDialog):
             "unlockAllButSel",
         ]:
             self.brushFunctions.setBSDAttr("getLockWeights", True)
+            self.refreshWeightEditor(getLocks=True)
 
     def resetBindPreMatrix(self):
         selectedItems = self.uiInfluenceTREE.selectedItems()
@@ -1251,6 +1265,7 @@ class SkinPaintWin(QtWidgets.QDialog):
 
     def prepareToGetHighestInfluence(self):
         self.highestInfluence = -1
+        self.dataOfSkin.softOn = False
         self.dataOfSkin.rawSkinValues = self.dataOfSkin.exposeSkinData(
             self.dataOfSkin.theSkinCluster
         )
@@ -1269,6 +1284,10 @@ class SkinPaintWin(QtWidgets.QDialog):
                 self.uiInfluenceTREE.topLevelItem(highestDriver)
             )
             self.brushFunctions.setInfluenceIndex(int(self.highestInfluence))
+
+    def refreshColorsAndLocks(self):
+        for i in range(self.uiInfluenceTREE.topLevelItemCount()):
+            self.uiInfluenceTREE.topLevelItem(i).setDisplay()
 
     def refreshCallBack(self):
         currContext = cmds.currentCtx()
@@ -1346,8 +1365,6 @@ class SkinPaintWin(QtWidgets.QDialog):
 # -------------------------------------------------------------------------------
 # INFLUENCE ITEM
 # -------------------------------------------------------------------------------
-
-
 class InfluenceTree(QtWidgets.QTreeWidget):
     blueBG = QtGui.QBrush(QtGui.QColor(112, 124, 137))
     redBG = QtGui.QBrush(QtGui.QColor(134, 119, 127))
