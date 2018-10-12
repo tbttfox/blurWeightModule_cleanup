@@ -139,7 +139,11 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
         while not iterSel.isDone():
             component = OpenMaya.MObject()
             dagPath = OpenMaya.MDagPath()
-            iterSel.getDagPath(dagPath, component)
+            try:
+                iterSel.getDagPath(dagPath, component)
+            except:
+                next(iterSel)
+                continue
             transform = dagPath.transform()
             node = dagPath.node()
             depNode = OpenMaya.MFnDependencyNode(node)
