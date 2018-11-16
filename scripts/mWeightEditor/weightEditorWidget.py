@@ -549,12 +549,20 @@ class SkinWeightWin(QtWidgets.QDialog):
         self.addPercentage = checked
 
     def smooth(self):
+        chunks = self.getRowColumnsSelected()
+        if not chunks:
+            chunks = [
+                (0, self.dataOfSkin.rowCount - 1, 0, self.dataOfSkin.columnCount - 1)
+            ]
+
         self.dataOfSkin.getConnectedBlurskinDisplay(disconnectWeightList=True)
-        cmds.blurSkinCmd(
-            command="smooth",
+        # convert to vertices or get the vertices
+        self.dataOfSkin.smoothSkin(
+            chunks,
             repeat=self.smoothBTN.precision,
             percentMvt=self.percentBTN.precision,
         )
+        # cmds.blurSkinCmd (command = "smooth", repeat = self.smoothBTN.precision, percentMvt = self.percentBTN.precision)
         if self.dataOfSkin.blurSkinNode and cmds.objExists(
             self.dataOfSkin.blurSkinNode
         ):
