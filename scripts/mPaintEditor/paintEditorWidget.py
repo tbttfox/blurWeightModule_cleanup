@@ -376,7 +376,7 @@ class SkinPaintWin(QtWidgets.QDialog):
         self.showZeroDeformers = (
             cmds.optionVar(query="showZeroDeformers")
             if cmds.optionVar(exists="showZeroDeformers")
-            else False
+            else True
         )
         chbox = QtWidgets.QCheckBox("show Zero Deformers", self.popMenu)
         chbox.setChecked(self.showZeroDeformers)
