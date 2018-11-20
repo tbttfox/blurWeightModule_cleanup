@@ -84,6 +84,7 @@ _icons = {
     "gaussian": getIcon("circleGauss"),
     "poly": getIcon("circlePoly"),
     "solid": getIcon("circleSolid"),
+    "clearText": getIcon("clearText"),
     "square": getIcon("rect"),
     "refresh": Icons.getIcon("refresh"),
     "eye": Icons.getIcon("eye"),
@@ -238,7 +239,7 @@ class SkinPaintWin(Window):
         super(SkinPaintWin, self).__init__(parent)
         import __main__
 
-        __main__.__dict__["paintEditor"] = self
+        __main__.paintEditor = self
 
         if not cmds.pluginInfo("blurSkin", query=True, loaded=True):
             cmds.loadPlugin("blurSkin")
@@ -826,6 +827,7 @@ class SkinPaintWin(Window):
         self.pickInfluence_btn.clicked.connect(self.pickInfluence)
         self.undo_btn.clicked.connect(self.brushFunctions.callUndo)
         self.undo_btn.clicked.connect(self.brushFunctions.callUndo)
+        self.clearText_btn.clicked.connect(self.clearInputText)
 
         self.postSet_cb.toggled.connect(self.autoExpand_cb.setEnabled)
 
@@ -916,6 +918,7 @@ class SkinPaintWin(Window):
         self.uiRightNamesLE.editingFinished.connect(self.storeMirrorOptions)
 
         for btn, icon in [
+            ("clearText", "clearText"),
             ("addInfluences", "plus"),
             ("removeInfluences", "minus"),
             ("removeUnusedInfluences", "removeUnused"),
@@ -982,6 +985,9 @@ class SkinPaintWin(Window):
         dialogLayout.insertLayout(1, Hlayout)
         dialogLayout.insertLayout(1, Hlayout2)
         dialogLayout.insertSpacing(1, 10)
+
+    def clearInputText(self):
+        self.searchInfluences_le.clear()
 
     def updateMirrorCB(self):
         mirrorActive = self.brushFunctions.getBSDAttr("mirrorActive")
@@ -1115,7 +1121,7 @@ class SkinPaintWin(Window):
                         zip(values, influences), reverse=True
                     )[0]
                     listCurrentInfluences = [
-                        self.uiInfluenceTREE.topLevelItem(i).text(1)
+                        self.uiInfluenceTREE.topLevelItem(i)._influence
                         for i in range(self.uiInfluenceTREE.topLevelItemCount())
                     ]
                     print(maxVal, maxInfluence)
@@ -1150,7 +1156,7 @@ class SkinPaintWin(Window):
 
     def influenceDoubleClicked(self, item, column):
         # print item.text(1), column
-        txt = item.text(1)
+        txt = item._influence  # text(1)
         if cmds.objExists(txt):
             if column == 1:
                 cmds.select(txt)
@@ -1175,7 +1181,7 @@ class SkinPaintWin(Window):
                 """
 
     def influenceClicked(self, item, column):
-        text = item.text(1)
+        text = item._influence  # text(1)
         # print "CLICKED " + text
         if text in self.dataOfSkin.driverNames:
             # ind = self.dataOfSkin.driverNames.index (text)
@@ -1191,7 +1197,7 @@ class SkinPaintWin(Window):
             for ind in range(self.uiInfluenceTREE.topLevelItemCount())
         ]
         if typeOfLock == "selJoints":
-            toSel = cmds.ls([item.text(1) for item in selectedItems])
+            toSel = cmds.ls([item._influence for item in selectedItems])
             if toSel:
                 cmds.select(toSel)
             else:
@@ -1429,7 +1435,8 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
             self._colors.append([int(el * 255) for el in col])
 
     def __init__(self, influence, index, col, skinCluster):
-        super(InfluenceTreeWidgetItem, self).__init__(["", influence])
+        shortName = influence.split(":")[-1]
+        super(InfluenceTreeWidgetItem, self).__init__(["", shortName])
         self._influence = influence
         self._index = index
         self._skinCluster = skinCluster
