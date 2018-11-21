@@ -9,6 +9,7 @@ from Qt import QtGui, QtCore, QtWidgets
 from functools import partial
 from maya import cmds, OpenMaya
 import blurdev
+from blurdev.gui import Window
 
 from studio.gui.resource import Icons
 from tools.skinData import DataOfSkin
@@ -98,7 +99,7 @@ HorizHeaderView{
 ###################################################################################
 
 
-class SkinWeightWin(QtWidgets.QDialog):
+class SkinWeightWin(Window):
     """
     A simple test widget to contain and own the model and table.
     """
@@ -126,6 +127,7 @@ class SkinWeightWin(QtWidgets.QDialog):
         blurdev.gui.loadUi(__file__, self)
 
         # QtWidgets.QWidget.__init__(self, parent)
+        self.getOptionVars()
         self.buildRCMenu()
 
         self.dataOfSkin = DataOfSkin(
@@ -137,6 +139,32 @@ class SkinWeightWin(QtWidgets.QDialog):
 
         self.addCallBacks()
         self.setWindowDisplay()
+
+    def showEvent(self, event):
+        super(SkinWeightWin, self).showEvent(event)
+        self.getOptionVars()
+
+    def getOptionVars(self):
+        self.autoPrune = (
+            cmds.optionVar(query="autoPrune")
+            if cmds.optionVar(exists="autoPrune")
+            else False
+        )
+        self.autoPruneValue = (
+            cmds.optionVar(query="autoPruneValue")
+            if cmds.optionVar(exists="autoPruneValue")
+            else 0.0001
+        )
+        self.useShortestNames = (
+            cmds.optionVar(query="useShortestNames")
+            if cmds.optionVar(exists="useShortestNames")
+            else True
+        )
+        self.hideZeroColumn = (
+            cmds.optionVar(query="hideZeroColumn")
+            if cmds.optionVar(exists="hideZeroColumn")
+            else False
+        )
 
     def addCallBacks(self):
         self.refreshSJ = cmds.scriptJob(event=["SelectionChanged", self.refresh])
@@ -173,26 +201,6 @@ class SkinWeightWin(QtWidgets.QDialog):
                 self._tv.showColumn(ind)
 
     def buildRCMenu(self):
-        self.autoPrune = (
-            cmds.optionVar(query="autoPrune")
-            if cmds.optionVar(exists="autoPrune")
-            else False
-        )
-        self.autoPruneValue = (
-            cmds.optionVar(query="autoPruneValue")
-            if cmds.optionVar(exists="autoPruneValue")
-            else 0.0001
-        )
-        self.useShortestNames = (
-            cmds.optionVar(query="useShortestNames")
-            if cmds.optionVar(exists="useShortestNames")
-            else True
-        )
-        self.hideZeroColumn = (
-            cmds.optionVar(query="hideZeroColumn")
-            if cmds.optionVar(exists="hideZeroColumn")
-            else False
-        )
         # -------------------
         self.popMenu = QtWidgets.QMenu(self)
 
@@ -330,7 +338,9 @@ class SkinWeightWin(QtWidgets.QDialog):
         self.unLock = not val
 
     def createWindow(self):
-        theLayout = self.layout()  # QtWidgets.QVBoxLayout(self)
+        # theLayout = self.layout()#QtWidgets.QVBoxLayout(self)
+        theLayout = self.mainLayout
+
         theLayout.setContentsMargins(10, 10, 10, 10)
         theLayout.setSpacing(3)
         self.addPercentage = False
