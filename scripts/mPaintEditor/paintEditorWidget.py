@@ -709,7 +709,10 @@ class SkinPaintWin(Window):
                 non_removable.append((nm, notNormalizable.tolist()))
 
         message = ""
-        toRmvStr = "\n - ".join(removeable)
+        toRmvStr = "\n - ".join(removeable[:10])
+        if len(removeable) > 10:
+            toRmvStr += "\n -....and {0} others..... ".format(len(removeable) - 10)
+
         message += "remove Influences :\n - {0}".format(toRmvStr)
         if non_removable:
             toNotRmvStr = "\n - ".join([el for el, vtx in non_removable])
@@ -746,7 +749,12 @@ class SkinPaintWin(Window):
             )
             zeroInfluences = list(allInfluences - weightedInfluences)
             if zeroInfluences:
-                toRmvStr = "\n - ".join(zeroInfluences)
+                toRmvStr = "\n - ".join(zeroInfluences[:10])
+                if len(zeroInfluences) > 10:
+                    toRmvStr += "\n -....and {0} others..... ".format(
+                        len(zeroInfluences) - 10
+                    )
+
                 res = cmds.confirmDialog(
                     title="remove Influences",
                     message="remove Unused Influences :\n - {0}".format(toRmvStr),
