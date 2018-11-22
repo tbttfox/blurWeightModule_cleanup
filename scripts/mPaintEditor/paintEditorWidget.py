@@ -651,9 +651,14 @@ class SkinPaintWin(Window):
         allInfluences = cmds.skinCluster(skn, query=True, influence=True)
         toAdd = [x for x in sel if x not in allInfluences]
         if toAdd:
+            toAddStr = "add Influences :\n - "
+            toAddStr += "\n - ".join(toAdd[:10])
+            if len(toAdd) > 10:
+                toAddStr += "\n -....and {0} others..... ".format(len(toAdd) - 10)
+
             res = cmds.confirmDialog(
                 title="add Influences",
-                message="add Influences :\n - {0}".format("\n - ".join(toAdd)),
+                message=toAddStr,
                 button=["Yes", "No"],
                 defaultButton="Yes",
                 cancelButton="No",
