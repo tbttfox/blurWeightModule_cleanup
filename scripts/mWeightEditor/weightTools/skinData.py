@@ -814,21 +814,7 @@ class DataOfSkin(DataAbstract):
 
         return weights
 
-    def rebuildRawSkin(self):
-        if self.fullShapeIsUsed:
-            self.rawSkinValues = self.exposeSkinData(self.theSkinCluster)
-        else:
-            self.rawSkinValues = self.exposeSkinData(
-                self.theSkinCluster, indices=self.vertices
-            )
-
-    def getSkinClusterValues(self, skinCluster):
-        driverNames = cmds.skinCluster(skinCluster, query=True, influence=True)
-        skinningMethod = cmds.getAttr(skinCluster + ".skinningMethod")
-        normalizeWeights = cmds.getAttr(skinCluster + ".normalizeWeights")
-        return (driverNames, skinningMethod, normalizeWeights)
-
-    def getZeroColumns(self):
+    def convertRawSkinToNumpyArray(self):
         """
         arr = np.array([])
         lent = self.rawSkinValues.length()
@@ -872,6 +858,20 @@ class DataOfSkin(DataAbstract):
         self.usedDeformersIndices = np.where(myAny)[0]
         self.hideColumnIndices = np.where(~myAny)[0]
         self.computeSumArray()
+
+    def rebuildRawSkin(self):
+        if self.fullShapeIsUsed:
+            self.rawSkinValues = self.exposeSkinData(self.theSkinCluster)
+        else:
+            self.rawSkinValues = self.exposeSkinData(
+                self.theSkinCluster, indices=self.vertices
+            )
+
+    def getSkinClusterValues(self, skinCluster):
+        driverNames = cmds.skinCluster(skinCluster, query=True, influence=True)
+        skinningMethod = cmds.getAttr(skinCluster + ".skinningMethod")
+        normalizeWeights = cmds.getAttr(skinCluster + ".normalizeWeights")
+        return (driverNames, skinningMethod, normalizeWeights)
 
     def computeSumArray(self):
         if self.raw2dArray != None:
@@ -988,7 +988,7 @@ class DataOfSkin(DataAbstract):
         self.columnCount = self.nbDrivers
 
         self.getLocksInfo()
-        self.getZeroColumns()
+        self.convertRawSkinToNumpyArray()
         return True
 
     def preSettingValuesFn(self, chunks, actualyVisibleColumns):
