@@ -566,7 +566,9 @@ class SkinWeightWin(Window):
             for ind in self.dataOfDeformer.hideColumnIndices:
                 self._tv.showColumn(ind)
             with GlobalContext(message="weightEdtior getAllData", doPrint=False):
+                self.dataOfDeformer.updateDisplayVerts([])
                 resultData = self.dataOfDeformer.getAllData(force=force)
+
             """
             sel = cmds.ls (sl=True, tr=True)
             if sel : 
@@ -725,7 +727,13 @@ class SkinWeightWin(Window):
                     average=average,
                 )
             else:
-                print("to implement Add, use Absolute")
+                self.dataOfDeformer.doAdd(
+                    val,
+                    percent=self.addPercentage,
+                    autoPrune=self.autoPrune,
+                    average=average,
+                )
+                # print "to implement Add, use Absolute"
         else:
             self.dataOfDeformer.absoluteVal(val)
 
