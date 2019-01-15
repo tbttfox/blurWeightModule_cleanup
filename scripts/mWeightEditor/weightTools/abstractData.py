@@ -35,9 +35,9 @@ class DataAbstract(object):
         cmds.select(sel)
         cmds.hilite(hil)
 
-    # -------------------------------------------------------------------------------------------
-    # locatorFunctions -------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # locatorFunctions -----------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def createDisplayLocator(self):
         self.pointsDisplayTrans = None
         if not cmds.pluginInfo("blurSkin", query=True, loaded=True):
@@ -195,9 +195,9 @@ class DataAbstract(object):
                     type="componentList",
                 )
 
-    # -------------------------------------------------------------------------------------------
-    # functions utils --------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # functions utils ------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def getDeformerFromSel(self, sel, typeOfDeformer="skinCluster"):
         if sel:
             hist = cmds.listHistory(sel, levels=0, pruneDagObjects=True)
@@ -238,24 +238,26 @@ class DataAbstract(object):
             self.opposite_sortedIndices = list(range(len(self.vertices)))
 
     def orderMelListValues(self, vertsIndicesWeights):
+        vertsIndicesWeights.sort(key=lambda x: x[0])
+        # print vertsIndicesWeights
         it = iter(vertsIndicesWeights)
         currentIndex, currentWeight = next(it)
         toReturn = []
         while True:
             try:
-                firstIndex = currentIndex
-                indexPlusOne = firstIndex
+                firstIndex, indexPlusOne = currentIndex, currentIndex
                 lstWeights = []
                 while currentIndex == indexPlusOne:
                     lstWeights.append(currentWeight)
-                    currentIndex, currentWeight = next(it)
                     indexPlusOne += 1
+                    currentIndex, currentWeight = next(it)
 
                 if firstIndex != (indexPlusOne - 1):
                     toAppend = [(firstIndex, (indexPlusOne - 1)), lstWeights]
                 else:
                     toAppend = [firstIndex, lstWeights[0]]
                 toReturn.append(toAppend)
+
             except StopIteration:
                 if firstIndex != (indexPlusOne - 1):
                     toAppend = [(firstIndex, (indexPlusOne - 1)), lstWeights]
@@ -307,9 +309,9 @@ class DataAbstract(object):
         else:
             return listInds
 
-    # -------------------------------------------------------------------------------------------
-    # functions for MObjects  ------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # functions for MObjects  ----------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def getMObject(self, nodeName, returnDagPath=True):
         # We expect here the fullPath of a shape mesh
         selList = OpenMaya.MSelectionList()
@@ -354,9 +356,9 @@ class DataAbstract(object):
         elif self.shapePath.apiType() == OpenMaya.MFn.kMesh:  # mesh
             self.nbVertices = cmds.polyEvaluate(self.deformedShape, vertex=True)
 
-    # -------------------------------------------------------------------------------------------
-    # functions for numpy ----------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # functions for numpy --------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def printArrayData(self, theArr):  # , theMask) :
         # theArr = self.orig2dArray
         # theMask
@@ -379,9 +381,9 @@ class DataAbstract(object):
             print(toPrint)
         print("\n")
 
-    # -------------------------------------------------------------------------------------------
-    # get the data ------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # get the data --------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def clearData(self):
         self.deformedShape, self.shapeShortName, self.deformedShape_longName = (
             "",
@@ -467,9 +469,25 @@ class DataAbstract(object):
 
         return True
 
-    # -------------------------------------------------------------------------------------------
-    # values setting ---------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # values setting -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    def pruneOnArray(self, theArray, theMask, pruneValue):
+        unLock = np.ma.array(theArray.copy(), mask=theMask, fill_value=0)
+        np.copyto(theArray, np.full(unLock.shape, 0), where=unLock < pruneValue)
+
+    def pruneWeights(self, pruneValue):
+        with GlobalContext(message="pruneWeights", doPrint=True):
+            new2dArray = np.copy(self.orig2dArray)
+
+            self.pruneOnArray(new2dArray, self.lockedMask, pruneValue)
+
+            self.setValueInDeformer(new2dArray)
+            if self.sub2DArrayToSet != None:
+                np.put(
+                    self.sub2DArrayToSet, range(self.sub2DArrayToSet.size), new2dArray
+                )
+
     def absoluteVal(self, val):
         with GlobalContext(message="absoluteVal", doPrint=self.verbose):
             new2dArray = np.copy(self.orig2dArray)
@@ -585,9 +603,9 @@ class DataAbstract(object):
     def getValue(self, row, column):
         return self.display2dArray[row][column]
 
-    # -------------------------------------------------------------------------------------------
-    # function to get display  texts ------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # function to get display  texts ----------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def createRowText(self):
         if self.isNurbsSurface:
             self.rowText = []
@@ -609,9 +627,9 @@ class DataAbstract(object):
                 " {0} ".format(ind) for ind in self.vertices
             ]  # map (str, self.vertices)
 
-    # -------------------------------------------------------------------------------------------
-    # ------ selection  ------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # ------ selection  ----------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def getZeroRows(self, selectedColumns):
         res = self.display2dArray[:, selectedColumns]
         myAny = np.any(res, axis=1)
@@ -666,9 +684,9 @@ class DataAbstract(object):
         # mel.eval ("select -r " + " ".join(toSel))
         cmds.select(toSel, replace=True)
 
-    # -------------------------------------------------------------------------------------------
-    # locks ------------------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # locks ----------------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def addLockVerticesAttribute(self):
         if not cmds.attributeQuery(
             "lockedVertices", node=self.deformedShape, exists=True
@@ -716,9 +734,9 @@ class DataAbstract(object):
     def isLocked(self, row, columnIndex):
         return self.isColumnLocked(columnIndex) or self.isRowLocked(row)
 
-    # -------------------------------------------------------------------------------------------
-    # callBacks --------------------------------------------------------------------------------
-    # -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    # callBacks ------------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
     def renameCB(self, oldName, newName):
         return
         print(
