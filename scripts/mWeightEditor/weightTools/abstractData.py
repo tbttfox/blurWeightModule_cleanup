@@ -149,6 +149,10 @@ class DataAbstract(object):
     def updateDisplayVerts(self, rowsSel):
         if isinstance(rowsSel, np.ndarray):
             rowsSel = rowsSel.tolist()
+        if "deformedShape" not in self.__dict__:
+            return
+        if not cmds.objExists(self.deformedShape):
+            return
 
         isMesh = (
             "shapePath" in self.__dict__

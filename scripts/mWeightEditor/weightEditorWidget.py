@@ -443,6 +443,7 @@ class SkinWeightWin(Window):
             OpenMaya.MSceneMessage.removeCallback(callBck)
 
     def deselectAll(self, *args):
+        # print "DESELECTALL"
         self._tm.beginResetModel()
         self.dataOfDeformer.clearData()
         self._tm.endResetModel()
