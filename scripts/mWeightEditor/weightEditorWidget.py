@@ -406,8 +406,8 @@ class SkinWeightWin(Window):
 
         with toggleBlockSignals([self.listInputs_CB]):
             self.listInputs_CB.addItems(
-                ["skinCluster", "blendShape", "deformers", "others"]
-            )
+                ["skinCluster", "blendShape", "deformers"]
+            )  # , "others"])
 
         """
         if self.dataOfDeformer.deformedShape : 

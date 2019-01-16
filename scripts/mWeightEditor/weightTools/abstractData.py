@@ -430,7 +430,8 @@ class DataAbstract(object):
 
         return
         """
-        print("getConnectVertices")
+        if self.verbose:
+            print("getConnectVertices")
         # shapePath = getMObject(None, "restShape")
         theMeshFn = OpenMaya.MFnMesh(self.shapePath)
         vertexCount = OpenMaya.MIntArray()
@@ -468,7 +469,9 @@ class DataAbstract(object):
 
         # print "theMax ", theMax
         self.maxNeighboors = theMax
-        print("end - getConnectVertices")
+        if self.verbose:
+            print("end - getConnectVertices")
+
         """
         shapePath = getMObject("restShape")
         theMeshFn = OpenMaya.MFnMesh (shapePath )
