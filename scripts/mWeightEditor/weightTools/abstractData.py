@@ -27,6 +27,8 @@ def isin(element, test_elements, assume_unique=False, invert=False):
 #
 ###################################################################################
 class DataAbstract(object):
+    verbose = False
+
     def __init__(self, createDisplayLocator=True):
         self.isSkinData = False
         sel = cmds.ls(selection=True)
@@ -204,31 +206,36 @@ class DataAbstract(object):
     # functions utils ------------------------------------------------------------------------------------------
     # -----------------------------------------------------------------------------------------------------------
     def getDeformerFromSel(self, sel, typeOfDeformer="skinCluster"):
-        if sel:
-            hist = cmds.listHistory(sel, levels=0, pruneDagObjects=True)
-            if typeOfDeformer != None and hist:
-                deformers = cmds.ls(hist, type=typeOfDeformer)
-                if deformers:
-                    theDeformer = deformers[0]
-                    theDeformedShape = cmds.ls(
-                        cmds.listHistory(theDeformer, allFuture=True, future=True),
-                        type="shape",
-                    )
-                    return theDeformer, theDeformedShape[0]
-            # get the selected shape only
-            selShape = cmds.ls(sel, objectsOnly=True)[0]
-            if cmds.ls(selShape, transforms=True):  # if it's a transform get the shape
-                selShape = (
-                    cmds.listRelatives(
-                        selShape, shapes=True, path=True, noIntermediate=True
-                    )
-                    or [""]
-                )[0]
-            if not cmds.ls(selShape, shapes=True):
-                return "", ""
-            else:
+        with GlobalContext(message="getDeformerFromSel", doPrint=self.verbose):
+            if sel:
+                selShape = cmds.ls(sel, objectsOnly=True)[0]
+                if cmds.ls(
+                    selShape, transforms=True
+                ):  # if it's a transform get the shape
+                    selShape = (
+                        cmds.listRelatives(
+                            selShape, shapes=True, path=True, noIntermediate=True
+                        )
+                        or [""]
+                    )[0]
+                if not cmds.ls(selShape, shapes=True):
+                    return "", ""
+
+                hist = cmds.listHistory(
+                    selShape, levels=0, pruneDagObjects=True, interestLevel=True
+                )
+                if typeOfDeformer != None and hist:
+                    deformers = cmds.ls(hist, type=typeOfDeformer)
+                    if deformers:
+                        theDeformer = deformers[0]
+                        theDeformedShape = cmds.ls(
+                            cmds.listHistory(theDeformer, allFuture=True, future=True),
+                            type="shape",
+                        )
+                        return theDeformer, theDeformedShape[0]
+
                 return "", selShape
-        return "", ""
+            return "", ""
 
     def getSoftSelectionVertices(self, inputVertices=None):
         dicOfSel = getSoftSelectionValuesNEW()
@@ -560,48 +567,49 @@ class DataAbstract(object):
     def getDataFromSelection(
         self, typeOfDeformer="skinCluster", force=True, inputVertices=None
     ):
-        if inputVertices != None:
-            inputVertices = list(map(int, inputVertices))
-        # print inputVertices
-        sel = cmds.ls(selection=True)
-        theDeformer, deformedShape = self.getDeformerFromSel(
-            sel, typeOfDeformer=typeOfDeformer
-        )
-        if not deformedShape or not cmds.objExists(deformedShape):
-            return False
-        # print "deformedShape -> ",deformedShape
-        # check if reloading is necessary
-        softOn = cmds.softSelect(query=True, softSelectEnabled=True)
-        prevSoftSel = cmds.softSelect(query=True, softSelectDistance=True)
-        isPreloaded = (
-            self.preSel == sel
-            and prevSoftSel == self.prevSoftSel
-            and softOn == self.softIsReallyOn
-        )
+        with GlobalContext(message="getDataFromSelection", doPrint=self.verbose):
+            if inputVertices != None:
+                inputVertices = list(map(int, inputVertices))
+            # print inputVertices
+            sel = cmds.ls(selection=True)
+            theDeformer, deformedShape = self.getDeformerFromSel(
+                sel, typeOfDeformer=typeOfDeformer
+            )
+            if not deformedShape or not cmds.objExists(deformedShape):
+                return False
+            # print "deformedShape -> ",deformedShape
+            # check if reloading is necessary
+            softOn = cmds.softSelect(query=True, softSelectEnabled=True)
+            prevSoftSel = cmds.softSelect(query=True, softSelectDistance=True)
+            isPreloaded = (
+                self.preSel == sel
+                and prevSoftSel == self.prevSoftSel
+                and softOn == self.softIsReallyOn
+            )
 
-        self.preSel = sel
-        self.prevSoftSel = prevSoftSel
-        self.softOn = softOn
-        self.softIsReallyOn = softOn
-        # self.theSkinCluster == theSkinCluster and self.deformedShape == deformedShape
-        if not force and isPreloaded:
-            return False
+            self.preSel = sel
+            self.prevSoftSel = prevSoftSel
+            self.softOn = softOn
+            self.softIsReallyOn = softOn
+            # self.theSkinCluster == theSkinCluster and self.deformedShape == deformedShape
+            if not force and isPreloaded:
+                return False
 
-        self.shapeShortName = (
-            cmds.listRelatives(deformedShape, parent=True)[0]
-            .split(":")[-1]
-            .split("|")[-1]
-        )
-        splt = self.shapeShortName.split("_")
-        if len(splt) > 5:
-            self.shapeShortName = "_".join(splt[-7:-4])
-        (self.deformedShape_longName,) = cmds.ls(deformedShape, long=True)
+            self.shapeShortName = (
+                cmds.listRelatives(deformedShape, parent=True)[0]
+                .split(":")[-1]
+                .split("|")[-1]
+            )
+            splt = self.shapeShortName.split("_")
+            if len(splt) > 5:
+                self.shapeShortName = "_".join(splt[-7:-4])
+            (self.deformedShape_longName,) = cmds.ls(deformedShape, long=True)
 
-        self.deformedShape = deformedShape
-        self.theDeformer = theDeformer
+            self.deformedShape = deformedShape
+            self.theDeformer = theDeformer
 
-        self.raw2dArray = None
-        return True
+            self.raw2dArray = None
+            return True
 
     # -----------------------------------------------------------------------------------------------------------
     # values setting -------------------------------------------------------------------------------------------
@@ -611,7 +619,7 @@ class DataAbstract(object):
         np.copyto(theArray, np.full(unLock.shape, 0), where=unLock < pruneValue)
 
     def pruneWeights(self, pruneValue):
-        with GlobalContext(message="pruneWeights", doPrint=True):
+        with GlobalContext(message="pruneWeights", doPrint=self.verbose):
             new2dArray = np.copy(self.orig2dArray)
 
             self.pruneOnArray(new2dArray, self.lockedMask, pruneValue)
