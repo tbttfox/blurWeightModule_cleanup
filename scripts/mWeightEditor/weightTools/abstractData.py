@@ -449,9 +449,12 @@ class DataAbstract(object):
             sumVerts += nbVertsInFace
 
         theMax = 0
+        self.nbNeighBoors = {}
         for vtx, lst in self.vertNeighboors.items():
+            QApplication.processEvents()
             self.vertNeighboors[vtx] = list(set(lst))
             newMax = len(self.vertNeighboors[vtx])
+            self.nbNeighBoors[vtx] = newMax
             if newMax > theMax:
                 theMax = newMax
 
