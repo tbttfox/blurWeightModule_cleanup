@@ -208,6 +208,7 @@ class DataAbstract(object):
     def getDeformerFromSel(self, sel, typeOfDeformer="skinCluster"):
         with GlobalContext(message="getDeformerFromSel", doPrint=self.verbose):
             if sel:
+                # cmds.ls (hilite=True)
                 selShape = cmds.ls(sel, objectsOnly=True)[0]
                 if cmds.ls(
                     selShape, transforms=True
