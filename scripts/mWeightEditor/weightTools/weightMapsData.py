@@ -39,6 +39,7 @@ class DataOfOneDimensionalAttrs(DataAbstract):
         )
 
     def smoothVertices(self, iteration=10):
+        # print "iteration", iteration
         with GlobalContext(message="smoothVertices", doPrint=True):
             new2dArray = np.copy(self.orig2dArray)
 
@@ -51,9 +52,9 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                     vertsIndicesWeights = []
                     settingLst = new2dArray[:, colIndex].tolist()
                     subArrsDics = {}
-                    indicesChanged = []
-                    valueChanged = []
                     for _ in range(iteration):
+                        indicesChanged = []
+                        valueChanged = []
                         for rowIndex, val in enumerate(settingLst):
                             if self.sumMasks[rowIndex, colIndex]:
                                 # print rowIndex, val
@@ -67,7 +68,6 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                                     subArr = subArrsDics[vertIndex]
 
                                 meanValue = np.mean(subArr)
-                                vertsIndicesWeights.append((vertIndex, meanValue))
 
                                 indicesChanged.append(vertIndex)
                                 valueChanged.append(meanValue)
@@ -76,11 +76,13 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                         self.fullAttributesArr[indicesChanged, colIndex] = valueChanged
                         # for indVtx, value in vertsIndicesWeights:
                         #    self.fullAttributesArr [indVtx, colIndex] = value
-
+                    vertsIndicesWeights = [
+                        (indVtx, valueChanged[i])
+                        for i, indVtx in enumerate(indicesChanged)
+                    ]
                     self.setAttributeValues(
                         self.listAttrs[colIndex], vertsIndicesWeights
                     )
-                    vertsIndicesWeights.sort()
 
     # -----------------------------------------------------------------------------------------------------------
     # Attrs functions -------------------------------------------------------------------------------------
@@ -390,7 +392,7 @@ class DataOfDeformers(DataOfOneDimensionalAttrs):
 
         # get list deformers attributes
         self.shortColumnsNames, self.listAttrs = self.getDeformersAttributes()
-        print(self.shortColumnsNames, self.listAttrs)
+        # print self.shortColumnsNames , self.listAttrs
 
         if displayLocator:
             self.connectDisplayLocator()
