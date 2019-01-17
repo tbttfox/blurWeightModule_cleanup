@@ -37,81 +37,71 @@ class DataOfOneDimensionalAttrs(DataAbstract):
             createDisplayLocator=createDisplayLocator
         )
 
-    def smoothVertices(self, iteration=10):
-        # print "iteration", iteration
+    # -----------------------------------------------------------------------------------------------------------
+    # export import  -------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------------------
+    def exportColumns(self, colIndices):
+        """
+        print colIndices
+        print [self.listAttrs[i] for i in colIndices]
+        print [self.shortColumnsNames[i] for i in colIndices]
+        """
+        # 1 re-get the values
         self.getAttributesValues(onlyfullArr=True)
-        with GlobalContext(message="smoothVertices", doPrint=self.verbose):
-            new2dArray = np.copy(self.orig2dArray)
+        # 2 subArray :
+        sceneName = cmds.file(query=True, sceneName=True)
+        splt = sceneName.split("/")
+        startDir = "/".join(splt[:-1])
+        res = cmds.fileDialog2(
+            fileMode=3, dialogStyle=1, caption="save data", startingDirectory=startDir
+        )
+        if res:
+            destinationFolder = res.pop()
+            for ind in colIndices:
+                filePth = "{}/{}.gz".format(
+                    destinationFolder, self.shortColumnsNames[ind]
+                )
+                print(filePth)
+                arrToExport = np.copy(self.fullAttributesArr[:, ind])
+                np.savetxt(filePth, arrToExport)
 
-            editedColumns = np.any(self.sumMasks, axis=0).tolist()
-            rows = new2dArray.shape[0]
-            for colIndex, isColumnChanged in enumerate(editedColumns):
-                if isColumnChanged:
-                    # print colIndex, self.Mtop
-                    # build array to set
-                    vertsIndicesWeights = []
-                    settingLst = new2dArray[:, colIndex].tolist()
-                    subArrsDics = {}
-                    for _ in range(iteration):
-                        indicesChanged = []
-                        valueChanged = []
+    def importColumns(self, colIndices):
+        """
+        print colIndices
+        print [self.listAttrs[i] for i in colIndices]
+        print [self.shortColumnsNames[i] for i in colIndices]
+        """
+        # 2 subArray :
+        sceneName = cmds.file(query=True, sceneName=True)
+        splt = sceneName.split("/")
+        startDir = "/".join(splt[:-1])
+        res = cmds.fileDialog2(
+            fileMode=4, dialogStyle=1, caption="save data", startingDirectory=startDir
+        )
+        if res:
+            if len(res) == 1:
+                (filePth,) = res
+                for colIndex in colIndices:
+                    self.doImport(filePth, colIndex)
+                    # we need a refresh I believe
+                return None
+            else:
+                return [self.shortColumnsNames[i] for i in colIndices], res
+        return None
 
-                        nbNonZero = np.count_nonzero(self.sumMasks[:, colIndex])
-                        # print "column [{}], nonZero [{}]".format (colIndex, nbNonZero)
-                        # create an array for a faster compute of the mean !!
-                        arrayForMean = np.full((nbNonZero, self.maxNeighboors), 0)
-                        arrayForMeanMask = np.full(
-                            (nbNonZero, self.maxNeighboors), False, dtype=bool
-                        )
-                        i = 0
-                        for rowIndex, val in enumerate(settingLst):
-                            if self.sumMasks[rowIndex, colIndex]:
-                                # print rowIndex, val
-                                vertIndex = self.vertices[self.Mtop + rowIndex]
-                                if vertIndex not in subArrsDics:
-                                    connectedVertices = self.vertNeighboors[vertIndex]
-                                    subArr = self.fullAttributesArr[
-                                        connectedVertices, colIndex
-                                    ]
-                                    arrayForMean[
-                                        i, 0 : self.nbNeighBoors[vertIndex]
-                                    ] = subArr
-                                    arrayForMeanMask[
-                                        i, 0 : self.nbNeighBoors[vertIndex]
-                                    ] = True
-                                    # update the mask
-                                else:
-                                    subArr = subArrsDics[vertIndex]
-                                # fill the mean array
-                                # arrayForMean [i, 0:self.nbNeighBoors[vertIndex]] = np.copy(subArr)
-                                i += 1
-                                # do the mean outside the loop!
-                                indicesChanged.append(vertIndex)
+    def doImport(self, filePth, colIndex):
+        print(filePth)
+        fileArr = np.loadtxt(str(filePth))
+        difference = fileArr - self.fullAttributesArr[:, colIndex]
 
-                                # meanValue = np.mean (subArr)
-                                # valueChanged.append (meanValue)
+        indicesDifferents = np.nonzero(difference)
+        values = fileArr[indicesDifferents]
 
-                        meanCopy = np.ma.array(
-                            arrayForMean, mask=~arrayForMeanMask, fill_value=0
-                        )
-                        meanValues = np.ma.mean(meanCopy, axis=1)
+        vertsIndicesWeights = list(zip(indicesDifferents[0].tolist(), values.tolist()))
+        self.setAttributeValues(self.listAttrs[colIndex], vertsIndicesWeights)
 
-                        # update array :
-                        self.fullAttributesArr[indicesChanged, colIndex] = np.copy(
-                            meanValues
-                        )  # valueChanged
-                        # self.fullAttributesArr [indicesChanged, colIndex] = np.copy(meanValues)#.tolist()
-
-                        # for indVtx, value in vertsIndicesWeights:
-                        #    self.fullAttributesArr [indVtx, colIndex] = value
-                    valueChanged = meanValues.tolist()
-                    vertsIndicesWeights = [
-                        (indVtx, valueChanged[i])
-                        for i, indVtx in enumerate(indicesChanged)
-                    ]
-                    self.setAttributeValues(
-                        self.listAttrs[colIndex], vertsIndicesWeights
-                    )
+    def queryAssociationWindow(self, colIndices, lstPaths):
+        print("path")
 
     # -----------------------------------------------------------------------------------------------------------
     # Attrs functions -------------------------------------------------------------------------------------
@@ -187,13 +177,6 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                 self.display2dArray = self.raw2dArray
 
     def setValueInDeformer(self, arrayForSetting):
-        ##### !!!!!!!!!!!!!!!!!!!!!!
-        ##### !!!!!!!!!!!!!!!!!!!!!!
-
-        # update self.fullAttributesArr ??
-
-        ##### !!!!!!!!!!!!!!!!!!!!!!
-        ##### !!!!!!!!!!!!!!!!!!!!!!
         # self.printArrayData (arrayForSetting)
         editedColumns = np.any(self.sumMasks, axis=0).tolist()
         rows = arrayForSetting.shape[0]
@@ -210,7 +193,6 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                         vertsIndicesWeights.append((vertIndex, val))
                 vertsIndicesWeights.sort()
                 self.setAttributeValues(self.listAttrs[colIndex], vertsIndicesWeights)
-
         """
         editedColumns = np.any(self.sumMasks, axis=0)
         rows = arrayForSetting .shape[0]        
@@ -259,6 +241,82 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                 else:
                     index, value = indices, weightArray
                     cmds.setAttr(att + "[{}]".format(index), value)
+
+    def smoothVertices(self, iteration=10):
+        # print "iteration", iteration
+        self.getAttributesValues(onlyfullArr=True)
+        with GlobalContext(message="smoothVertices", doPrint=self.verbose):
+            new2dArray = np.copy(self.orig2dArray)
+
+            editedColumns = np.any(self.sumMasks, axis=0).tolist()
+            rows = new2dArray.shape[0]
+            for colIndex, isColumnChanged in enumerate(editedColumns):
+                if isColumnChanged:
+                    # print colIndex, self.Mtop
+                    # build array to set
+                    vertsIndicesWeights = []
+                    settingLst = new2dArray[:, colIndex].tolist()
+                    subArrsDics = {}
+                    for _ in range(iteration):
+                        indicesChanged = []
+                        valueChanged = []
+
+                        nbNonZero = np.count_nonzero(self.sumMasks[:, colIndex])
+                        # print "column [{}], nonZero [{}]".format (colIndex, nbNonZero)
+                        # create an array for a faster compute of the mean !!
+                        arrayForMean = np.full((nbNonZero, self.maxNeighboors), 0)
+                        arrayForMeanMask = np.full(
+                            (nbNonZero, self.maxNeighboors), False, dtype=bool
+                        )
+                        i = 0
+                        for rowIndex, val in enumerate(settingLst):
+                            if self.sumMasks[rowIndex, colIndex]:
+                                # print rowIndex, val
+                                vertIndex = self.vertices[self.Mtop + rowIndex]
+                                if vertIndex not in subArrsDics:
+                                    connectedVertices = self.vertNeighboors[vertIndex]
+                                    subArr = self.fullAttributesArr[
+                                        connectedVertices, colIndex
+                                    ]
+                                    arrayForMean[
+                                        i, 0 : self.nbNeighBoors[vertIndex]
+                                    ] = subArr
+                                    arrayForMeanMask[
+                                        i, 0 : self.nbNeighBoors[vertIndex]
+                                    ] = True
+                                    # update the mask
+                                else:
+                                    subArr = subArrsDics[vertIndex]
+                                # fill the mean array
+                                # arrayForMean [i, 0:self.nbNeighBoors[vertIndex]] = np.copy(subArr)
+                                i += 1
+                                # do the mean outside the loop!
+                                indicesChanged.append(vertIndex)
+
+                                # meanValue = np.mean (subArr)
+                                # valueChanged.append (meanValue)
+
+                        meanCopy = np.ma.array(
+                            arrayForMean, mask=~arrayForMeanMask, fill_value=0
+                        )
+                        meanValues = np.ma.mean(meanCopy, axis=1)
+
+                        # update array :
+                        self.fullAttributesArr[indicesChanged, colIndex] = np.copy(
+                            meanValues
+                        )  # valueChanged
+                        # self.fullAttributesArr [indicesChanged, colIndex] = np.copy(meanValues)#.tolist()
+
+                        # for indVtx, value in vertsIndicesWeights:
+                        #    self.fullAttributesArr [indVtx, colIndex] = value
+                    valueChanged = meanValues.tolist()
+                    vertsIndicesWeights = [
+                        (indVtx, valueChanged[i])
+                        for i, indVtx in enumerate(indicesChanged)
+                    ]
+                    self.setAttributeValues(
+                        self.listAttrs[colIndex], vertsIndicesWeights
+                    )
 
     # -----------------------------------------------------------------------------------------------------------
     # redefine abstract data functions -------------------------------------------------------------------------
