@@ -915,4 +915,5 @@ class DataAbstract(object):
         )
 
     def callUndo(self):
+        cmds.Undo()
         pass
