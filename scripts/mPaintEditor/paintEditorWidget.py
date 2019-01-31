@@ -1322,7 +1322,7 @@ class SkinPaintWin(Window):
         self.dataOfSkin.rawSkinValues = self.dataOfSkin.exposeSkinData(
             self.dataOfSkin.theSkinCluster
         )
-        self.dataOfSkin.getZeroColumns()
+        self.dataOfSkin.convertRawSkinToNumpyArray()
 
     def getHighestInfluence(self, vtxIndex):
         highestDriver = np.argmax(self.dataOfSkin.raw2dArray[vtxIndex])
@@ -1408,7 +1408,11 @@ class SkinPaintWin(Window):
         # self.brushFunctions.deleteNode ()
 
     def paintStart(self):
+        print("paintStart")
         # self.enterPaint ( withBrushFn = False)
+
+        prevSelection = cmds.ls(selection=True)
+        # convert to vertices
 
         self.brushFunctions.bsd = self.dataOfSkin.getConnectedBlurskinDisplay()
         if not self.brushFunctions.bsd:
@@ -1422,6 +1426,9 @@ class SkinPaintWin(Window):
             self.__dict__[btnName].setEnabled(True)
         self.setStyleSheet(styleSheet + "SkinPaintWin {border : 2px solid red}")
         self.changeMultiSolo(self.multi_rb.isChecked())
+
+        # reselect
+        cmds.select(prevSelection)
 
 
 # -------------------------------------------------------------------------------
