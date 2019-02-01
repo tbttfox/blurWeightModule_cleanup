@@ -25,16 +25,20 @@ cmds.setAttr ("blendShape1.inputTarget[0].baseWeights[0:2]",*values, size=len(va
 
 
 class DataOfOneDimensionalAttrs(DataAbstract):
-    useAPI = False  # for setting values use API
+    useAPI = True  # for setting values use API
 
     def __init__(
-        self, useShortestNames=False, hideZeroColumn=True, createDisplayLocator=True
+        self,
+        useShortestNames=False,
+        hideZeroColumn=True,
+        createDisplayLocator=True,
+        mainWindow=None,
     ):
         self.useShortestNames = useShortestNames
         self.hideZeroColumn = hideZeroColumn
         self.clearData()
         super(DataOfOneDimensionalAttrs, self).__init__(
-            createDisplayLocator=createDisplayLocator
+            createDisplayLocator=createDisplayLocator, mainWindow=mainWindow
         )
 
     # -----------------------------------------------------------------------------------------------------------
@@ -180,6 +184,10 @@ class DataOfOneDimensionalAttrs(DataAbstract):
         arrIndicesVerts = np.array(self.vertices)
         editedColumns = np.any(self.sumMasks, axis=0).tolist()
         rows = arrayForSetting.shape[0]
+        attsValues = []
+        if self.storeUndo:
+            undoValues = []
+
         for colIndex, isColumnChanged in enumerate(editedColumns):
             if isColumnChanged:
                 # we can also check what didn't change with a difference same as in doImport
@@ -188,20 +196,28 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                 verts = arrIndicesVerts[indices + self.Mtop]
                 vertsIndicesWeights = list(zip(verts.tolist(), values.tolist()))
 
-                # print vertsIndicesWeights
-                """
-                #print colIndex, self.Mtop
-                #build array to set
-                vertsIndicesWeights = []
-                settingLst = arrayForSetting[:,colIndex].tolist ()
-                for rowIndex, val in enumerate(settingLst) : 
-                    if self.sumMasks [rowIndex, colIndex]:
-                        #print rowIndex, val
-                        vertIndex = self.vertices [self.Mtop + rowIndex]
-                        vertsIndicesWeights.append ((vertIndex,val))
-                vertsIndicesWeights.sort()
-                """
-                self.setAttributeValues(self.listAttrs[colIndex], vertsIndicesWeights)
+                # self.setAttributeValues (self.listAttrs [colIndex],vertsIndicesWeights)
+                attsValues.append((self.listAttrs[colIndex], vertsIndicesWeights))
+                # now the undo values ------------------------------
+                if self.storeUndo:
+                    valuesOrig = self.fullAttributesArr[verts.tolist(), colIndex]
+                    undoVertsIndicesWeights = list(
+                        zip(verts.tolist(), valuesOrig.tolist())
+                    )
+                    undoValues.append(
+                        (self.listAttrs[colIndex], undoVertsIndicesWeights)
+                    )
+
+        if self.storeUndo:
+            self.undoValues = undoValues
+            self.storeUndo = False
+        self.redoValues = attsValues
+        self.setAttsValues(attsValues)
+
+    def setAttsValues(self, attsValues):
+        # stor undo values and redo values
+        for att, vertsIndicesWeights in attsValues:
+            self.setAttributeValues(att, vertsIndicesWeights)
 
     def setAttributeValues(self, att, vertsIndicesWeights):
         if not vertsIndicesWeights:
@@ -244,6 +260,9 @@ class DataOfOneDimensionalAttrs(DataAbstract):
         # for the extended neighBoors
         padder = list(range(self.maxNeighboors))
         dicOfVertsSubArray = {}
+        attsValues = []
+        if self.storeUndo:
+            undoValues = []
 
         with GlobalContext(message="smoothVertices", doPrint=True):
             new2dArray = np.copy(self.orig2dArray)
@@ -255,7 +274,7 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                     # get indices to set ---------------------------------------
                     indices = np.nonzero(self.sumMasks[:, colIndex])[0]
                     # values  = new2dArray [ indices, colIndex]
-                    # get verrttices to set ------------------------------------
+                    # get vertices to set ------------------------------------
                     verts = arrIndicesVerts[indices + self.Mtop]
 
                     # prepare array for mean -----------------------------------
@@ -264,6 +283,14 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                     arrayForMeanMask = np.full(
                         (nbNonZero, self.maxNeighboors), False, dtype=bool
                     )
+                    if self.storeUndo:
+                        valuesOrig = self.fullAttributesArr[verts.tolist(), colIndex]
+                        undoVertsIndicesWeights = list(
+                            zip(verts.tolist(), valuesOrig.tolist())
+                        )
+                        undoValues.append(
+                            (self.listAttrs[colIndex], undoVertsIndicesWeights)
+                        )
 
                     for _ in range(iteration):
                         for i, vertIndex in enumerate(verts):
@@ -298,9 +325,13 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                         self.fullAttributesArr[verts, colIndex] = meanValues
 
                     vertsIndicesWeights = list(zip(verts.tolist(), meanValues.tolist()))
-                    self.setAttributeValues(
-                        self.listAttrs[colIndex], vertsIndicesWeights
-                    )
+                    attsValues.append((self.listAttrs[colIndex], vertsIndicesWeights))
+
+            if self.storeUndo:
+                self.undoValues = undoValues
+                self.storeUndo = False
+            self.redoValues = attsValues
+            self.setAttsValues(attsValues)
 
     # -----------------------------------------------------------------------------------------------------------
     # redefine abstract data functions -------------------------------------------------------------------------

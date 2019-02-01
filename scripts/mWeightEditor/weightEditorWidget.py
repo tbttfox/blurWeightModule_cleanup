@@ -14,6 +14,7 @@ from blurdev.gui import Window
 
 from studio.gui.resource import Icons
 from tools.skinData import DataOfSkin
+from tools.abstractData import DataQuickSet
 from tools.weightMapsData import DataOfBlendShape, DataOfDeformers
 
 from tools.tableWidget import TableView, TableModel
@@ -23,6 +24,7 @@ from tools.utils import (
     addNameChangedCallback,
     removeNameChangedCallback,
     toggleBlockSignals,
+    SettingWithRedraw,
 )
 
 
@@ -34,6 +36,14 @@ def getIcon(iconNm):
     uiFolder, filename = os.path.split(fileVar)
     iconPth = os.path.join(uiFolder, "img", iconNm + ".png")
     return QtGui.QIcon(iconPth)
+
+
+def loadUndoPlugin():
+    fileVar = os.path.realpath(__file__)
+    uiFolder, filename = os.path.split(fileVar)
+    plugPth = os.path.join(uiFolder, "tools", "undoPlug.py")
+    # print plugPth
+    cmds.loadPlugin(plugPth)
 
 
 _icons = {
@@ -141,6 +151,8 @@ class SkinWeightWin(Window):
         if not cmds.pluginInfo("blurSkin", query=True, loaded=True):
             cmds.loadPlugin("blurSkin")
         blurdev.gui.loadUi(__file__, self)
+        if not cmds.pluginInfo("undoPlug", query=True, loaded=True):
+            loadUndoPlugin()
 
         # QtWidgets.QWidget.__init__(self, parent)
         self.getOptionVars()
@@ -148,7 +160,9 @@ class SkinWeightWin(Window):
 
         # self.dataOfDeformer = DataOfBlendShape ()
         self.dataOfDeformer = DataOfSkin(
-            useShortestNames=self.useShortestNames, hideZeroColumn=self.hideZeroColumn
+            useShortestNames=self.useShortestNames,
+            hideZeroColumn=self.hideZeroColumn,
+            mainWindow=self,
         )
 
         self.get_data_frame()
@@ -178,24 +192,17 @@ class SkinWeightWin(Window):
         # self.headerView.deleteLater()
         super(SkinWeightWin, self).closeEvent(event)
 
-    def keyPressEvent(self, event):
-        theKeyPressed = event.key()
-        ctrlPressed = event.modifiers() == QtCore.Qt.ControlModifier
-
-        if ctrlPressed and event.key() == QtCore.Qt.Key_Z:
-            self.storeSelection()
-            self._tm.beginResetModel()
-
-            self.dataOfDeformer.callUndo()
-
-            self._tm.endResetModel()
-            self.retrieveSelection()
-
-            if not self.dataOfDeformer.isSkinData:
-                self.refresh()
-            # super(SkinWeightWin, self).keyPressEvent(event)
+    """
+    def keyPressEvent (self,event):
+        theKeyPressed = event.key()        
+        ctrlPressed = event.modifiers () == QtCore.Qt.ControlModifier
+        
+        if ctrlPressed and event.key() == QtCore.Qt.Key_Z : 
+            self.undoFn ()
+            #super(SkinWeightWin, self).keyPressEvent(event)
             return
         super(SkinWeightWin, self).keyPressEvent(event)
+    """
 
     def mousePressEvent(self, event):
         # print "click"
@@ -239,7 +246,7 @@ class SkinWeightWin(Window):
 
             newBtn.clicked.connect(self.prepareToSetValue)
             newBtn.clicked.connect(partial(self.doAddValue, theVal / 100.0))
-            newBtn.clicked.connect(self.dataOfDeformer.postSkinSet)
+            newBtn.clicked.connect(self.postSetValue)
 
             carryWidgLayoutlayout.addWidget(newBtn)
         theCarryWidget.setMaximumSize(self.maxWidthCentralWidget, 14)
@@ -623,9 +630,8 @@ class SkinWeightWin(Window):
             self.resize(vals[2], vals[3])
 
     def refreshBtn(self):
-        self.storeSelection()
-        self.refresh(force=True)
-        self.retrieveSelection()
+        with SettingWithRedraw(self):
+            self.refresh(force=True)
 
     def refreshPaintEditor(self):
         import __main__
@@ -675,15 +681,11 @@ class SkinWeightWin(Window):
                 for indCol in self.dataOfDeformer.hideColumnIndices
                 if not self._tv.HHeaderView.isSectionHidden(indCol)
             ]
-            self.storeSelection()
-            self._tm.beginResetModel()
 
-            self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
-            self.dataOfDeformer.reassignLocally()
-            self.dataOfDeformer.postSkinSet()
-
-            self._tm.endResetModel()
-            self.retrieveSelection()
+            with SettingWithRedraw(self):
+                self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
+                self.dataOfDeformer.reassignLocally()
+                self.postSetValue()
 
     def pruneWeights(self):
         chunks = self.getRowColumnsSelected()
@@ -698,15 +700,10 @@ class SkinWeightWin(Window):
             ]
         actualyVisibleColumns = []
 
-        self.storeSelection()
-        self._tm.beginResetModel()
-
-        self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
-        self.dataOfDeformer.pruneWeights(self.pruneWghtBTN.precisionValue / 100.0)
-        self.dataOfDeformer.postSkinSet()
-
-        self._tm.endResetModel()
-        self.retrieveSelection()
+        with SettingWithRedraw(self):
+            self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
+            self.dataOfDeformer.pruneWeights(self.pruneWghtBTN.precisionValue / 100.0)
+            self.postSetValue()
 
     def doNormalize(self):
         chunks = self.getRowColumnsSelected()
@@ -721,50 +718,52 @@ class SkinWeightWin(Window):
             ]
         actualyVisibleColumns = []
 
-        self.storeSelection()
-        self._tm.beginResetModel()
-
-        self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
-        self.dataOfDeformer.normalize()
-        self.dataOfDeformer.postSkinSet()
-
-        self._tm.endResetModel()
-        self.retrieveSelection()
+        with SettingWithRedraw(self):
+            self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
+            self.dataOfDeformer.normalize()
+            self.postSetValue()
 
     def doAverage(self):
+        # with SettingWithRedraw (self) :         --> no need because it's already in doAddValue
         self.prepareToSetValue()
         self.doAddValue(0, forceAbsolute=False, average=True)
-        self.dataOfDeformer.postSkinSet()
+        self.postSetValue()
 
     def smooth(self):
-        if self.dataOfDeformer.isSkinData:
-            chunks = self.getRowColumnsSelected()
-            if not chunks:
-                chunks = [
-                    (
-                        0,
-                        self.dataOfDeformer.rowCount - 1,
-                        0,
-                        self.dataOfDeformer.columnCount - 1,
-                    )
-                ]
+        with SettingWithRedraw(self):
+            if self.dataOfDeformer.isSkinData:
+                chunks = self.getRowColumnsSelected()
+                if not chunks:
+                    chunks = [
+                        (
+                            0,
+                            self.dataOfDeformer.rowCount - 1,
+                            0,
+                            self.dataOfDeformer.columnCount - 1,
+                        )
+                    ]
 
-            self.dataOfDeformer.getConnectedBlurskinDisplay(disconnectWeightList=True)
-            # convert to vertices or get the vertices
-            self.dataOfDeformer.smoothSkin(
-                chunks,
-                repeat=self.smoothBTN.precision,
-                percentMvt=self.percentBTN.precision,
-            )
-            # cmds.blurSkinCmd (command = "smooth", repeat = self.smoothBTN.precision, percentMvt = self.percentBTN.precision)
-            if self.dataOfDeformer.blurSkinNode and cmds.objExists(
-                self.dataOfDeformer.blurSkinNode
-            ):
-                cmds.delete(self.dataOfDeformer.blurSkinNode)
-        else:
-            self.prepareToSetValue()
-            self.dataOfDeformer.smoothVertices(iteration=self.smoothBTN.precision)
-            self.dataOfDeformer.postSkinSet()
+                self.dataOfDeformer.getConnectedBlurskinDisplay(
+                    disconnectWeightList=True
+                )
+                # convert to vertices or get the vertices
+                self.dataOfDeformer.smoothSkin(
+                    chunks,
+                    repeat=self.smoothBTN.precision,
+                    percentMvt=self.percentBTN.precision,
+                )
+                # cmds.blurSkinCmd (command = "smooth", repeat = self.smoothBTN.precision, percentMvt = self.percentBTN.precision)
+                if self.dataOfDeformer.blurSkinNode and cmds.objExists(
+                    self.dataOfDeformer.blurSkinNode
+                ):
+                    cmds.delete(self.dataOfDeformer.blurSkinNode)
+            else:
+                success = self.prepareToSetValue()
+                if success:
+                    self.dataOfDeformer.smoothVertices(
+                        iteration=self.smoothBTN.precision
+                    )
+                    self.postSetValue()
 
     def selProbVerts(self):
         vtx = self.dataOfDeformer.fixAroundVertices(
@@ -795,33 +794,41 @@ class SkinWeightWin(Window):
 
     def postSetValue(self):
         if self.dataOfDeformer.isSkinData:
-            return self.dataOfDeformer.postSkinSet()
+            self.dataOfDeformer.postSkinSet()
+            undoArgs = (self.dataOfDeformer.undoValues,)
+            redoArgs = (self.dataOfDeformer.redoValues,)
+            self.dataOfDeformer.undoDic["mainWindow"] = self
+
+            newClass = DataQuickSet(undoArgs, redoArgs, **self.dataOfDeformer.undoDic)
+            cmds.pythonCommand(hex(id(newClass)))
+
+        else:
+            # return
+            undoArgs = (self.dataOfDeformer.undoValues,)
+            redoArgs = (self.dataOfDeformer.redoValues,)
+            newClass = DataQuickSet(undoArgs, redoArgs, mainWindow=self)
+            cmds.pythonCommand(hex(id(newClass)))
 
     def doAddValue(self, val, forceAbsolute=False, average=False):
-        self.storeSelection()
-        self._tm.beginResetModel()
-
-        if self.valueSetter.addMode and not forceAbsolute:
-            if self.dataOfDeformer.isSkinData:
-                self.dataOfDeformer.setSkinData(
-                    val,
-                    percent=self.addPercentage,
-                    autoPrune=self.autoPrune,
-                    average=average,
-                )
+        with SettingWithRedraw(self):
+            if self.valueSetter.addMode and not forceAbsolute:
+                if self.dataOfDeformer.isSkinData:
+                    self.dataOfDeformer.setSkinData(
+                        val,
+                        percent=self.addPercentage,
+                        autoPrune=self.autoPrune,
+                        average=average,
+                    )
+                else:
+                    self.dataOfDeformer.doAdd(
+                        val,
+                        percent=self.addPercentage,
+                        autoPrune=self.autoPrune,
+                        average=average,
+                    )
+                    # print "to implement Add, use Absolute"
             else:
-                self.dataOfDeformer.doAdd(
-                    val,
-                    percent=self.addPercentage,
-                    autoPrune=self.autoPrune,
-                    average=average,
-                )
-                # print "to implement Add, use Absolute"
-        else:
-            self.dataOfDeformer.absoluteVal(val)
-
-        self._tm.endResetModel()
-        self.retrieveSelection()
+                self.dataOfDeformer.absoluteVal(val)
 
     # -----------------------------------------------------------------------------------------------------------
     # Selection ------------------------------------------------------------------------------------------------
@@ -835,12 +842,15 @@ class SkinWeightWin(Window):
     def retrieveSelection(self):
         self._tv.ignoreReselect = True
         newSel = self._tv.selectionModel().selection()
+        somethingSelected = False
         for top, left, bottom, right in self.topLeftBotRightSel:
+            somethingSelected = True
             newSel.select(self._tm.index(top, left), self._tm.index(bottom, right))
         self._tv.selectionModel().select(
             newSel, QtCore.QItemSelectionModel.ClearAndSelect
         )
         self._tv.ignoreReselect = False
+        self._tv.selEmptied.emit(somethingSelected)
 
     def highlightSelectedDeformers(self):
         selection = cmds.ls(selection=True)
@@ -887,13 +897,14 @@ class SkinWeightWin(Window):
             self.dataOfDeformer = DataOfSkin(
                 useShortestNames=self.useShortestNames,
                 hideZeroColumn=self.hideZeroColumn,
+                mainWindow=self,
             )
             self.problemVertsBTN.setEnabled(True)
         elif ind == 1:  # blendShape
-            self.dataOfDeformer = DataOfBlendShape()
+            self.dataOfDeformer = DataOfBlendShape(mainWindow=self)
             self.problemVertsBTN.setEnabled(False)
         elif ind == 2:  # deformers
-            self.dataOfDeformer = DataOfDeformers()
+            self.dataOfDeformer = DataOfDeformers(mainWindow=self)
             self.problemVertsBTN.setEnabled(False)
 
         self._tm.update(self.dataOfDeformer)
