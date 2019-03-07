@@ -274,6 +274,8 @@ class SkinPaintWin(Window):
             self, thePaintContextName=thePaintContextName
         )
         self.createWindow()
+        self.newBrush_cb.hide()
+
         self.setStyleSheet(styleSheet)
         self.setWindowDisplay()
 
@@ -315,7 +317,7 @@ class SkinPaintWin(Window):
             in QtWidgets.QApplication.instance().topLevelWidgets()
         ):
             if getLocks:
-                __main__.weightEditor.dataOfSkin.getLocksInfo()
+                __main__.weightEditor.dataOfDeformer.getLocksInfo()
             __main__.weightEditor._tv.repaint()
 
     def createColorPicker(self):
@@ -631,7 +633,7 @@ class SkinPaintWin(Window):
                     self.dataOfSkin.deformedShape, self.dataOfSkin.theSkinCluster
                 )
             self.transferValues()
-            self.brushFunctions.enterPaint()
+            self.brushFunctions.enterPaint(newBrush=self.newBrush_cb.isChecked())
 
     def transferValues(self):
         self.brushFunctions.setPaintMode(self.commandIndex)
