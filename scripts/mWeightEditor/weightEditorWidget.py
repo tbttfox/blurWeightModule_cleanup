@@ -662,6 +662,7 @@ class SkinWeightWin(Window):
             else : 
                 self.listInputs_CB.clear()
             """
+            self.dataOfDeformer.getLocksInfo()
 
             self._tm.endResetModel()
             self.setColumnVisSize()
