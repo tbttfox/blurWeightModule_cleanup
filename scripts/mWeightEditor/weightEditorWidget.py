@@ -401,11 +401,10 @@ class SkinWeightWin(Window):
 
         for uiName in [
             "reassignLocallyBTN",
-            "averageBTN",
             "widgetAbs",
             "widgetAdd",
             "valueSetter",
-        ]:
+        ]:  # "averageBTN",
             theUI = self.__dict__[uiName]
             theUI.setEnabled(False)
             self._tv.selEmptied.connect(theUI.setEnabled)
@@ -733,7 +732,7 @@ class SkinWeightWin(Window):
 
     def doAverage(self):
         # with SettingWithRedraw (self) :         --> no need because it's already in doAddValue
-        self.prepareToSetValue()
+        self.prepareToSetValue(selectAllIfNothing=True)
         self.doAddValue(0, forceAbsolute=False, average=True)
         self.postSetValue()
 
@@ -787,7 +786,7 @@ class SkinWeightWin(Window):
     # -----------------------------------------------------------------------------------------------------------
     # Basic set Values -----------------------------------------------------------------------------------------
     # -----------------------------------------------------------------------------------------------------------
-    def prepareToSetValue(self):
+    def prepareToSetValue(self, selectAllIfNothing=False):
         # with GlobalContext (message = "preSettingValuesFn"):
         chunks = self.getRowColumnsSelected()
         actualyVisibleColumns = [
@@ -795,6 +794,15 @@ class SkinWeightWin(Window):
             for indCol in self.dataOfDeformer.hideColumnIndices
             if not self._tv.HHeaderView.isSectionHidden(indCol)
         ]
+        if selectAllIfNothing and not chunks:
+            chunks = [
+                (
+                    0,
+                    self.dataOfDeformer.rowCount - 1,
+                    0,
+                    self.dataOfDeformer.columnCount - 1,
+                )
+            ]
         if chunks:
             self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
             return True
