@@ -50,33 +50,46 @@ class DataAbstract(object):
     # -----------------------------------------------------------------------------------------------------------
     # locator Functions ----------------------------------------------------------------------------------------
     # -----------------------------------------------------------------------------------------------------------
-    def createDisplayLocator(self):
+    def createDisplayLocator(self, forceSelection=False):
         self.pointsDisplayTrans = None
         if not cmds.pluginInfo("blurSkin", query=True, loaded=True):
             cmds.loadPlugin("blurSkin")
         if cmds.ls("MSkinWeightEditorDisplay*"):
             cmds.delete(cmds.ls("MSkinWeightEditorDisplay*"))
         self.pointsDisplayTrans = cmds.createNode(
-            "transform", name="MSkinWeightEditorDisplay"
+            "transform", name="MSkinWeightEditorDisplay", skipSelect=True
         )
 
         pointsDisplayNode = cmds.createNode(
-            "pointsDisplay", parent=self.pointsDisplayTrans
+            "pointsDisplay", parent=self.pointsDisplayTrans, skipSelect=True
         )
-        """
-        nurbsConnected = cmds.createNode ("nurbsSurface", p=self.pointsDisplayTrans)
-        curveConnected = cmds.createNode ("nurbsCurve", p=self.pointsDisplayTrans)
-        meshConnected = cmds.createNode ("mesh", p=self.pointsDisplayTrans)
-        for nd in [nurbsConnected, meshConnected, curveConnected] : 
-            cmds.setAttr (nd+".v", False)
-            cmds.setAttr (nd+".ihi", False)
-        #cmds.connectAttr (nurbsConnected+".worldSpace", pointsDisplayNode+".inGeometry", f=True)
-        #cmds.connectAttr (meshConnected+".outMesh", pointsDisplayNode+".inMesh", f=True)
-        #cmds.connectAttr (meshConnected+".outMesh", pointsDisplayNode+".inGeometry", f=True)
-        """
+        # add to the Isolate of all ---------------------------------------------------------
+        if forceSelection:
+            cmds.select(self.pointsDisplayTrans, add=True)
+            # that's added because the isolate doesnt work otherwise, it's dumb I know
+
+        listModelPanels = [
+            el
+            for el in cmds.getPanel(visiblePanels=True)
+            if cmds.getPanel(typeOf=el) == "modelPanel"
+        ]
+        for thePanel in listModelPanels:
+            if cmds.isolateSelect(thePanel, query=True, state=True):
+                # cmds.isolateSelect (thePanel ,addSelectedObjects=True)
+                cmds.isolateSelect(
+                    thePanel, addDagObject=self.pointsDisplayTrans
+                )  # doesnt work
+                # theSet = cmds.isolateSelect (thePanel ,q=True,     viewObjects =True )
+                # mel.eval ("sets -edit -forceElement {} {}".format ( theSet, self.pointsDisplayTrans))
 
         cmds.setAttr(pointsDisplayNode + ".pointWidth", 5)
         cmds.setAttr(pointsDisplayNode + ".inputColor", 0.0, 1.0, 1.0)
+
+        if forceSelection:
+            cmds.evalDeferred(
+                lambda: cmds.select(self.pointsDisplayTrans, deselect=True)
+            )
+            # that's added because the isolate doesnt work otherwise, it's dumb I know
 
         """
         for nd in [self.pointsDisplayTrans,pointsDisplayNode, meshConnected, nurbsConnected, curveConnected] : 

@@ -27,6 +27,7 @@ from tools.utils import (
     removeNameChangedCallback,
     toggleBlockSignals,
     SettingWithRedraw,
+    SettingVariable,
 )
 
 
@@ -739,9 +740,14 @@ class SkinWeightWin(Window):
     def useDisplayLocatorChecked(self, checked):
         cmds.optionVar(intValue=["useDisplayLocator", checked])
         self.useDisplayLocator = checked
-
         if checked:
-            self.dataOfDeformer.createDisplayLocator()
+            with SettingVariable(self, "unLock", valueOn=False, valueOut=True):
+                # print "self.unLock ", self.unLock
+                # cmds.scriptJob( kill=self.refreshSJ, force=True)
+                self.dataOfDeformer.createDisplayLocator(forceSelection=True)
+                # self.refreshSJ = cmds.scriptJob( event= ["SelectionChanged",self.refresh])
+                # print "self.unLock ", self.unLock
+
         else:
             self.dataOfDeformer.removeDisplayLocator()
 
@@ -783,7 +789,7 @@ class SkinWeightWin(Window):
             if sel : 
                 theSel = sel [0]
                 theShape = cmds.listRelatives( theSel, noIntermediate=True, shapes = True) [0]
-                self.getListPaintableAttributes (theShape)
+                self.getListPaintableAttributes (theShape)f
             else : 
                 self.listInputs_CB.clear()
             """
