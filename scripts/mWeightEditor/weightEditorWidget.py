@@ -180,6 +180,7 @@ class SkinWeightWin(Window):
 
         self.addCallBacks()
         self.setWindowDisplay()
+        self.applyDisplayColumnsFilters(None)
 
     # -----------------------------------------------------------------------------------------------------------
     # window events --------------------------------------------------------------------------------------------
@@ -282,7 +283,7 @@ class SkinWeightWin(Window):
             self.locked_BTN.setIcon(_icons["lockJnts"])
         else:
             self.locked_BTN.setIcon(_icons["unlockJnts"])
-
+        self.toggleDisplayLockColumn(val)
         # self.unLock = not val
 
     def changeAddAbs(self, checked):
@@ -472,7 +473,7 @@ class SkinWeightWin(Window):
         self.locked_BTN.setText("")
         # self.locked_BTN.setMaximumSize (24,24)
         self.locked_BTN.setCheckable(True)
-        self.locked_BTN.setChecked(False)
+        self.locked_BTN.setChecked(self.hideLockColumn)
         self.locked_BTN.toggled.connect(self.changeDisplayLock)
 
         self.option_BTN.setIcon(_icons["option"])
@@ -661,23 +662,22 @@ class SkinWeightWin(Window):
             if cmds.optionVar(exists="hideZeroColumn")
             else False
         )
+        self.hideLockColumn = (
+            cmds.optionVar(query="hideLockColumn")
+            if cmds.optionVar(exists="hideLockColumn")
+            else False
+        )
         self.useDisplayLocator = (
             cmds.optionVar(query="useDisplayLocator")
             if cmds.optionVar(exists="useDisplayLocator")
             else True
         )
 
-    def toggleZeroColumn(self, checked):
-        cmds.optionVar(intValue=["hideZeroColumn", checked])
-        self.hideZeroColumn = checked
-        for ind in self.dataOfDeformer.hideColumnIndices:
-            if self.hideZeroColumn:
-                self._tv.hideColumn(ind)
-            else:
-                self._tv.showColumn(ind)
-        self.zeroCol_BTN.setChecked(checked)
-
-    def filterInfluences(self, newText):
+    def applyDisplayColumnsFilters(self, newText):
+        displayColumns = [True] * self.dataOfDeformer.columnCount
+        # first apply the Text ---------------------
+        if newText == None:
+            newText = self.searchInfluences_le.text()
         if newText:
             newTexts = newText.split(" ")
             while "" in newTexts:
@@ -689,19 +689,37 @@ class SkinWeightWin(Window):
                     foundText = re.search(txt, nameInfluence, re.IGNORECASE) != None
                     if foundText:
                         break
-                if foundText:
-                    self._tv.showColumn(ind)
-                else:
-                    self._tv.hideColumn(ind)
-        else:
-            for ind, nameInfluence in enumerate(self.dataOfDeformer.columnsNames):
+                displayColumns[ind] = foundText
+        # then apply the Zero Colums : -----------------------------
+        if self.hideZeroColumn:
+            for ind in self.dataOfDeformer.hideColumnIndices:
+                displayColumns[ind] = False
+
+        # then apply the Lock Colums : -----------------------------
+        if self.hideLockColumn:
+            for ind, isLocked in enumerate(self.dataOfDeformer.lockedColumns):
+                if isLocked:
+                    displayColumns[ind] = False
+        # now do the hidding --------------------------------------------
+        for ind, isVisible in enumerate(displayColumns):
+            if isVisible:
                 self._tv.showColumn(ind)
-            self.toggleZeroColumn(self.hideZeroColumn)
-        """        
-        else : 
-            for nm , item in self.uiInfluenceTREE.dicWidgName.iteritems ():
-                item.setHidden (not self.showZeroDeformers and item.isZeroDfm )
-        """
+            else:
+                self._tv.hideColumn(ind)
+
+    def toggleDisplayLockColumn(self, checked):
+        cmds.optionVar(intValue=["hideLockColumn", checked])
+        self.hideLockColumn = checked
+        self.applyDisplayColumnsFilters(None)
+
+    def toggleZeroColumn(self, checked):
+        cmds.optionVar(intValue=["hideZeroColumn", checked])
+        self.hideZeroColumn = checked
+        self.applyDisplayColumnsFilters(None)
+        self.zeroCol_BTN.setChecked(checked)
+
+    def filterInfluences(self, newText):
+        self.applyDisplayColumnsFilters(newText)
 
     def autoPruneChecked(self, checked):
         cmds.optionVar(intValue=["autoPrune", checked])
