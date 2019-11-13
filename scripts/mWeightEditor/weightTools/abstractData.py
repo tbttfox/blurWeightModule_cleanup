@@ -98,7 +98,7 @@ class DataAbstract(object):
             return
         isMesh = (
             "shapePath" in self.__dict__
-            and self.shapePath != None
+            and self.shapePath is not None
             and self.shapePath.apiType() == OpenMaya.MFn.kMesh
         )
         if cmds.objExists(self.pointsDisplayTrans):
@@ -178,7 +178,7 @@ class DataAbstract(object):
 
         isMesh = (
             "shapePath" in self.__dict__
-            and self.shapePath != None
+            and self.shapePath is not None
             and self.shapePath.apiType() == OpenMaya.MFn.kMesh
         )
         if cmds.objExists(self.pointsDisplayTrans):
@@ -247,7 +247,7 @@ class DataAbstract(object):
                 hist = cmds.listHistory(
                     selShape, levels=0, pruneDagObjects=True, interestLevel=True
                 )
-                if typeOfDeformer != None and hist:
+                if typeOfDeformer is not None and hist:
                     deformers = cmds.ls(hist, type=typeOfDeformer)
                     if deformers:
                         theDeformer = deformers[0]
@@ -267,7 +267,7 @@ class DataAbstract(object):
             if self.deformedShape_longName in dicOfSel
             else []
         )
-        if inputVertices != None:
+        if inputVertices is not None:
             res = inputVertices
         if isinstance(res, tuple):
             self.vertices, self.verticesWeight = res
@@ -599,7 +599,7 @@ class DataAbstract(object):
         self, typeOfDeformer="skinCluster", force=True, inputVertices=None
     ):
         with GlobalContext(message="getDataFromSelection", doPrint=self.verbose):
-            if inputVertices != None:
+            if inputVertices is not None:
                 inputVertices = list(map(int, inputVertices))
             # print inputVertices
             sel = cmds.ls(selection=True)
