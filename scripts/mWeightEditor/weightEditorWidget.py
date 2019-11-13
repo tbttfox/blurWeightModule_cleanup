@@ -52,6 +52,12 @@ _icons = {
     "lock": getIcon("lock-48"),
     "unlock": getIcon("unlock-48"),
     "refresh": Icons.getIcon("refresh"),
+    "clearText": getIcon("clearText"),
+    "unlockJnts": getIcon("unlockJnts"),
+    "lockJnts": getIcon("lockJnts"),
+    "zeroOn": getIcon("zeroOn"),
+    "zeroOff": getIcon("zeroOff"),
+    "option": getIcon("option"),
 }
 
 styleSheet = """
@@ -165,6 +171,7 @@ class SkinWeightWin(Window):
             useShortestNames=self.useShortestNames,
             hideZeroColumn=self.hideZeroColumn,
             mainWindow=self,
+            createDisplayLocator=self.useDisplayLocator,
         )
 
         self.get_data_frame()
@@ -261,6 +268,22 @@ class SkinWeightWin(Window):
         else:
             self.lockBTN.setIcon(_icons["unlock"])
         self.unLock = not val
+
+    def changeDisplayZero(self, val):
+        if val:
+            self.zeroCol_BTN.setIcon(_icons["zeroOn"])
+        else:
+            self.zeroCol_BTN.setIcon(_icons["zeroOff"])
+        self.toggleZeroColumn(val)
+        # self.unLock = not val
+
+    def changeDisplayLock(self, val):
+        if val:
+            self.locked_BTN.setIcon(_icons["lockJnts"])
+        else:
+            self.locked_BTN.setIcon(_icons["unlockJnts"])
+
+        # self.unLock = not val
 
     def changeAddAbs(self, checked):
         self.widgetAbs.setVisible(False)
@@ -435,6 +458,26 @@ class SkinWeightWin(Window):
         self.clearWildCardBTN.clicked.connect(
             lambda: self.searchInfluences_le.setText("")
         )
+        self.clearWildCardBTN.setIcon(_icons["clearText"])
+        self.clearWildCardBTN.setText("")
+
+        self.zeroCol_BTN.setIcon(_icons["zeroOff"])
+        self.zeroCol_BTN.setText("")
+        # self.zeroCol_BTN.setMaximumSize (24,24)
+        self.zeroCol_BTN.setCheckable(True)
+        self.zeroCol_BTN.setChecked(self.hideZeroColumn)
+        self.zeroCol_BTN.toggled.connect(self.changeDisplayZero)
+
+        self.locked_BTN.setIcon(_icons["unlockJnts"])
+        self.locked_BTN.setText("")
+        # self.locked_BTN.setMaximumSize (24,24)
+        self.locked_BTN.setCheckable(True)
+        self.locked_BTN.setChecked(False)
+        self.locked_BTN.toggled.connect(self.changeDisplayLock)
+
+        self.option_BTN.setIcon(_icons["option"])
+        self.option_BTN.setText("")
+        self.option_BTN.mousePressEvent = self.showRightClickMenu
 
         """
         if self.dataOfDeformer.deformedShape : 
@@ -562,11 +605,18 @@ class SkinWeightWin(Window):
         checkableAction.setDefaultWidget(chbox)
         self.popMenu.addAction(checkableAction)
 
-        # autoPruneAction = self.popMenu.addAction("auto Prune")
-        # autoPruneAction.setCheckable (True)
-        # autoPruneAction.setChecked ( True )
+        chbox = QtWidgets.QCheckBox("locator display", self.popMenu)
+        chbox.setChecked(self.useDisplayLocator)
+        chbox.toggled.connect(self.useDisplayLocatorChecked)
+        checkableAction = QtWidgets.QWidgetAction(self.popMenu)
+        checkableAction.setDefaultWidget(chbox)
+        self.popMenu.addAction(checkableAction)
+
         self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showMenu)
+
+    def showRightClickMenu(self, event):
+        self.popMenu.exec_(event.globalPos())
 
     def showMenu(self, pos):
         chd = self.childAt(pos)
@@ -611,6 +661,11 @@ class SkinWeightWin(Window):
             if cmds.optionVar(exists="hideZeroColumn")
             else False
         )
+        self.useDisplayLocator = (
+            cmds.optionVar(query="useDisplayLocator")
+            if cmds.optionVar(exists="useDisplayLocator")
+            else True
+        )
 
     def toggleZeroColumn(self, checked):
         cmds.optionVar(intValue=["hideZeroColumn", checked])
@@ -620,6 +675,7 @@ class SkinWeightWin(Window):
                 self._tv.hideColumn(ind)
             else:
                 self._tv.showColumn(ind)
+        self.zeroCol_BTN.setChecked(checked)
 
     def filterInfluences(self, newText):
         if newText:
@@ -659,6 +715,15 @@ class SkinWeightWin(Window):
         if self.dataOfDeformer.isSkinData:
             self.dataOfDeformer.getDriversShortNames()
         self.popMenu.close()
+
+    def useDisplayLocatorChecked(self, checked):
+        cmds.optionVar(intValue=["useDisplayLocator", checked])
+        self.useDisplayLocator = checked
+
+        if checked:
+            self.dataOfDeformer.createDisplayLocator()
+        else:
+            self.dataOfDeformer.removeDisplayLocator()
 
     # -----------------------------------------------------------------------------------------------------------
     # Refresh --------------------------------------------------------------------------------------------------
@@ -947,13 +1012,18 @@ class SkinWeightWin(Window):
                 useShortestNames=self.useShortestNames,
                 hideZeroColumn=self.hideZeroColumn,
                 mainWindow=self,
+                createDisplayLocator=self.useDisplayLocator,
             )
             self.problemVertsBTN.setEnabled(True)
         elif ind == 1:  # blendShape
-            self.dataOfDeformer = DataOfBlendShape(mainWindow=self)
+            self.dataOfDeformer = DataOfBlendShape(
+                mainWindow=self, createDisplayLocator=self.useDisplayLocator
+            )
             self.problemVertsBTN.setEnabled(False)
         elif ind == 2:  # deformers
-            self.dataOfDeformer = DataOfDeformers(mainWindow=self)
+            self.dataOfDeformer = DataOfDeformers(
+                mainWindow=self, createDisplayLocator=self.useDisplayLocator
+            )
             self.problemVertsBTN.setEnabled(False)
 
         self._tm.update(self.dataOfDeformer)
