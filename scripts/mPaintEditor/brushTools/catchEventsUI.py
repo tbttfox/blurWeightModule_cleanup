@@ -8,7 +8,11 @@ except:
     from PySide2.QtWidgets import QApplication, QSplashScreen, QDialog, QMainWindow
 
 from maya import OpenMayaUI, cmds, mel
-import brSkinBrush_pythonFunctions
+
+import brushPythonFunctions
+import importlib
+
+importlib.reload(brushPythonFunctions)
 
 """
 import catchEventsUI
@@ -349,7 +353,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
             elif event.key() == QtCore.Qt.Key_Escape:
                 # print "CLOSING"
-                brSkinBrush_pythonFunctions.escapePressed()
+                brushPythonFunctions.escapePressed()
                 event.ignore()
                 # self.close ()
                 mel.eval("setToolTo $gMove;")
@@ -489,7 +493,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
                 if event.key() == QtCore.Qt.Key_S:
                     # print "toggle soloMode"
-                    brSkinBrush_pythonFunctions.toggleSoloMode()
+                    brushPythonFunctions.toggleSoloMode()
                     event.ignore()
                     return True
 
