@@ -461,19 +461,19 @@ class SkinPaintWin(Window):
     def setWindowDisplay(self):
         self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.Tool)
         self.setWindowTitle("Paint Editor")
-        self.refreshPosition()
+        # self.refreshPosition ()
         self.show()
 
-    def refreshPosition(self):
-        if cmds.optionVar(exists="SkinPaintWindow"):
-            vals = cmds.optionVar(query="SkinPaintWindow")
-            if vals:
-                self.move(vals[0], vals[1])
-                self.resize(vals[2], vals[3])
-            if len(vals) > 4:
-                self.changeCommand(vals[4])
-                thebtn = self.__dict__[self.commandArray[vals[4]] + "_btn"]
-                thebtn.setChecked(True)
+    # def refreshPosition(self):
+    #     if cmds.optionVar (ex="SkinPaintWindow") :
+    #         vals = cmds.optionVar (q="SkinPaintWindow")
+    #         if vals :
+    #             self.move(vals[0], vals[1])
+    #             self.resize(vals[2], vals[3])
+    #         if len (vals) > 4 :
+    #             self.changeCommand ( vals[4])
+    #             thebtn = self.__dict__ [self.commandArray[vals[4]]+"_btn"]
+    #             thebtn.setChecked(True)
 
     def renameCB(self, oldName, newName):
         if self.dataOfSkin:
@@ -535,7 +535,11 @@ class SkinPaintWin(Window):
         return None
 
     def changeCommand(self, newCommand):
-        print(newCommand)
+        if self.isInPaint():
+            # commandIndex = self.commandArray[newCommand]
+            cmds.brSkinBrushContext(
+                "brSkinBrushContext1", edit=True, commandIndex=newCommand
+            )
         # nmPrev = self.storePrevCommandValue ()
 
         # nmNew  = self.commandArray [newCommand]
@@ -550,13 +554,13 @@ class SkinPaintWin(Window):
         mel.eval("setToolTo $gMove;")
 
         self.deleteCallBacks()
-        pos = self.pos()
-        size = self.size()
-        cmds.optionVar(clearArray="SkinPaintWindow")
-        for el in pos.x(), pos.y(), size.width(), size.height():
-            cmds.optionVar(intValueAppend=("SkinPaintWindow", el))
-        cmds.optionVar(intValueAppend=("SkinPaintWindow", self.commandIndex))
-        self.storePrevCommandValue()
+        # pos = self.pos()
+        # size = self.size()
+        # cmds.optionVar (clearArray= "SkinPaintWindow")
+        # for el in pos.x (), pos.y(), size.width(), size.height() :
+        #     cmds.optionVar (intValueAppend = ("SkinPaintWindow", el))
+        # cmds.optionVar (intValueAppend = ("SkinPaintWindow", self.commandIndex))
+        # self.storePrevCommandValue ()
 
         # self.headerView.deleteLater()
         # if self.EVENTCATCHER!=None: self.EVENTCATCHER.close()
@@ -634,6 +638,9 @@ class SkinPaintWin(Window):
         # if cmds.currentCtx() == thePaintContextName:
         #     currentVal = cmds.artAttrCtx(thePaintContextName ,q=True,value = True)
         #     self.updateStrengthVal (currentVal)
+
+    def isInPaint(self):
+        return cmds.currentCtx() == "brSkinBrushContext1"
 
     def enterPaint(self):
         if not cmds.pluginInfo(" brSkinBrush", query=True, loaded=True):
@@ -1037,12 +1044,16 @@ class SkinPaintWin(Window):
 
     def updateUIwithContextValues(self):
         KArgs = fixOptionVarContext()
-        self.updateSizeVal(float(KArgs["size"]))
-        self.updateStrengthVal(float(KArgs["strength"]))
-        commandIndex = int(KArgs["commandIndex"])
-        nmBtn = self.commandArray[commandIndex] + "_btn"
-        self.__dict__[nmBtn].setChecked(True)
-        self.updateCurrentInfluence(KArgs["influenceName"])
+        if "size" in KArgs:
+            self.updateSizeVal(float(KArgs["size"]))
+        if "strength" in KArgs:
+            self.updateStrengthVal(float(KArgs["strength"]))
+        if "commandIndex" in KArgs:
+            commandIndex = int(KArgs["commandIndex"])
+            nmBtn = self.commandArray[commandIndex] + "_btn"
+            self.__dict__[nmBtn].setChecked(True)
+        if "influenceName" in KArgs:
+            self.updateCurrentInfluence(KArgs["influenceName"])
 
     def clearInputText(self):
         self.searchInfluences_le.clear()
@@ -1103,13 +1114,18 @@ class SkinPaintWin(Window):
         return [item.influence() for item in self.uiInfluenceTREE.selectedItems()]
 
     def influenceDoubleClicked(self, item, column):
-        # print item.text(1), column
-        txt = item._influence  # text(1)
+        txt = item._influence
         if cmds.objExists(txt):
+            currentCursor = QtGui.QCursor().pos()
+            autoHide = not self.showLocks_btn.isChecked()
             if column == 1:
-                cmds.select(txt)
+                pos = self.uiInfluenceTREE.mapFromGlobal(currentCursor)
+                if pos.x() > 40:
+                    cmds.select(txt)
+                else:
+                    item.setLocked(not item.isLocked(), autoHide=autoHide)
             elif column == 0:
-                pos = QtGui.QCursor().pos() - QtCore.QPoint(355, 100)
+                pos = currentCursor - QtCore.QPoint(355, 100)
                 self.colorDialog.item = item
                 with toggleBlockSignals([self.colorDialog]):
                     self.colorDialog.setCurrentColor(QtGui.QColor(*item.color()))
@@ -1129,12 +1145,12 @@ class SkinPaintWin(Window):
                 """
 
     def influenceClicked(self, item, column):
-        text = item._influence  # text(1)
-        print("CLICKED " + text)
-        if text in self.dataOfSkin.driverNames:
-            # ind = self.dataOfSkin.driverNames.index (text)
-            ind = item._index
-            # self.brushFunctions.setInfluenceIndex (ind)
+        text = item._influence
+        # print "CLICKED " + text
+        if self.isInPaint():
+            cmds.brSkinBrushContext(
+                "brSkinBrushContext1", edit=True, influenceName=text
+            )
 
     def applyLock(self, typeOfLock):
         # ["lockSel","unlockSel","lockAllButSel","unlockAllButSel","clearLocks" ]
