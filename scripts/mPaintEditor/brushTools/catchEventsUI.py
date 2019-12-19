@@ -9,10 +9,9 @@ except:
 
 from maya import OpenMayaUI, cmds, mel
 
-import brushPythonFunctions
-import importlib
+from brushPythonFunctions import callPaintEditorFunction, escapePressed, toggleSoloMode
 
-importlib.reload(brushPythonFunctions)
+# reload(brushPythonFunctions)
 
 """
 import catchEventsUI
@@ -60,18 +59,20 @@ def callMarkingMenu():
         ("add", "N", "add", 0),
         ("remove", "S", "rmv", 1),
         ("addPercent", "NW", "addPerc", 2),
-        ("absolute", "E", "abs", 3),
+        ("absolute", "NE", "abs", 3),
         ("smooth", "W", "smooth", 4),
-        ("locks Verts", "SE", "locks", 6),
+        ("locks Verts", "E", "locks", 6),
+        ("Unlocks Verts", "SE", "unLocks", 7),
     ]
+
     for ind, (txt, posi, btn, cmdInd) in enumerate(lstCommands):
         kwArgs["radialPosition"] = posi
         kwArgs["label"] = txt
-        kwArgs["command"] = (
-            "brSkinBrushContext -edit -commandIndex {} `currentCtx`;".format(cmdInd)
+        cmd = "brSkinBrushContext -edit -commandIndex {} `currentCtx`;".format(cmdInd)
+        cmd += (
+            'python("import __main__;__main__.paintEditor.' + btn + '_btn.click()");\n'
         )
-        # kwArgs ["command"] =  "python(\"import __main__;__main__.paintEditor."+btn+"_btn.click()\")"
-        # kwArgs ["command"] =  "print \"hi\""
+        kwArgs["command"] = cmd
         cmds.menuItem("menuEditorMenuItem{0}".format(ind + 1), **kwArgs)
 
     kwArgs.pop("radialPosition", None)
@@ -82,10 +83,13 @@ def callMarkingMenu():
     kwArgs["subMenu"] = False
     for ind, colType in enumerate(["white", "lava", "influence"]):
         kwArgs["label"] = colType
-        # kwArgs ["command"] =  "python(\"import __main__;__main__.paintEditor.updateSoloColor ("+str(ind)+")\")"
-        kwArgs["command"] = (
-            "brSkinBrushContext -edit -soloColorType {} `currentCtx`;".format(ind)
+        cmd = (
+            'python("import __main__;__main__.paintEditor.updateSoloColor ('
+            + str(ind)
+            + ')");\n'
         )
+        cmd += "brSkinBrushContext -edit -soloColorType {} `currentCtx`;".format(ind)
+        kwArgs["command"] = cmd
 
         cmds.menuItem("menuEditorMenuItemCol{0}".format(ind + 1), **kwArgs)
 
@@ -168,6 +172,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.mainMaya = QtCompat.wrapInstance(int(ptr), QtWidgets.QWidget)
         # self.setAttribute (QtCore.Qt.WA_MouseNoMask, True)
         self.prevButton = self.lstButtons[0]
+        self.prevQtButton = "add"
 
     # ---------- GAMMA --------------------------------------
     restorePanels = []
@@ -244,16 +249,19 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 self.CtrlOrShiftPressed = False
                 if cmds.radioButton(self.prevButton, exists=True):
                     cmds.radioButton(self.prevButton, edit=True, select=True)
+                if self.prevQtButton:
+                    callPaintEditorFunction("highlightBtn", self.prevQtButton)
 
-                if hasattr(self, "prevStrengthValue"):
-                    try:
-                        cmds.floatSliderGrp(
-                            "brSkinBrushStrength",
-                            edit=True,
-                            value=self.prevStrengthValue,
-                        )
-                    except:
-                        pass
+                prevStrengthValue = cmds.brSkinBrushContext(
+                    "brSkinBrushContext1", query=True, strength=True
+                )  # cmds.floatSliderGrp ("brSkinBrushStrength", query =True, value=True)
+                callPaintEditorFunction("updateStrengthVal", prevStrengthValue)
+                try:
+                    cmds.floatSliderGrp(
+                        "brSkinBrushStrength", edit=True, value=prevStrengthValue
+                    )
+                except:
+                    pass
                 # event.ignore ()
 
             elif event.key() == QtCore.Qt.Key_U:
@@ -290,7 +298,6 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     if self.markingMenuShown:
                         # print "Closing markingMenu !!"
                         self.closingNextPressMarkingMenu = True
-
                 return super(CatchEventsWidget, self).eventFilter(obj, event)
             return super(CatchEventsWidget, self).eventFilter(obj, event)
 
@@ -353,7 +360,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
             elif event.key() == QtCore.Qt.Key_Escape:
                 # print "CLOSING"
-                brushPythonFunctions.escapePressed()
+                escapePressed()
                 event.ignore()
                 # self.close ()
                 mel.eval("setToolTo $gMove;")
@@ -377,7 +384,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 # ptr = OpenMayaUI.MQtUtil.findControl(listModelPanels [0])
                 # model_panel_4 = QtCompat.wrapInstance(long(ptr), QtWidgets.QWidget)
                 if obj in listModelPanelsCompats or obj in listModelPanelsCompatsPrts:
-                    print("it is a model_panel")
+                    # print "it is a model_panel"
                     event.ignore()
 
                     if event.modifiers() == QtCore.Qt.AltModifier:
@@ -405,6 +412,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                             "brSkinBrushContext1", query=True, commandIndex=True
                         )
                     ]
+                    self.prevQtButton = callPaintEditorFunction("getEnabledButton")
                     # cmds.radioCollection( "brSkinBrushCommandRbCollection", query=True, select=True)
 
                     if self.prevButton != "brSkinBrushSmoothRb":
@@ -414,9 +422,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                             cmds.radioButton(
                                 "brSkinBrushSmoothRb", edit=True, select=True
                             )
-                        self.prevStrengthValue = cmds.brSkinBrushContext(
-                            "brSkinBrushContext1", query=True, strength=True
-                        )  # cmds.floatSliderGrp ("brSkinBrushStrength", query =True, value=True)
+                        callPaintEditorFunction("highlightBtn", "smooth")
                         smoothValue = cmds.brSkinBrushContext(
                             "brSkinBrushContext1", query=True, smoothStrength=True
                         )
@@ -426,6 +432,8 @@ class CatchEventsWidget(QtWidgets.QWidget):
                             )
                         except:
                             pass
+                        callPaintEditorFunction("updateStrengthVal", smoothValue)
+
                     return True
 
             elif event.key() == QtCore.Qt.Key_Shift and not self.CtrlOrShiftPressed:
@@ -439,6 +447,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                             "brSkinBrushContext1", query=True, commandIndex=True
                         )
                     ]
+                    self.prevQtButton = callPaintEditorFunction("getEnabledButton")
                     # cmds.radioCollection( "brSkinBrushCommandRbCollection", query=True, select=True)
                     try:
                         if (self.prevButton == "brSkinBrushAddRb") and cmds.radioButton(
@@ -458,6 +467,11 @@ class CatchEventsWidget(QtWidgets.QWidget):
                             )
                     except:
                         pass
+                    if self.prevQtButton:
+                        if self.prevQtButton == "add":
+                            callPaintEditorFunction("highlightBtn", "rmv")
+                        elif self.prevQtButton == "locks":
+                            callPaintEditorFunction("highlightBtn", "unLocks")
                     return True
 
             elif event.modifiers() == QtCore.Qt.AltModifier:
@@ -493,7 +507,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
                 if event.key() == QtCore.Qt.Key_S:
                     # print "toggle soloMode"
-                    brushPythonFunctions.toggleSoloMode()
+                    toggleSoloMode()
                     event.ignore()
                     return True
 
