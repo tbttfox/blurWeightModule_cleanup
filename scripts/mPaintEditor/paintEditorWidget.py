@@ -514,12 +514,12 @@ class SkinPaintWin(Window):
         thebtn = self.__dict__[btnName + "_btn"]
         thebtn.setChecked(True)
 
-    def getEnabledButton(self):
-        for nm in self.commandArray:
+    def getCommandIndex(self):
+        for ind, nm in enumerate(self.commandArray):
             thebtn = self.__dict__[nm + "_btn"]
             if thebtn.isChecked():
-                return nm
-        return None
+                return ind
+        return -1
 
     def changeCommand(self, newCommand):
         print("changeCommand")
@@ -619,7 +619,10 @@ class SkinPaintWin(Window):
         #     self.updateStrengthVal (currentVal)
 
     def isInPaint(self):
-        return cmds.currentCtx() == "brSkinBrushContext1"
+        currentContext = cmds.currentCtx()
+        if currentContext.startswith("brSkinBrushContext"):
+            return currentContext
+        return False
 
     def enterPaint(self):
         if not cmds.pluginInfo(" brSkinBrush", query=True, loaded=True):
@@ -628,10 +631,25 @@ class SkinPaintWin(Window):
             # print "ENTERPAINT \n"
             setColorsOnJoints()
             context = "brSkinBrushContext1"
+            # "from brSkinBrush_pythonFunctions import "
+            dic = {
+                "soloColor": self.solo_rb.isChecked(),
+                "soloColorType": self.soloColor_cb.currentIndex(),
+                "size": self.sizeBrushSetter.theSpinner.value(),
+                "strength": self.valueSetter.theSpinner.value() * 0.01,
+                "commandIndex": self.getCommandIndex(),
+            }
+            selectedInfluences = self.selectedInfluences()
+            if selectedInfluences:
+                dic["influenceName"] = selectedInfluences[0]
+            fixOptionVarContext(**dic)
+
             if not cmds.contextInfo(context, exists=True):
-                pytonCmd = "from mPaintEditor.brushTools.brushPythonFunctions import "
-                # "from brSkinBrush_pythonFunctions import "
-                context = cmds.brSkinBrushContext(importPython=pytonCmd)
+                importPython = (
+                    "from mPaintEditor.brushTools.brushPythonFunctions import "
+                )
+                context = cmds.brSkinBrushContext(context, importPython=importPython)
+
             cmds.setToolTo(context)
             mel.eval("rememberCtxSettings " + context)
 
@@ -678,7 +696,8 @@ class SkinPaintWin(Window):
                 self.uiInfluenceTREE.setCurrentItem(ito)
 
     def changeMultiSolo(self, val):
-        print("swap MultiSold")
+        if self.isInPaint():
+            cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, soloColor=val)
 
     def addInfluences(self):
         sel = cmds.ls(selection=True, transforms=True)
@@ -890,7 +909,7 @@ class SkinPaintWin(Window):
         self.postSet_cb.toggled.connect(self.autoExpand_cb.setEnabled)
 
         self.searchInfluences_le.textChanged.connect(self.filterInfluences)
-        self.multi_rb.toggled.connect(self.changeMultiSolo)
+        self.solo_rb.toggled.connect(self.changeMultiSolo)
 
         self.repeatBTN = ButtonWithValue(
             self.buttonWidg,
@@ -1042,6 +1061,14 @@ class SkinPaintWin(Window):
 
     def updateUIwithContextValues(self):
         KArgs = fixOptionVarContext()
+        if "soloColor" in KArgs:
+            val = int(KArgs["soloColor"])
+            if val:
+                self.solo_rb.setChecked(True)
+            else:
+                self.multi_rb.setChecked(True)
+        if "soloColorType" in KArgs:
+            self.soloColor_cb.setCurrentIndex(int(KArgs["soloColorType"]))
         if "size" in KArgs:
             self.updateSizeVal(float(KArgs["size"]))
         if "strength" in KArgs:
@@ -1105,10 +1132,17 @@ class SkinPaintWin(Window):
     # artAttrSkinPaintCtx
     # --------------------------------------------------------------
     def pickMaxInfluence(self):
-        print("pickMaxInfluence")
+        if self.isInPaint():
+            cmds.brSkinBrushContext(
+                "brSkinBrushContext1", edit=True, pickMaxInfluence=True
+            )
+            print("pickMaxInfluence")
 
     def pickInfluence(self, vertexPicking=False):
-        print("pickInfluence")
+        if self.isInPaint():
+            cmds.brSkinBrushContext(
+                "brSkinBrushContext1", edit=True, pickInfluence=True
+            )
 
     def selectedInfluences(self):
         return [item.influence() for item in self.uiInfluenceTREE.selectedItems()]
@@ -1321,7 +1355,56 @@ class SkinPaintWin(Window):
         for btnName in self.uiToActivateWithPaint:
             self.__dict__[btnName].setEnabled(True)
         self.uiInfluenceTREE.setStyleSheet("QWidget {border : 2px solid red}\n")
-        # self.changeMultiSolo(self.multi_rb.isChecked ())
+        # self.updateUIwithContextValues ()
+
+        dicValues = {
+            "edit": True,
+            "soloColor": self.solo_rb.isChecked(),
+            "soloColorType": self.soloColor_cb.currentIndex(),
+            "size": self.sizeBrushSetter.theSpinner.value(),
+            "strength": self.valueSetter.theSpinner.value() * 0.01,
+            "commandIndex": self.getCommandIndex(),
+        }
+        selectedInfluences = self.selectedInfluences()
+        if selectedInfluences:
+            dicValues["influenceName"] = selectedInfluences[0]
+
+        cmds.brSkinBrushContext("brSkinBrushContext1", **dicValues)
+        # self.checkCorrectUI()
+
+    def checkCorrectUI(self):
+        if self.isInPaint():
+            # commandIndex = self.commandArray[newCommand]
+            commandIndex = cmds.brSkinBrushContext(
+                "brSkinBrushContext1", query=True, commandIndex=True
+            )
+            soloColor = cmds.brSkinBrushContext(
+                "brSkinBrushContext1", query=True, soloColor=True
+            )
+            soloColorType = cmds.brSkinBrushContext(
+                "brSkinBrushContext1", query=True, soloColorType=True
+            )
+            size = cmds.brSkinBrushContext("brSkinBrushContext1", query=True, size=True)
+            strength = cmds.brSkinBrushContext(
+                "brSkinBrushContext1", query=True, strength=True
+            )
+            influenceName = cmds.brSkinBrushContext(
+                "brSkinBrushContext1", query=True, influenceName=True
+            )
+
+            if soloColor:
+                self.solo_rb.setChecked(True)
+            else:
+                self.multi_rb.setChecked(True)
+            self.soloColor_cb.setCurrentIndex(soloColorType)
+
+            self.updateSizeVal(size)
+            self.updateStrengthVal(strength)
+            nmBtn = self.commandArray[commandIndex] + "_btn"
+            self.__dict__[nmBtn].setChecked(True)
+
+            self.previousInfluenceName = influenceName
+            self.updateCurrentInfluence(influenceName)
 
 
 # -------------------------------------------------------------------------------
