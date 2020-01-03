@@ -41,7 +41,7 @@ class ValueSettingPE(ValueSetting):
         if not self.blockPostSet:
             if cmds.currentCtx() == "brSkinBrushContext1":
                 value = self.theSpinner.value()
-                if self.commandArg == "strength":
+                if self.commandArg in ["strength", "smoothStrength"]:
                     value /= 100.0
                 kArgs = {"edit": True}
                 kArgs[self.commandArg] = value
@@ -52,6 +52,17 @@ class ValueSettingPE(ValueSetting):
             self.theProgress.width() - self.btn.width()
         )
         self.btn.move(pos, 0)
+
+    def setEnabled(self, val):
+        if val:
+            self.btn.setStyleSheet(
+                "border : 1px solid black; background-color:rgb(200,200,200)"
+            )
+        else:
+            self.btn.setStyleSheet(
+                "border : 1px solid black; background-color:rgb(170,170,170)"
+            )
+        super(ValueSettingPE, self).setEnabled(val)
 
     def updateBtn(self):
         self.progressValueChanged(self.theProgress.value())
@@ -300,7 +311,7 @@ class SkinPaintWin(Window):
         item = self.colorDialog.item
         nm = item._influence
         ind = item._index
-        # print ind,nm, values
+        # print ind, nm, values
         item.setColor(values)
 
         self.refreshWeightEditor(getLocks=False)
@@ -462,7 +473,7 @@ class SkinPaintWin(Window):
             event=["SelectionChanged", self.refreshCallBack]
         )
         """
-        #self.listJobEvents =[refreshSJ] 
+        #self.listJobEvents =[refreshSJ]
         sceneUpdateCallback = OpenMaya.MSceneMessage.addCallback(OpenMaya.MSceneMessage.kBeforeNew, self.deselectAll )  #kSceneUpdate
         self.close_callback = [sceneUpdateCallback]
         self.close_callback.append (  OpenMaya.MSceneMessage.addCallback(OpenMaya.MSceneMessage.kBeforeOpen, self.deselectAll )  )
@@ -491,13 +502,6 @@ class SkinPaintWin(Window):
         "locks",
         "unLocks",
     ]
-    # def storePrevCommandValue(self):
-    #     #print "call prevCommand"
-    #     if self.commandIndex != -1 :
-    #         nmPrev = self.commandArray [self.commandIndex]
-    #         cmds.optionVar (floatValue = [nmPrev + "_SkinPaintWin",self.value])
-    #         return nmPrev
-    #     return "-1"
     highlightingBtn = False
 
     def highlightBtn(self, btnName):
@@ -520,30 +524,39 @@ class SkinPaintWin(Window):
 
     def changeCommand(self, newCommand):
         commandText = self.commandArray[newCommand]
-        contextExists = cmds.brSkinBrushContext("brSkinBrushContext1", query=True, ex=True)
-        if commandText == "smooth":
-            theValue = (
-                cmds.brSkinBrushContext(
-                    "brSkinBrushContext1", query=True, smoothStrength=True
-                )
-                if contextExists
-                else self.smoothStrengthVarStored
-            )
-        elif commandText in ["lock", "unlocks"]:
-            print("disable the strength")
+        print(commandText)
+        if commandText in ["locks", "unLocks"]:
+            self.valueSetter.setEnabled(False)
+            self.widgetAbs.setEnabled(False)
         else:
-            theValue = (
-                cmds.brSkinBrushContext(
-                    "brSkinBrushContext1", query=True, strength=True
-                )
-                if contextExists
-                else self.strengthVarStored
+            contextExists = cmds.brSkinBrushContext(
+                "brSkinBrushContext1", query=True, ex=True
             )
-        try:
-            cmds.floatSliderGrp("brSkinBrushStrength", edit=True, value=theValue)
-        except:
-            pass
-        self.updateStrengthVal(theValue)
+            self.valueSetter.setEnabled(True)
+            self.widgetAbs.setEnabled(True)
+            if commandText == "smooth":
+                theValue = (
+                    cmds.brSkinBrushContext(
+                        "brSkinBrushContext1", query=True, smoothStrength=True
+                    )
+                    if contextExists
+                    else self.smoothStrengthVarStored
+                )
+                self.valueSetter.commandArg = "smoothStrength"
+            else:
+                theValue = (
+                    cmds.brSkinBrushContext(
+                        "brSkinBrushContext1", query=True, strength=True
+                    )
+                    if contextExists
+                    else self.strengthVarStored
+                )
+                self.valueSetter.commandArg = "strength"
+            try:
+                cmds.floatSliderGrp("brSkinBrushStrength", edit=True, value=theValue)
+            except:
+                pass
+            self.updateStrengthVal(theValue)
 
         if self.isInPaint():
             cmds.brSkinBrushContext(
