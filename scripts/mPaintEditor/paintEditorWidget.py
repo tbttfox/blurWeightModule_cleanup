@@ -153,7 +153,7 @@ QMenu::item:disabled {
     font: italic;
 }
 QMenu::item:selected  {
-    background-color:rgb(120, 120, 120);  
+    background-color:rgb(120, 120, 120);
 }
 QPushButton {
     color:  black;
@@ -161,11 +161,11 @@ QPushButton {
 QPushButton:checked{
     background-color: rgb(100, 100, 100);
     color:white;
-    border: none; 
+    border: none;
 }
-QPushButton:hover{  
-    background-color: grey; 
-    border-style: outset;  
+QPushButton:hover{ 
+    background-color: grey;
+    border-style: outset; 
 }
 QPushButton:pressed {
     background-color: rgb(130, 130, 130);
@@ -177,7 +177,6 @@ QGroupBox {
     border: 1px solid grey;
     margin-top: 1ex; /* leave space at the top for the title */
 }
-
 QGroupBox::title {
     subcontrol-origin: margin;
     padding: 0 3px;
@@ -188,10 +187,10 @@ QGroupBox::indicator {
 }
 QCheckBox:hover
 {
-  background:rgb(120, 120, 120); 
+  background:rgb(120, 120, 120);
 }
 QComboBox{
-    border : 1px solid rgb(120, 120, 120); 
+    border : 1px solid rgb(120, 120, 120);
 }
 """
 
@@ -870,6 +869,7 @@ class SkinPaintWin(Window):
                 and it.widget() == self.uiInfluenceTREE
             ):
                 break
+        dialogLayout.setSpacing(0)
         # for propName in ["selectionMode", "indentation","columnCount", "headerVisible", "headerDefaultSectionSize", "headerDefaultSectionSize", "headerVisible"]:
         # dialogLayout.removeItem(it)
         self.uiInfluenceTREE.deleteLater()
@@ -903,8 +903,6 @@ class SkinPaintWin(Window):
         self.pickVertex_btn.clicked.connect(self.pickMaxInfluence)
         self.pickInfluence_btn.clicked.connect(self.pickInfluence)
         self.clearText_btn.clicked.connect(self.clearInputText)
-
-        self.postSet_cb.toggled.connect(self.autoExpand_cb.setEnabled)
 
         self.searchInfluences_le.textChanged.connect(self.filterInfluences)
         self.solo_rb.toggled.connect(self.changeMultiSolo)
@@ -1027,12 +1025,17 @@ class SkinPaintWin(Window):
 
         self.drawManager_rb.toggled.connect(self.drawManager_gb.setEnabled)
 
-        for att in [
+        self.listCheckBoxesDirectAction = [
             "meshdrawTriangles",
             "meshdrawEdges",
             "meshdrawPoints",
             "meshdrawTransparency",
-        ]:
+            "drawBrush",
+            "coverage",
+            "postSetting",
+            "message",
+        ]
+        for att in self.listCheckBoxesDirectAction:
             checkBox = self.__dict__[att + "_cb"]
             checkBox.toggled.connect(partial(self.brSkinConn, att))
         self.colorSets_rb.toggled.connect(
@@ -1092,12 +1095,7 @@ class SkinPaintWin(Window):
             else:
                 self.drawManager_rb.setChecked(True)
 
-        for att in [
-            "meshdrawTriangles",
-            "meshdrawEdges",
-            "meshdrawPoints",
-            "meshdrawTransparency",
-        ]:
+        for att in self.listCheckBoxesDirectAction:
             if att in KArgs:
                 val = bool(int(KArgs[att]))
                 self.__dict__[att + "_cb"].setChecked(val)
@@ -1420,12 +1418,7 @@ class SkinPaintWin(Window):
             else:
                 self.drawManager_rb.setChecked(True)
 
-            for att in [
-                "meshdrawTriangles",
-                "meshdrawEdges",
-                "meshdrawPoints",
-                "meshdrawTransparency",
-            ]:
+            for att in self.listCheckBoxesDirectAction:
                 dic = {"edit": True}
                 dic[att] = True
                 val = cmds.brSkinBrushContext("brSkinBrushContext1", **dic)
