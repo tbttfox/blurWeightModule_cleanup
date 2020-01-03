@@ -362,7 +362,6 @@ def toolOnSetupEnd():
 
 def toolOffCleanup():
     print("finishing tool\n")
-    callPaintEditorFunction("paintEnd")
     closeEventCatcher()
     if cmds.objExists("SkinningWireframe"):
         cmds.delete("SkinningWireframe")
@@ -383,6 +382,7 @@ def toolOffCleanup():
         cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
         mode = "parallel" if val == 3 else "serial"
         cmds.evaluationManager(mode=mode)
+    callPaintEditorFunction("paintEnd")
 
 
 def escapePressed():
