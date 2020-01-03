@@ -1086,7 +1086,7 @@ class SkinPaintWin(Window):
             self.updateCurrentInfluence(jointName)
 
         if "useColorSetsWhilePainting" in KArgs:
-            val = int(KArgs["useColorSetsWhilePainting"])
+            val = bool(int(KArgs["useColorSetsWhilePainting"]))
             if val:
                 self.colorSets_rb.setChecked(True)
             else:
@@ -1099,7 +1099,7 @@ class SkinPaintWin(Window):
             "meshdrawTransparency",
         ]:
             if att in KArgs:
-                val = bool(KArgs[att])
+                val = bool(int(KArgs[att]))
                 self.__dict__[att + "_cb"].setChecked(val)
 
     def clearInputText(self):
@@ -1411,6 +1411,25 @@ class SkinPaintWin(Window):
             influenceName = cmds.brSkinBrushContext(
                 "brSkinBrushContext1", query=True, influenceName=True
             )
+
+            val = cmds.brSkinBrushContext(
+                "brSkinBrushContext1", query=True, useColorSetsWhilePainting=True
+            )
+            if val:
+                self.colorSets_rb.setChecked(True)
+            else:
+                self.drawManager_rb.setChecked(True)
+
+            for att in [
+                "meshdrawTriangles",
+                "meshdrawEdges",
+                "meshdrawPoints",
+                "meshdrawTransparency",
+            ]:
+                dic = {"edit": True}
+                dic[att] = True
+                val = cmds.brSkinBrushContext("brSkinBrushContext1", **dic)
+                self.__dict__[att + "_cb"].setChecked(val)
 
             if soloColor:
                 self.solo_rb.setChecked(True)
