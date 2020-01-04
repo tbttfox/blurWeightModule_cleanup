@@ -320,7 +320,7 @@ def callEventCatcher():
     # from mPaintEditor.brushTools import catchEventsUI
     import catchEventsUI
 
-    print(catchEventsUI.__file__)
+    # print catchEventsUI.__file__
     importlib.reload(catchEventsUI)
     catchEventsUI.EVENTCATCHER = catchEventsUI.CatchEventsWidget()
     catchEventsUI.EVENTCATCHER.open()
@@ -361,7 +361,7 @@ def toolOnSetupEnd():
 
 
 def toolOffCleanup():
-    print("finishing tool\n")
+    # print "finishing tool\n"
     closeEventCatcher()
     if cmds.objExists("SkinningWireframe"):
         cmds.delete("SkinningWireframe")
@@ -542,7 +542,7 @@ def headsUpMessage(offsetX, offsetY, message, valueDisplay, precision):
 
 
 def pickedInfluence(jointName):
-    print("pickedInfluence from python 2.0")
+    # print "pickedInfluence from python 2.0"
     if cmds.treeView("brSkinBrushJointTree", query=True, exists=True):
         cmds.treeView("brSkinBrushJointTree", edit=True, clearSelection=True)
         cmds.treeView("brSkinBrushJointTree", edit=True, showItem=jointName)

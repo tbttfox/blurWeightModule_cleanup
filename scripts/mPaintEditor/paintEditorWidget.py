@@ -319,7 +319,8 @@ class SkinPaintWin(Window):
         item.setColor(values)
 
         self.refreshWeightEditor(getLocks=False)
-        # cmds.displayRGBColor ("userDefined{0}".format (theUserDefinedIndex),*values)
+        if self.isInPaint():
+            cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, refreshDfmColor=ind)
 
     def refreshWeightEditor(self, getLocks=True):
         import __main__
