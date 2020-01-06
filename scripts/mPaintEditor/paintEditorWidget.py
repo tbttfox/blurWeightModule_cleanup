@@ -1254,6 +1254,10 @@ class SkinPaintWin(Window):
                     cmds.select(txt)
                 else:
                     item.setLocked(not item.isLocked(), autoHide=autoHide)
+                    if self.isInPaint():
+                        cmds.brSkinBrushContext(
+                            "brSkinBrushContext1", edit=True, refreshDfmColor=item._index
+                        )  # refresh lock color
             elif column == 0:
                 pos = currentCursor - QtCore.QPoint(355, 100)
                 self.colorDialog.item = item
@@ -1322,6 +1326,9 @@ class SkinPaintWin(Window):
         ]:
             # self.brushFunctions.setBSDAttr ( "getLockWeights", True)
             self.refreshWeightEditor(getLocks=True)
+
+        if self.isInPaint():
+            cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, refresh=True)
 
     def resetBindPreMatrix(self):
         selectedItems = self.uiInfluenceTREE.selectedItems()
