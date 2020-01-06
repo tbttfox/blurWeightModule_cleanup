@@ -32,6 +32,7 @@ from brushTools.brushPythonFunctions import (
     fixOptionVarContext,
     generate_new_color,
     deleteExistingColorSets,
+    setSoloMode,
 )
 
 
@@ -337,11 +338,14 @@ class SkinPaintWin(Window):
                 __main__.weightEditor.dataOfDeformer.getLocksInfo()
             __main__.weightEditor._tv.repaint()
 
+    def revertColor(self):
+        self.colorDialog.setCurrentColor(self.colorDialog.cancelColor)
+
     def createColorPicker(self):
         self.colorDialog = QtWidgets.QColorDialog()
         # self.colorDialog .colorSelected.connect ( self.colorSelected )
         self.colorDialog.currentColorChanged.connect(self.colorSelected)
-
+        self.colorDialog.rejected.connect(self.revertColor)
         self.colorDialog.setWindowFlags(QtCore.Qt.Tool)
         self.colorDialog.setWindowTitle("pick color")
         self.colorDialog.setWindowModality(QtCore.Qt.ApplicationModal)
@@ -740,6 +744,7 @@ class SkinPaintWin(Window):
     def changeMultiSolo(self, val):
         if self.isInPaint():
             cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, soloColor=val)
+            setSoloMode(val)
 
     def addInfluences(self):
         sel = cmds.ls(selection=True, transforms=True)
@@ -1253,7 +1258,8 @@ class SkinPaintWin(Window):
                 pos = currentCursor - QtCore.QPoint(355, 100)
                 self.colorDialog.item = item
                 with toggleBlockSignals([self.colorDialog]):
-                    self.colorDialog.setCurrentColor(QtGui.QColor(*item.color()))
+                    self.colorDialog.cancelColor = QtGui.QColor(*item.color())
+                    self.colorDialog.setCurrentColor(self.colorDialog.cancelColor)
                 self.colorDialog.move(pos)
                 self.colorDialog.show()
                 """
@@ -1408,6 +1414,8 @@ class SkinPaintWin(Window):
             self.uiInfluenceTREE.clear()
             self.uiInfluenceTREE.dicWidgName = {}
 
+            if not self.dataOfSkin.shapePath:
+                return
             isPaintable = self.dataOfSkin.shapePath.apiType() == OpenMaya.MFn.kMesh
             for uiObj in [
                 "options_widget",
