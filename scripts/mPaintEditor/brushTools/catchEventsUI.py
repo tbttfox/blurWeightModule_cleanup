@@ -179,6 +179,12 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
     def setPanelsDisplayOn(self):
         self.restorePanels = []
+        dicPanel = {"edit": True, "displayLights": "flat"}
+        wireframeCB = callPaintEditorFunction("wireframe_cb")
+
+        if wireframeCB and wireframeCB.isChecked():
+            dicPanel["wireframeOnShaded"] = False
+
         for panel in cmds.getPanel(visiblePanels=True):
             if cmds.getPanel(typeOf=panel) == "modelPanel":
                 valDic = {}
@@ -193,9 +199,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 # cmEnabled = cmds.modelEditor (panel, query=True, cmEnabled = True)
                 # selectionHiliteDisplay= cmds.modelEditor (panel, query=True, selectionHiliteDisplay = True)
                 self.restorePanels.append((panel, valDic))
-                cmds.modelEditor(
-                    panel, edit=True, displayLights="flat", wireframeOnShaded=False
-                )
+                cmds.modelEditor(panel, **dicPanel)
                 # GAMMA ENABLED
                 cmds.modelEditor(panel, edit=True, cmEnabled=False)
 
@@ -496,11 +500,17 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     if cmds.objExists("SkinningWireframe"):
                         vis = cmds.getAttr("SkinningWireframe.v")
                         cmds.setAttr("SkinningWireframe.v", not vis)
-                    """
-                    listModelPanels = [ el for el in cmds.getPanel (vis=True) if cmds.getPanel (to=el) == "modelPanel" ]
-                    val = not cmds.modelEditor (listModelPanels [0], query=True, sel = True)
-                    for pnel in listModelPanels :    cmds.modelEditor (pnel , edit=True, sel = val)
-                    """
+                    else:
+                        listModelPanels = [
+                            el
+                            for el in cmds.getPanel(visiblePanels=True)
+                            if cmds.getPanel(typeOf=el) == "modelPanel"
+                        ]
+                        val = not cmds.modelEditor(
+                            listModelPanels[0], query=True, wireframeOnShaded=True
+                        )
+                        for pnel in listModelPanels:
+                            cmds.modelEditor(pnel, edit=True, wireframeOnShaded=val)
                     event.ignore()
                     return True
 
