@@ -4,6 +4,12 @@ import time
 import datetime
 from collections import OrderedDict
 import random
+
+
+from dcc.maya.skinCluster import getFastData
+import maya.OpenMaya as om
+import maya.OpenMayaAnim as oma
+from pymel.core import PyNode
 import importlib
 
 """
@@ -366,7 +372,7 @@ def closeEventCatcher():
     """
 
 
-def toolOnSetupEnd():
+def toolOnSetupEndDeferred():
     with disableUndoContext():
         addWireFrameToMesh()
         cmds.select(clear=True)
@@ -386,6 +392,11 @@ def toolOnSetupEnd():
                 mshShape, completionTime
             )
         )
+
+
+def toolOnSetupEnd():
+    toolOnSetupEndDeferred()
+    # cmds.evalDeferred(toolOnSetupEndDeferred)
 
 
 def toolOffCleanup():
@@ -547,6 +558,87 @@ def deleteExistingColorSets():
         ]:
             if colSet in existingColorSets:
                 cmds.polyColorSet(obj, delete=True, colorSet=colSet)
+
+
+"""
+matIndices =cmds.getAttr ("{}.matrix".format (newSkinName), mi=True) 
+len (matIndices ) != max (matIndices )+1
+"""
+
+
+def reloadSkin(skinClusterName):
+    sknFn, shapePath, fullComponent, nbDrivers, influencesIndices = getFastData(
+        skinClusterName, indices=None, shapePathIndex=0
+    )
+    weights = om.MDoubleArray()
+
+    intptrUtil = om.MScriptUtil()
+    intptrUtil.createFromInt(0)
+    intPtr = intptrUtil.asUintPtr()
+
+    sknFn.getWeights(shapePath, fullComponent, weights, intPtr)
+
+    listBindPreMat = {}
+    listInfluenceColor = {}
+    for influenceName, influencesIndex in influencesIndices.items():
+        bindPreAtt = "{}.bindPreMatrix[{}]".format(skinClusterName, influencesIndex)
+        bindPreConn = cmds.listConnections(
+            bindPreAtt, source=True, destination=False, plugs=True
+        )
+        if bindPreConn:
+            listBindPreMat[influenceName] = bindPreConn[0]
+        else:
+            listBindPreMat[influenceName] = PyNode(bindPreAtt).get()
+
+        influenceColorAtt = "{}.influenceColor[{}]".format(
+            skinClusterName, influencesIndex
+        )
+        influenceColorConn = cmds.listConnections(
+            influenceColorAtt, source=True, destination=False, plugs=True
+        )
+        if influenceColorConn:
+            listInfluenceColor[influenceName] = influenceColorConn[0]
+        else:
+            listInfluenceColor[influenceName] = PyNode(influenceColorAtt).get()
+
+    geometries = cmds.skinCluster(skinClusterName, query=True, geometry=True)
+    lstInfluences = cmds.skinCluster(skinClusterName, query=True, influence=True)
+
+    # that's the get part------------------------------------------
+
+    cmds.delete(skinClusterName)
+    # recreate the skin -----------------------------------
+    newSkinName = cmds.skinCluster(
+        lstInfluences + geometries, toSelectedBones=True, includeHiddenSelections=False
+    )[0]
+    sknFnNew, shapePathNew, fullComponentNew, nbDriversNew, influencesIndicesNew = (
+        getFastData(newSkinName, indices=None, shapePathIndex=0)
+    )
+
+    # reset the weights
+    undoValues = om.MDoubleArray()
+    tmpInflInd = list(range(len(lstInfluences)))
+    tmpInflInd = om.MIntArray(len(lstInfluences))
+    for i in range(len(lstInfluences)):
+        tmpInflInd.set(i, i)
+    sknFnNew.setWeights(
+        shapePathNew, fullComponentNew, tmpInflInd, weights, False, undoValues
+    )
+
+    # reconnect the Atts -----------------------
+    for influenceName, influencesIndex in influencesIndicesNew.items():
+        bindPreAtt = "{}.bindPreMatrix[{}]".format(newSkinName, influencesIndex)
+        bindPreValue = listBindPreMat[influenceName]
+        if isinstance(bindPreValue, str):
+            cmds.connectAttr(bindPreValue, bindPreAtt, force=True)
+        else:
+            PyNode(bindPreAtt).set(bindPreValue)
+
+        influenceColorAtt = "{}.influenceColor[{}]".format(newSkinName, influencesIndex)
+        influenceColorValue = listInfluenceColor[influenceName]
+
+        if not isinstance(influenceColorValue, str):
+            PyNode(influenceColorAtt).set(influenceColorValue)
 
 
 ######################### --------------CALL FROM BRUSH------------------------- ###############################################
