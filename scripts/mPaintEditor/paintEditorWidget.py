@@ -263,6 +263,9 @@ class SkinPaintWin(Window):
 
         if not cmds.pluginInfo("brSkinBrush", query=True, loaded=True):
             cmds.loadPlugin("brSkinBrush")
+        if not cmds.pluginInfo("wireframeDisplay", query=True, loaded=True):
+            cmds.loadPlugin("wireframeDisplay")
+
         blurdev.gui.loadUi(__file__, self)
 
         self.useShortestNames = (

@@ -20,6 +20,34 @@ updateWireFrameColorSoloMode
 # random.seed(10)
 
 
+class disableUndoContext(object):
+    """
+    **CONTEXT** class (*use* ``with`` *statement*)
+    """
+
+    def __init__(self, raise_error=True, disableUndo=True, disableSoft=False):
+        self.raise_error = raise_error
+        self.disableUndo = disableUndo
+        # self.disableSoft = disableSoft
+
+    def __enter__(self):
+        if self.disableUndo:
+            cmds.undoInfo(state=False)
+        # if self.disableSoft:
+        #     cmds.softSelect(e=True, softSelectEnabled=False)
+        #     self.isSoftSelect = cmds.softSelect(q=True, softSelectEnabled=True)
+        # self.isSymetry = cmds.symmetricModelling(q=True, symmetry=True)
+        # cmds.symmetricModelling(e=True, symmetry=False)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Turn refresh on again and raise errors if asked"""
+        if self.disableUndo:
+            cmds.undoInfo(state=True)
+        # cmds.symmetricModelling(e=True, symmetry=self.isSymetry )
+        # if self.disableSoft:
+        #     cmds.softSelect(e=True, softSelectEnabled=self.isSoftSelect)
+
+
 def get_random_color(pastel_factor=0.5):
     return [
         (x + pastel_factor) / (1.0 + pastel_factor)
@@ -188,8 +216,6 @@ def doRemoveColorSets():
 
 
 def createWireframe(meshNode, hideOther=True, valAlpha=0.25):
-    if not cmds.pluginInfo("wireframeDisplay", query=True, loaded=True):
-        cmds.loadPlugin("wireframeDisplay")
     if hideOther:
         wireDisplay = cmds.listRelatives(
             meshNode, shapes=True, path=True, type="wireframeDisplay"
@@ -209,10 +235,11 @@ def createWireframe(meshNode, hideOther=True, valAlpha=0.25):
     prt = cmds.createNode("transform", name="SkinningWireframe", parent=meshNode)
     # prt,=cmds.parent (prt, w=True)
     for msh in meshes:
-        loc = cmds.createNode("wireframeDisplay", parent=prt)
+        loc = cmds.createNode(
+            "wireframeDisplay", parent=prt, name="SkinningWireframeShape"
+        )
         cmds.connectAttr(msh + ".outMesh", loc + ".inMesh", force=True)
         cmds.setAttr(loc + ".ihi", False)
-
     return prt
 
 
@@ -340,49 +367,54 @@ def closeEventCatcher():
 
 
 def toolOnSetupEnd():
-    addWireFrameToMesh()
-    cmds.select(clear=True)
-    currentContext = cmds.currentCtx()
-    mshShape = cmds.brSkinBrushContext(currentContext, query=True, meshName=True)
-    mel.eval('global string $gSkinBrushMesh; $gSkinBrushMesh="' + mshShape + '";')
-    cmds.evalDeferred(doUpdateWireFrameColorSoloMode)
-    # ------ compute time ----------------------------------
-    startTime = cmds.optionVar(query="startTime")
-    completionTime = time.time() - startTime
-    timeRes = str(datetime.timedelta(seconds=int(completionTime))).split(":")
-    # result = "{} hours {} mins {} secs".format (*timeRes)
+    with disableUndoContext():
+        addWireFrameToMesh()
+        cmds.select(clear=True)
+        currentContext = cmds.currentCtx()
+        mshShape = cmds.brSkinBrushContext(currentContext, query=True, meshName=True)
+        mel.eval('global string $gSkinBrushMesh; $gSkinBrushMesh="' + mshShape + '";')
+        cmds.evalDeferred(doUpdateWireFrameColorSoloMode)
+        # ------ compute time ----------------------------------
+        startTime = cmds.optionVar(query="startTime")
+        completionTime = time.time() - startTime
+        timeRes = str(datetime.timedelta(seconds=int(completionTime))).split(":")
+        # result = "{} hours {} mins {} secs".format (*timeRes)
 
-    callPaintEditorFunction("paintStart")
-    print(
-        "----- load BRUSH for {} in  [{:.2f} secs] ------".format(
-            mshShape, completionTime
+        callPaintEditorFunction("paintStart")
+        print(
+            "----- load BRUSH for {} in  [{:.2f} secs] ------".format(
+                mshShape, completionTime
+            )
         )
-    )
 
 
 def toolOffCleanup():
     # print "finishing tool\n"
-    closeEventCatcher()
-    if cmds.objExists("SkinningWireframe"):
-        cmds.delete("SkinningWireframe")
+    with disableUndoContext():
+        closeEventCatcher()
 
-    # unhide previous wireFrames :
-    theMesh = getMeshTransfrom()
-    if theMesh:
-        wireDisplay = cmds.listRelatives(
-            theMesh, shapes=True, path=True, type="wireframeDisplay"
-        )
-        if wireDisplay:
-            cmds.showHidden(wireDisplay)
+        if cmds.objExists("SkinningWireframe"):
+            cmds.delete("SkinningWireframe")
+        # unhide previous wireFrames :
+        theMesh = getMeshTransfrom()
+        if theMesh:
+            try:
+                wireDisplay = cmds.listRelatives(
+                    theMesh, shapes=True, path=True, type="wireframeDisplay"
+                )
+                if wireDisplay:
+                    cmds.showHidden(wireDisplay)
+            except RuntimeError:  # RuntimeError: Unknown object type: wireframeDisplay
+                pass
 
-    # delete colors on Q pressed
-    doRemoveColorSets()
-    val = cmds.optionVar(query="revertParallelEvaluationMode")
-    if val != 0:
-        cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
-        mode = "parallel" if val == 3 else "serial"
-        cmds.evaluationManager(mode=mode)
-    callPaintEditorFunction("paintEnd")
+        # delete colors on Q pressed
+        doRemoveColorSets()
+        val = cmds.optionVar(query="revertParallelEvaluationMode")
+        if val != 0:
+            cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
+            mode = "parallel" if val == 3 else "serial"
+            cmds.evaluationManager(mode=mode)
+        callPaintEditorFunction("paintEnd")
 
 
 def escapePressed():
@@ -403,14 +435,14 @@ def addWireFrameToMesh():
 def updateWireFrameColorSoloMode(soloColor):
     ctx = cmds.currentCtx()
     # soloColor = cmds.brSkinBrushContext (ctx, q=True, soloColor=True  )
-    if cmds.objExists("wireframeDisplayShape1"):
+    if cmds.objExists("SkinningWireframeShape"):
         if not soloColor:
             overrideColorRGB = [0.1, 0.1, 0.1]
         else:
             overrideColorRGB = [0.8, 0.8, 0.8]
-        cmds.setAttr("wireframeDisplayShape1.overrideEnabled", 1)
-        cmds.setAttr("wireframeDisplayShape1.overrideRGBColors", 1)
-        cmds.setAttr("wireframeDisplayShape1.overrideColorRGB", *overrideColorRGB)
+        cmds.setAttr("SkinningWireframeShape.overrideEnabled", 1)
+        cmds.setAttr("SkinningWireframeShape.overrideRGBColors", 1)
+        cmds.setAttr("SkinningWireframeShape.overrideColorRGB", *overrideColorRGB)
 
 
 def doUpdateWireFrameColorSoloMode():
