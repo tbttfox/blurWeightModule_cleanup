@@ -10,6 +10,8 @@ from dcc.maya.skinCluster import getFastData
 import maya.OpenMaya as om
 import maya.OpenMayaAnim as oma
 from pymel.core import PyNode
+
+from mWeightEditor.tools.utils import GlobalContext
 import importlib
 
 """
@@ -385,7 +387,7 @@ def closeEventCatcher():
 
 
 def toolOnSetupEndDeferred():
-    with disableUndoContext():
+    with GlobalContext(message="toolOnSetupEndDeferred", doPrint=False):
         addWireFrameToMesh()
         cmds.select(clear=True)
         currentContext = cmds.currentCtx()
@@ -412,15 +414,15 @@ def toolOnSetupEnd():
 
 
 def toolOffCleanup():
-    cmds.evalDeferred(toolOffCleanupDeferred)
+    toolOffCleanupDeferred()
 
 
 def toolOffCleanupDeferred():
     # print "finishing tool\n"
-    with disableUndoContext():
-        closeEventCatcher()
+    with GlobalContext(message="toolOffCleanupDeferred", doPrint=False):
         if cmds.objExists("SkinningWireframe"):
             cmds.delete("SkinningWireframe")
+        closeEventCatcher()
         # unhide previous wireFrames :
         theMesh = getMeshTransfrom()
         if theMesh:
@@ -435,7 +437,7 @@ def toolOffCleanupDeferred():
 
         # delete colors on Q pressed
         doRemoveColorSets()
-        cmds.evalDeferred(retrieveParallelMode)
+        retrieveParallelMode()
 
         # retrieve autoSave
         if (
