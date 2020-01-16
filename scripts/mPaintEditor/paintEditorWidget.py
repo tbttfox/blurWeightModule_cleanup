@@ -480,6 +480,11 @@ class SkinPaintWin(Window):
                 OpenMaya.MSceneMessage.kBeforeOpen, self.exitPaint
             )
         )
+        self.close_callback.append(
+            OpenMaya.MSceneMessage.addCallback(
+                OpenMaya.MSceneMessage.kBeforeSave, self.exitPaint
+            )
+        )
 
     def deleteCallBacks(self):
         try:
@@ -669,7 +674,7 @@ class SkinPaintWin(Window):
             return currentContext
         return False
 
-    def exitPaint(self):
+    def exitPaint(self, *args):  # *args for callBacks
         if self.isInPaint():
             mel.eval("setToolTo $gMove;")
 
