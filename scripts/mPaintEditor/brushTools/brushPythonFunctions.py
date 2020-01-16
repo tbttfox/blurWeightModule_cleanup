@@ -318,6 +318,12 @@ def toolOnSetupStart():
     cmds.optionVar(
         intValueAppend=["colorShadedDisplay", 1], intValue=["colorizeSkeleton", 1]
     )  # found that if not Shannon paint doesn't swap deformers
+
+    sel = cmds.ls(selection=True)
+    cmds.optionVar(clearArray="brushPreviousSelection")
+    for obj in sel:
+        cmds.optionVar(stringValueAppend=["brushPreviousSelection", obj])
+
     # addControllersToJoints ()
     shapeSelected = getShapesSelected(returnTransform=True)
     if not shapeSelected:  # if nothing selected
@@ -426,6 +432,8 @@ def toolOffCleanupDeferred():
         doRemoveColorSets()
         cmds.evalDeferred(retrieveParallelMode)
         callPaintEditorFunction("paintEnd")
+        if cmds.optionVar(exists="brushPreviousSelection"):
+            cmds.select(cmds.optionVar(query="brushPreviousSelection"))
 
 
 def retrieveParallelMode():
