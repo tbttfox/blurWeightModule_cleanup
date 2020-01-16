@@ -221,10 +221,6 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.show()
         # print "THAT SHOULD BE OPEN"
 
-    def fermer(self):
-        self.setPanelsDisplayOff()
-        self.removeFilters()
-
     def installFilters(self):
         listModelPanels = [
             el
@@ -550,6 +546,10 @@ class CatchEventsWidget(QtWidgets.QWidget):
         """
         self.fermer()
         return super(CatchEventsWidget, self).closeEvent(e)
+
+    def fermer(self):
+        self.setPanelsDisplayOff()
+        self.removeFilters()
 
 
 """
