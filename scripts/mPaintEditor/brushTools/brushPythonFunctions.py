@@ -309,6 +309,12 @@ def toolOnSetupStart():
         cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
         # cmds.optionVar(q="evaluationMode")
 
+    # disable AutoSave --------------------------
+    if cmds.autoSave(query=True, enable=True):
+        if not cmds.optionVar(exists="autoSaveEnable"):
+            cmds.optionVar(intValue=["autoSaveEnable", 1])
+        cmds.autoSave(enable=False)
+
     cmds.optionVar(
         clearArray="colorShadedDisplay"
     )  # found that if not Shannon paint doesn't swap deformers
@@ -430,6 +436,14 @@ def toolOffCleanupDeferred():
         # delete colors on Q pressed
         doRemoveColorSets()
         cmds.evalDeferred(retrieveParallelMode)
+
+        # retrieve autoSave
+        if (
+            cmds.optionVar(exists="autoSaveEnable")
+            and cmds.optionVar(query="autoSaveEnable") == 1
+        ):
+            cmds.autoSave(enable=True)
+
         callPaintEditorFunction("paintEnd")
         if cmds.optionVar(exists="brushPreviousSelection"):
             cmds.select(cmds.optionVar(query="brushPreviousSelection"))
