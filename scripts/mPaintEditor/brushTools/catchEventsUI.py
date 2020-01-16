@@ -538,7 +538,13 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     return True
 
             return super(CatchEventsWidget, self).eventFilter(obj, event)
-        return super(CatchEventsWidget, self).eventFilter(obj, event)
+        try:
+            return super(CatchEventsWidget, self).eventFilter(obj, event)
+        except (
+            TypeError
+        ):  # TypeError: super(type, obj): obj must be an instance or subtype of type
+            print("Shannon bug ...")
+            self.removeFilters()
 
     def closeEvent(self, e):
         """
