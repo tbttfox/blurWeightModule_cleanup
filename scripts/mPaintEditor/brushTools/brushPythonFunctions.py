@@ -299,18 +299,32 @@ def fnFonts(txt):
     return [sz.width() + 2, sz.height() + 2]
 
 
-def toolOnSetupStart():
-    cmds.optionVar(intValue=["startTime", time.time()])
-
+def setToDgMode():
     goodMode = "off"  # "serial" anmd "serialUncached" and "parallel" crashes
     if cmds.evaluationManager(query=True, mode=True) != [goodMode]:
         val = cmds.optionVar(query="evaluationMode")
         cmds.evaluationManager(mode=goodMode)
         cmds.optionVar(intValue=["revertParallelEvaluationMode", val])
+        # Set everything in the entire scene dirty
+        #
+        cmds.dgdirty(allPlugs=True)
     else:
         cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
         # cmds.optionVar(q="evaluationMode")
 
+
+def retrieveParallelMode():
+    val = cmds.optionVar(query="revertParallelEvaluationMode")
+    if val != 0:
+        cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
+        mode = "parallel" if val == 3 else "serial"
+        cmds.evaluationManager(mode=mode)
+
+
+def toolOnSetupStart():
+    cmds.optionVar(intValue=["startTime", time.time()])
+
+    setToDgMode()
     # disable AutoSave --------------------------
     if cmds.autoSave(query=True, enable=True):
         if not cmds.optionVar(exists="autoSaveEnable"):
@@ -449,14 +463,6 @@ def toolOffCleanupDeferred():
         callPaintEditorFunction("paintEnd")
         if cmds.optionVar(exists="brushPreviousSelection"):
             cmds.select(cmds.optionVar(query="brushPreviousSelection"))
-
-
-def retrieveParallelMode():
-    val = cmds.optionVar(query="revertParallelEvaluationMode")
-    if val != 0:
-        cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
-        mode = "parallel" if val == 3 else "serial"
-        cmds.evaluationManager(mode=mode)
 
 
 def escapePressed():
