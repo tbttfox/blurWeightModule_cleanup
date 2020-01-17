@@ -756,7 +756,7 @@ class SkinPaintWin(Window):
             setSoloMode(val)
 
     def addInfluences(self):
-        sel = cmds.ls(selection=True, transforms=True)
+        sel = cmds.ls(selection=True, type="joint")
         skn = self.dataOfSkin.theSkinCluster
         prt = (
             cmds.listRelatives(self.dataOfSkin.deformedShape, path=-True, parent=True)[
