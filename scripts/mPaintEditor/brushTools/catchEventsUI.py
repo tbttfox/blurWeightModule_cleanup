@@ -15,8 +15,7 @@ from brushPythonFunctions import (
     toggleSoloMode,
     disableUndoContext,
 )
-
-# reload(brushPythonFunctions)
+import meshFnIntersection
 
 """
 import catchEventsUI
@@ -178,6 +177,8 @@ class CatchEventsWidget(QtWidgets.QWidget):
         # self.setAttribute (QtCore.Qt.WA_MouseNoMask, True)
         self.prevButton = self.lstButtons[0]
         self.prevQtButton = "add"
+
+        self.orbit = meshFnIntersection.Orbit()
 
     # ---------- GAMMA --------------------------------------
     restorePanels = []
@@ -405,6 +406,11 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     event.ignore()
                     return True
                 # else : return super(CatchEventsWidget, self).eventFilter(obj, event)
+
+            if event.key() == QtCore.Qt.Key_F:
+                self.orbit.setOrbitPosi()
+                event.ignore()
+                return True
 
             elif event.key() == QtCore.Qt.Key_Control:
                 if QApplication.mouseButtons() == QtCore.Qt.NoButton:
