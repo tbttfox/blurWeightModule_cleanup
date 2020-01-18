@@ -227,6 +227,7 @@ QComboBox{
 lstShortCuts = [
     ("Remove ", "Shift + LMB"),
     ("Smooth", "Ctrl + LMB"),
+    ("Sharpen", "Ctrl + Shift + LMB"),
     ("Size", "MMB left right"),
     ("Strength", "MMB up down"),
     ("Fine Strength Size", "Ctrl + MMB"),
@@ -235,6 +236,7 @@ lstShortCuts = [
     ("pick Vertex ", "ALT + D"),
     ("Toggle Mirror Mode", "ALT + M"),
     ("Toggle Solo Mode", "ALT + S"),
+    ("Toggle Solo Opaque", "ALT + A"),
     ("Toggle Wireframe", "ALT + W"),
     ("Toggle Xray", "ALT + X"),
     # ("Flood", "ALT + F"),
@@ -798,6 +800,7 @@ class SkinPaintWin(Window):
                 )
                 cmds.evalDeferred(self.selectRefresh)
                 cmds.evalDeferred(partial(self.reselectIndices, toSelect))
+                # add color to the damn influences added
 
     def fromScene(self):
         sel = cmds.ls(selection=True, transforms=True)
@@ -1116,7 +1119,9 @@ class SkinPaintWin(Window):
         )
 
         self.maxColor_sb.valueChanged.connect(partial(self.brSkinConn, "maxColor"))
-        self.minColor_sb.valueChanged.connect(partial(self.brSkinConn, "minColor"))
+        self.minColor_sb.valueChanged.connect(self.editSoloColor)
+
+        self.soloOpaque_cb.toggled.connect(self.opaqueSet)
 
         self.wireframe_cb.toggled.connect(self.wireframeToggle)
         self.WarningFixSkin_btn.setVisible(False)
@@ -1124,6 +1129,17 @@ class SkinPaintWin(Window):
         """
         things that are not working yet !!!
         """
+
+    def opaqueSet(self, checked):
+        val = 1.0 if checked else 0.0
+        self.brSkinConn("minColor", val)
+        with toggleBlockSignals([self.minColor_sb]):
+            self.minColor_sb.setValue(val)
+
+    def editSoloColor(self, val):
+        with toggleBlockSignals([self.soloOpaque_cb]):
+            self.soloOpaque_cb.setChecked(val == 1.0)
+        self.brSkinConn("minColor", val)
 
     def changeDGParallel(self, val):
         # isDG = cmds.evaluationManager( q=True, mode=True) == [u'off']

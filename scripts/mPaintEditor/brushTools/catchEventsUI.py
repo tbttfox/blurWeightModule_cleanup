@@ -526,6 +526,25 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     event.ignore()
                     return True
 
+                if event.key() == QtCore.Qt.Key_A:
+                    soloOpaque = callPaintEditorFunction("soloOpaque_cb")
+                    if soloOpaque:
+                        soloOpaque.toggle()
+                    else:
+                        minColor = cmds.brSkinBrushContext(
+                            "brSkinBrushContext1", query=True, minColor=True
+                        )
+                        if minColor == 1.0:
+                            cmds.brSkinBrushContext(
+                                "brSkinBrushContext1", edit=True, minColor=0.0
+                            )
+                        else:
+                            cmds.brSkinBrushContext(
+                                "brSkinBrushContext1", edit=True, minColor=1.0
+                            )
+                    event.ignore()
+                    return True
+
                 # if event.key() == QtCore.Qt.Key_F:
                 #     print "FLOOD"
                 #     cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, flood=True)
