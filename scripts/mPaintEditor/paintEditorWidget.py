@@ -1550,6 +1550,7 @@ class SkinPaintWin(Window):
 
             self.updateCurrentInfluence(self.previousInfluenceName)
         self.updateWarningBtn()
+        self.showHideLocks(self.showLocks_btn.isChecked())
 
     def fixSparseArray(self):
         if self.isInPaint():
