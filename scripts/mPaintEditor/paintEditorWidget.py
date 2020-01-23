@@ -310,6 +310,7 @@ class SkinPaintWin(Window):
         super(SkinPaintWin, self).showEvent(event)
         self.addCallBacks()
         cmds.evalDeferred(self.updateUIwithContextValues)
+        cmds.evalDeferred(self.refresh)
 
     def colorSelected(self, color):
         values = [color.red() / 255.0, color.green() / 255.0, color.blue() / 255.0]
@@ -1540,6 +1541,7 @@ class SkinPaintWin(Window):
                 "buttonWidg",
                 "widgetAbs",
                 "valueSetter",
+                "sizeBrushSetter",
                 "widget_paintBtns",
                 "option_GB",
             ]:
