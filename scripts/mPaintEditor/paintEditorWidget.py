@@ -456,7 +456,6 @@ class SkinPaintWin(Window):
     def setWindowDisplay(self):
         self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.Tool)
         self.setWindowTitle("Paint Editor")
-        # self.refreshPosition ()
         self.show()
 
     def renameCB(self, oldName, newName):
@@ -580,8 +579,10 @@ class SkinPaintWin(Window):
 
     def closeEvent(self, event):
         mel.eval("setToolTo $gMove;")
-
-        self.deleteCallBacks()
+        try:
+            self.deleteCallBacks()
+        except RuntimeError:
+            print("Error removeing callbacks")
         # pos = self.pos()
         # size = self.size()
         # cmds.optionVar (clearArray= "SkinPaintWindow")
