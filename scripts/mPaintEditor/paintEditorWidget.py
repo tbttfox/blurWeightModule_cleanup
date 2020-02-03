@@ -3,6 +3,8 @@ import __main__
 self = __main__.paintEditor
 """
 
+# from mPaintEditor.brushTools.brushPythonFunctions import *
+
 from Qt import QtGui, QtCore, QtWidgets, QtCompat
 
 # import shiboken2 as shiboken
@@ -1536,7 +1538,11 @@ class SkinPaintWin(Window):
 
             if not hasattr(self.dataOfSkin, "shapePath"):
                 return
-            isPaintable = self.dataOfSkin.shapePath.apiType() == OpenMaya.MFn.kMesh
+
+            isPaintable = self.dataOfSkin.shapePath.apiType() in [
+                OpenMaya.MFn.kMesh,
+                OpenMaya.MFn.kNurbsSurface,
+            ]
             for uiObj in [
                 "options_widget",
                 "buttonWidg",
@@ -1582,7 +1588,7 @@ class SkinPaintWin(Window):
     def updateWarningBtn(self):
         skn = self.dataOfSkin.theSkinCluster
         if skn and cmds.objExists(skn):
-            matIndices = cmds.getAttr("{}.matrix".format(skn), multiIndices=True)
+            matIndices = cmds.getAttr("{}.matrix".format(skn), multiIndices=True) or []
             sparseArray = len(matIndices) != max(matIndices) + 1
         else:
             sparseArray = False
