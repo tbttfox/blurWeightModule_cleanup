@@ -488,6 +488,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
 
     def lockAllButSelectedColumns(self):
         selectedIndices = set(range(self.count() - 1))
+        self.model().datatable.unLockColumns(selectedIndices)
         selectedIndices.difference_update(self.getSelectedColumns())
         self.model().datatable.lockColumns(selectedIndices)
         self.mainWindow.refreshPaintEditor()
