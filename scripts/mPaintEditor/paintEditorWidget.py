@@ -16,6 +16,8 @@ import os
 import re
 import numpy as np
 from studio.gui.resource import Icons
+from dcc.maya.skinCluster import cmdSkinCluster
+
 from mWeightEditor.tools.skinData import DataOfSkin
 from mWeightEditor.tools.spinnerSlider import ValueSetting, ButtonWithValue, VerticalBtn
 from mWeightEditor.tools.utils import (
@@ -35,7 +37,6 @@ from brushTools.brushPythonFunctions import (
     generate_new_color,
     deleteExistingColorSets,
     setSoloMode,
-    reloadSkin,
 )
 
 
@@ -1587,17 +1588,17 @@ class SkinPaintWin(Window):
             prevSelection = cmds.ls(selection=True)
             skn = self.dataOfSkin.theSkinCluster
             if skn and cmds.objExists(skn):
-                reloadSkin(skn)
+                cmdSkinCluster.reloadSkin(skn)
                 self.refresh(force=True)
                 cmds.select(prevSelection)
 
     def updateWarningBtn(self):
         skn = self.dataOfSkin.theSkinCluster
-        if skn and cmds.objExists(skn):
-            matIndices = cmds.getAttr("{}.matrix".format(skn), multiIndices=True) or []
-            sparseArray = len(matIndices) != max(matIndices) + 1
-        else:
-            sparseArray = False
+        sparseArray = (
+            skn
+            and cmds.objExists(skn)
+            and cmdSkinCluster.skinClusterHasSparceArray(skn)
+        )
         self.WarningFixSkin_btn.setVisible(sparseArray)
 
     def paintEnd(self):  # called by the brush
