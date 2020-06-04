@@ -721,6 +721,8 @@ class SkinPaintWin(Window):
                     )
 
                 # getMirrorInfluenceArray
+                # let's select the shape first
+                cmds.select(self.dataOfSkin.deformedShape, replace=True)
                 cmds.setToolTo(context)
                 mel.eval("rememberCtxSettings " + context)
                 self.getMirrorInfluenceArray()
