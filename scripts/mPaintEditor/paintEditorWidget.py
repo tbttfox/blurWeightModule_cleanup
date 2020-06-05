@@ -402,7 +402,7 @@ class SkinPaintWin(Window):
 
         self.popMenu.addSeparator()
         unLockSel = self.popMenu.addAction(
-            "clear locks", partial(self.applyLock, "clearLocks")
+            "unlock ALL", partial(self.applyLock, "clearLocks")
         )
         self.popMenu.addAction(unLockSel)
 
