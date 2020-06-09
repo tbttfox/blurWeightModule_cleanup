@@ -178,7 +178,8 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
             transform = dagPath.transform()
             node = dagPath.node()
             depNode = OpenMaya.MFnDependencyNode(node)
-            depNode_name = dagPath.fullPathName()  # depNode.absoluteName ()
+            depNode_name = dagPath.fullPathName()
+            # depNode.absoluteName ()
 
             # print depNode_name,
 
