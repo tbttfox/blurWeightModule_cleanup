@@ -4,9 +4,16 @@ import time
 import datetime
 from collections import OrderedDict
 import random
+from functools import partial
+
+from dcc.maya.skinCluster import getFastData
+import maya.OpenMaya as om
+import maya.OpenMayaAnim as oma
+from pymel.core import PyNode
 
 from Qt import QtGui
 from mWeightEditor.tools.utils import GlobalContext
+import importlib
 
 # To make your color choice reproducible, uncomment the following line:
 # random.seed(10)
@@ -184,6 +191,11 @@ def addInfluences():
                 cmds.skinCluster(
                     skn, edit=True, lockWeights=False, weight=0.0, addInfluence=toAdd
                 )
+                """
+                toSelect = range(self.uiInfluenceTREE.topLevelItemCount(), self.uiInfluenceTREE.topLevelItemCount()+len(toAdd))
+                cmds.evalDeferred(self.selectRefresh)
+                cmds.evalDeferred(partial(self.reselectIndices,toSelect))
+                """
 
 
 def removeUnusedInfluences(self):
@@ -570,6 +582,7 @@ def callEventCatcher():
     import catchEventsUI
 
     # print catchEventsUI.__file__
+    importlib.reload(catchEventsUI)
     catchEventsUI.EVENTCATCHER = catchEventsUI.CatchEventsWidget()
     catchEventsUI.EVENTCATCHER.open()
 
