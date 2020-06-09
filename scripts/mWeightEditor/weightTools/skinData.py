@@ -939,18 +939,20 @@ class DataOfSkin(DataAbstract):
         self.undoDic = {"isSkin": True, "inListVertices": [], "theSkinCluster": ""}
 
     def getAllData(
-        self, displayLocator=True, getskinWeights=True, force=True, inputVertices=None
+        self,
+        displayLocator=True,
+        getskinWeights=True,
+        force=True,
+        inputVertices=None,
+        **kwargs,
     ):
         success = self.getDataFromSelection(
-            typeOfDeformer="skinCluster", force=force, inputVertices=inputVertices
+            typeOfDeformer="skinCluster",
+            force=force,
+            inputVertices=inputVertices,
+            **kwargs,
         )
         if not success or self.theDeformer == "":
-            """
-            clearData = cmds.objExists(self.deformedShape) and self.theDeformer == ""
-            clearData = clearData and cmds.nodeType(self.deformedShape) in["mesh", "nurbsSurface"]
-            if clearData:
-                self.clearData()
-            """
             if not force:
                 return False
         else:
