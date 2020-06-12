@@ -527,7 +527,7 @@ class DataOfSkin(DataAbstract):
             # renormalize ---------------------------------------------------------------------------------------------------
 
             # add with the mask ---------------------------------------------------------------------------------------------
-            # np.copyto(new2dArray , absValues.filled(0)+remainingValues.filled(0), where = ~self.lockedMask)
+            # np.copyto(new2dArray , absValues.filled(0)+remainingValues.filled(0), where=~self.lockedMask)
             np.copyto(new2dArray, absValues, where=~absValues.mask)
             np.copyto(new2dArray, remainingValues, where=~remainingValues.mask)
 
@@ -582,7 +582,7 @@ class DataOfSkin(DataAbstract):
                 )
             elif percent:  # percent Add
                 """
-                addValues = np.ma.array(selectArr , mask = ~theMask, fill_value = 0 )
+                addValues = np.ma.array(selectArr , mask=~theMask, fill_value = 0 )
                 sum_addValues = addValues.sum(axis=1)
                 toMult = (sum_addValues + val) / sum_addValues
                 addValues = addValues * toMult[:, np.newaxis]
@@ -636,7 +636,7 @@ class DataOfSkin(DataAbstract):
                 )
 
             # add with the mask ---------------------------------------------------------------------------------------------
-            # np.copyto(new2dArray , addValues.filled(0)+remainingValues.filled(0), where = ~self.lockedMask)
+            # np.copyto(new2dArray , addValues.filled(0)+remainingValues.filled(0), where=~self.lockedMask)
             np.copyto(new2dArray, addValues, where=~addValues.mask)
             np.copyto(new2dArray, remainingValues, where=~remainingValues.mask)
             if self.softOn:  # mult soft Value
@@ -675,7 +675,7 @@ class DataOfSkin(DataAbstract):
 
     def actuallySetValue(
         self,
-        theValues,
+        new2dArray,
         sub2DArrayToSet,
         userComponents,
         influenceIndices,
@@ -684,9 +684,9 @@ class DataOfSkin(DataAbstract):
     ):
         with GlobalContext(message="actuallySetValue", doPrint=self.verbose):
             if self.softOn:
-                arrayForSetting = np.copy(theValues[self.opposite_sortedIndices])
+                arrayForSetting = np.copy(new2dArray[self.subOpposite_sortedIndices])
             else:
-                arrayForSetting = np.copy(theValues)
+                arrayForSetting = np.copy(new2dArray)
             doubles = arrayForSetting.flatten()
             count = doubles.size
             tempArrayForSize = OpenMaya.MDoubleArray()
@@ -721,7 +721,7 @@ class DataOfSkin(DataAbstract):
             # do the stting in the 2dArray -----
             # if sub2DArrayToSet != None:
             if sub2DArrayToSet is not None and sub2DArrayToSet.size != 0:
-                np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), theValues)
+                np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), new2dArray)
                 self.computeSumArray()
             # else :
             # self.undoMirrorValues.append([UndoValues, userComponents, influenceIndices] )
