@@ -1793,9 +1793,9 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
 
     def lockIcon(self):
         return (
-            Icons.getIcon("lock")
+            getIcon("lock-gray-locked")
             if self.isLocked()
-            else Icons.getIcon("lock-gray-unlocked")
+            else getIcon("lock-gray-unlocked")
         )
 
     def colorIcon(self):
