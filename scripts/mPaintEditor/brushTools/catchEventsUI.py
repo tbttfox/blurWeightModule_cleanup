@@ -8,7 +8,7 @@ except:
     from PySide2.QtWidgets import QApplication, QSplashScreen, QDialog, QMainWindow
 
 from maya import OpenMayaUI, cmds, mel
-
+import time
 from brushPythonFunctions import (
     callPaintEditorFunction,
     escapePressed,
@@ -172,6 +172,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.closingNextPressMarkingMenu = False
         self.ctrlPressed = False
         self.shiftPressed = False
+        self.testWireFrame = True
 
         self.rootWin = rootWindow()
         ptr = OpenMayaUI.MQtUtil.mainWindow()
@@ -181,6 +182,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.prevQtButton = "add"
 
         self.orbit = meshFnIntersection.Orbit()
+        self.timeStampRunning = time.time()
 
     # ---------- GAMMA --------------------------------------
     restorePanels = []
@@ -189,19 +191,22 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.restorePanels = []
         dicPanel = {"edit": True, "displayLights": "flat"}
         wireframeCB = callPaintEditorFunction("wireframe_cb")
-
-        if wireframeCB and wireframeCB.isChecked():
-            dicPanel["wireframeOnShaded"] = False
+        listModelEditorKeys = [
+            "displayLights",
+            "cmEnabled",
+            "selectionHiliteDisplay",
+            "wireframeOnShaded",
+        ]
+        if not self.testWireFrame:
+            if wireframeCB and wireframeCB.isChecked():
+                dicPanel["wireframeOnShaded"] = False
+        else:
+            listModelEditorKeys.remove("wireframeOnShaded")
 
         for panel in cmds.getPanel(visiblePanels=True):
             if cmds.getPanel(typeOf=panel) == "modelPanel":
                 valDic = {}
-                for key in [
-                    "displayLights",
-                    "cmEnabled",
-                    "selectionHiliteDisplay",
-                    "wireframeOnShaded",
-                ]:
+                for key in listModelEditorKeys:
                     dic = {"query": True, key: True}
                     valDic[key] = cmds.modelEditor(panel, **dic)
                 # cmEnabled = cmds.modelEditor(panel, query=True, cmEnabled = True)
@@ -287,6 +292,13 @@ class CatchEventsWidget(QtWidgets.QWidget):
             cmds.floatSliderGrp("brSkinBrushStrength", edit=True, value=value)
         except:
             pass
+
+    def testRunOnce(self):
+        currentStampTime = time.time()
+        correctTime = (currentStampTime - self.timeStampRunning) > 0.5
+        if correctTime:
+            self.timeStampRunning = currentStampTime
+        return correctTime
 
     def eventFilter(self, obj, event):
         # with disableUndoContext():
@@ -411,29 +423,16 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
             elif event.key() == QtCore.Qt.Key_D:
                 with disableUndoContext():
-                    listModelPanels = [
-                        el
-                        for el in cmds.getPanel(visiblePanels=True)
-                        if cmds.getPanel(typeOf=el) == "modelPanel"
-                    ]
-                    listModelPanelsCompats = [
-                        QtCompat.wrapInstance(
-                            int(OpenMayaUI.MQtUtil.findControl(el)), QtWidgets.QWidget
-                        )
-                        for el in listModelPanels
-                    ]
-                    listModelPanelsCompatsPrts = [
-                        el.parent() for el in listModelPanelsCompats
-                    ]
+                    # listModelPanels = [ el for el in cmds.getPanel(vis=True) if cmds.getPanel(to=el) == "modelPanel" ]
+                    # listModelPanelsCompats = [QtCompat.wrapInstance(long( OpenMayaUI.MQtUtil.findControl(el)), QtWidgets.QWidget) for el in listModelPanels]
+                    # listModelPanelsCompatsPrts = [el.parent() for el in listModelPanelsCompats]
+
                     # ptr = OpenMayaUI.MQtUtil.findControl(listModelPanels [0])
                     # model_panel_4 = QtCompat.wrapInstance(long(ptr), QtWidgets.QWidget)
-                    if (
-                        obj in listModelPanelsCompats
-                        or obj in listModelPanelsCompatsPrts
-                    ):
-                        # print "it is a model_panel"
-                        event.ignore()
-
+                    # if obj in listModelPanelsCompats or obj in listModelPanelsCompatsPrts:
+                    # print "it is a model_panel"
+                    event.ignore()
+                    if self.testRunOnce():
                         if event.modifiers() == QtCore.Qt.AltModifier:
                             mel.eval(
                                 "brSkinBrushContext -edit -pickMaxInfluence 1 `currentCtx`;"
@@ -451,7 +450,8 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
             if event.key() == QtCore.Qt.Key_F:
                 with disableUndoContext():
-                    self.orbit.setOrbitPosi()
+                    if self.testRunOnce():
+                        self.orbit.setOrbitPosi()
                 event.ignore()
                 return True
 
@@ -463,16 +463,19 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     self.ctrlPressed = True
                     event.ignore()
                     with disableUndoContext():
-                        if not self.shiftPressed:
-                            self.prevButton = self.lstButtons[
-                                cmds.brSkinBrushContext(
-                                    "brSkinBrushContext1", query=True, commandIndex=True
+                        if self.testRunOnce():
+                            if not self.shiftPressed:
+                                self.prevButton = self.lstButtons[
+                                    cmds.brSkinBrushContext(
+                                        "brSkinBrushContext1",
+                                        query=True,
+                                        commandIndex=True,
+                                    )
+                                ]
+                                self.prevQtButton = callPaintEditorFunction(
+                                    "getEnabledButton"
                                 )
-                            ]
-                            self.prevQtButton = callPaintEditorFunction(
-                                "getEnabledButton"
-                            )
-                        self.highlightBtns()
+                            self.highlightBtns()
 
             if event.key() == QtCore.Qt.Key_Shift:
                 if (
@@ -483,18 +486,21 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     event.ignore()
                     with disableUndoContext():
                         # callPaintEditorFunction("highlightBtn", "sharpen")
-                        if not self.ctrlPressed:
-                            if self.verbose:
-                                print("custom SHIFT pressed")
-                            self.prevButton = self.lstButtons[
-                                cmds.brSkinBrushContext(
-                                    "brSkinBrushContext1", query=True, commandIndex=True
+                        if self.testRunOnce():
+                            if not self.ctrlPressed:
+                                if self.verbose:
+                                    print("custom SHIFT pressed")
+                                self.prevButton = self.lstButtons[
+                                    cmds.brSkinBrushContext(
+                                        "brSkinBrushContext1",
+                                        query=True,
+                                        commandIndex=True,
+                                    )
+                                ]
+                                self.prevQtButton = callPaintEditorFunction(
+                                    "getEnabledButton"
                                 )
-                            ]
-                            self.prevQtButton = callPaintEditorFunction(
-                                "getEnabledButton"
-                            )
-                        self.highlightBtns()
+                            self.highlightBtns()
 
             elif event.modifiers() == QtCore.Qt.AltModifier:
                 if event.key() == QtCore.Qt.Key_X:
@@ -514,47 +520,54 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
                 if event.key() == QtCore.Qt.Key_W:
                     with disableUndoContext():
-                        if cmds.objExists("SkinningWireframe"):
-                            vis = cmds.getAttr("SkinningWireframe.v")
-                            cmds.setAttr("SkinningWireframe.v", not vis)
-                        else:
-                            listModelPanels = [
-                                el
-                                for el in cmds.getPanel(visiblePanels=True)
-                                if cmds.getPanel(typeOf=el) == "modelPanel"
-                            ]
-                            val = not cmds.modelEditor(
-                                listModelPanels[0], query=True, wireframeOnShaded=True
-                            )
-                            for pnel in listModelPanels:
-                                cmds.modelEditor(pnel, edit=True, wireframeOnShaded=val)
+                        if self.testRunOnce():
+                            if cmds.objExists("SkinningWireframe"):
+                                vis = cmds.getAttr("SkinningWireframe.v")
+                                cmds.setAttr("SkinningWireframe.v", not vis)
+                            else:
+                                listModelPanels = [
+                                    el
+                                    for el in cmds.getPanel(visiblePanels=True)
+                                    if cmds.getPanel(typeOf=el) == "modelPanel"
+                                ]
+                                val = not cmds.modelEditor(
+                                    listModelPanels[0],
+                                    query=True,
+                                    wireframeOnShaded=True,
+                                )
+                                for pnel in listModelPanels:
+                                    cmds.modelEditor(
+                                        pnel, edit=True, wireframeOnShaded=val
+                                    )
                     event.ignore()
                     return True
 
                 if event.key() == QtCore.Qt.Key_S:
                     # print "toggle soloMode"
                     with disableUndoContext():
-                        toggleSoloMode()
+                        if self.testRunOnce():
+                            toggleSoloMode()
                     event.ignore()
                     return True
 
                 if event.key() == QtCore.Qt.Key_A:
                     with disableUndoContext():
-                        soloOpaque = callPaintEditorFunction("soloOpaque_cb")
-                        if soloOpaque:
-                            soloOpaque.toggle()
-                        else:
-                            minColor = cmds.brSkinBrushContext(
-                                "brSkinBrushContext1", query=True, minColor=True
-                            )
-                            if minColor == 1.0:
-                                cmds.brSkinBrushContext(
-                                    "brSkinBrushContext1", edit=True, minColor=0.0
-                                )
+                        if self.testRunOnce():
+                            soloOpaque = callPaintEditorFunction("soloOpaque_cb")
+                            if soloOpaque:
+                                soloOpaque.toggle()
                             else:
-                                cmds.brSkinBrushContext(
-                                    "brSkinBrushContext1", edit=True, minColor=1.0
+                                minColor = cmds.brSkinBrushContext(
+                                    "brSkinBrushContext1", query=True, minColor=True
                                 )
+                                if minColor == 1.0:
+                                    cmds.brSkinBrushContext(
+                                        "brSkinBrushContext1", edit=True, minColor=0.0
+                                    )
+                                else:
+                                    cmds.brSkinBrushContext(
+                                        "brSkinBrushContext1", edit=True, minColor=1.0
+                                    )
                     event.ignore()
                     return True
                 # if event.key() == QtCore.Qt.Key_F:
@@ -564,8 +577,9 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 #     return True
                 if event.key() == QtCore.Qt.Key_M:
                     with disableUndoContext():
-                        print("mirror active")
-                        callPaintEditorFunction("mirrorActive_cb").toggle()
+                        if self.testRunOnce():
+                            print("mirror active")
+                            callPaintEditorFunction("mirrorActive_cb").toggle()
                     # self.mainWindow.mirrorActive_cb
                     event.ignore()
                     return True
