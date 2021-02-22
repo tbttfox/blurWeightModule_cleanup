@@ -129,6 +129,8 @@ class DataOfOneDimensionalAttrs(DataAbstract):
             nodeType, nodeName, attr = splt[:3]
             nodeNameShort = nodeName.split("|")[-1]
             displayName = "-".join([nodeNameShort, attr])
+            if not cmds.attributeQuery(attr, node=nodeName, exists=True):
+                continue
 
             if nodeType == "skinCluster":
                 toSel = displayName
@@ -484,32 +486,33 @@ class DataOfDeformers(DataOfOneDimensionalAttrs):
         )
         # get the index of the shape in the deformer !
         listAttrs = []
-
+        lstDeformersRtn = []
         for dfmNm in lstDeformers:
             dfm, attName = dfmNm.split("-")
-            isMulti = cmds.attributeQuery(attName, node=dfm, multi=True)
-            # if attName == "weights":
-            if isMulti:
-                # print dfm, attName
-                lsGeomsOrig = cmds.deformer(dfm, query=True, geometry=True)
-                lsGeomsIndicesOrig = cmds.deformer(
-                    dfm, query=True, geometryIndices=True
-                )
-                if self.deformedShape in lsGeomsOrig:
-                    inputTarget = lsGeomsIndicesOrig[
-                        lsGeomsOrig.index(self.deformedShape)
-                    ]
+            if cmds.attributeQuery(attName, node=dfm, exists=True):
+                lstDeformersRtn.append(dfmNm)
+                isMulti = cmds.attributeQuery(attName, node=dfm, multi=True)
+                # if attName == "weights":
+                if isMulti:
+                    # print dfm, attName
+                    lsGeomsOrig = cmds.deformer(dfm, query=True, geometry=True)
+                    lsGeomsIndicesOrig = cmds.deformer(
+                        dfm, query=True, geometryIndices=True
+                    )
+                    if self.deformedShape in lsGeomsOrig:
+                        inputTarget = lsGeomsIndicesOrig[
+                            lsGeomsOrig.index(self.deformedShape)
+                        ]
+                    else:
+                        inputTarget = 0
+                    prtAtt = cmds.attributeQuery(attName, node=dfm, listParent=True)
+                    prtAtt = ".".join(prtAtt)
+                    theAtt = "{}.{}[{}].{}".format(dfm, prtAtt, inputTarget, attName)
+                    listAttrs.append(theAtt)
                 else:
-                    inputTarget = 0
-                prtAtt = cmds.attributeQuery(attName, node=dfm, listParent=True)
-                prtAtt = ".".join(prtAtt)
-                theAtt = "{}.{}[{}].{}".format(dfm, prtAtt, inputTarget, attName)
-                listAttrs.append(theAtt)
-            else:
-                listAttrs.append(self.dicDisplayNames[dfmNm])
-
+                    listAttrs.append(self.dicDisplayNames[dfmNm])
         # listAttrs = [self.dicDisplayNames [el].replace(".weights",".weightList[0].weights" ) for el in lstDeformers]
-        return lstDeformers, listAttrs
+        return lstDeformersRtn, listAttrs
 
     # -----------------------------------------------------------------------------------------------------------
     # redefine abstract data functions -------------------------------------------------------------------------
