@@ -13,7 +13,6 @@ from pymel.core import PyNode
 
 from Qt import QtGui
 from mWeightEditor.tools.utils import GlobalContext
-import importlib
 
 # To make your color choice reproducible, uncomment the following line:
 # random.seed(10)
@@ -583,7 +582,8 @@ def callEventCatcher():
     import catchEventsUI
 
     # print catchEventsUI.__file__
-    importlib.reload(catchEventsUI)
+    if catchEventsUI.ROOTWINDOW is None:
+        catchEventsUI.ROOTWINDOW = catchEventsUI.rootWindow()
     catchEventsUI.EVENTCATCHER = catchEventsUI.CatchEventsWidget()
     catchEventsUI.EVENTCATCHER.open()
 
@@ -869,6 +869,11 @@ def headsUpMessage(offsetX, offsetY, message, valueDisplay, precision):
         cmds.headsUpMessage(
             theMessage, horizontalOffset=offsetX, verticalOffset=offsetY, time=0.1
         )
+
+
+def orderedInfluence(strl):
+    orderOfJoints = list(map(int, strl[:-1].split(" ")))
+    callPaintEditorFunction("updateOrderOfInfluences", orderOfJoints)
 
 
 def pickedInfluence(jointName):
