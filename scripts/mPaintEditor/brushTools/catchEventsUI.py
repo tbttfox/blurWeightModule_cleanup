@@ -9,13 +9,13 @@ except:
 
 from maya import OpenMayaUI, cmds, mel
 import time
-from brushPythonFunctions import (
+from .brushPythonFunctions import (
     callPaintEditorFunction,
     escapePressed,
     toggleSoloMode,
     disableUndoContext,
 )
-import meshFnIntersection
+from . import meshFnIntersection
 
 EVENTCATCHER = None
 ROOTWINDOW = None

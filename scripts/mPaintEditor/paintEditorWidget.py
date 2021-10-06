@@ -28,7 +28,7 @@ from mWeightEditor.tools.utils import (
     SettingVariable,
 )
 
-from brushTools.brushPythonFunctions import (
+from .brushTools.brushPythonFunctions import (
     UndoContext,
     setColorsOnJoints,
     fixOptionVarContext,

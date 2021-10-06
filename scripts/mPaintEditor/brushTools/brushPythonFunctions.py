@@ -579,7 +579,7 @@ def deferredDisconnect(mshTesselate, msh):
 def callEventCatcher():
     # print("-- callEventCatcher --")
     # from mPaintEditor.brushTools import catchEventsUI
-    import catchEventsUI
+    from . import catchEventsUI
 
     # print catchEventsUI.__file__
     if catchEventsUI.ROOTWINDOW is None:
@@ -590,7 +590,7 @@ def callEventCatcher():
 
 def closeEventCatcher():
     # print("-- closeEventCatcher --")
-    import catchEventsUI
+    from . import catchEventsUI
 
     if hasattr(catchEventsUI, "EVENTCATCHER"):
         catchEventsUI.EVENTCATCHER.close()
