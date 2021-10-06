@@ -20,6 +20,7 @@ from .utils import (
     getThreeIndices,
     SettingWithRedraw,
 )
+import six
 
 
 def isin(element, test_elements, assume_unique=False, invert=False):
@@ -350,7 +351,7 @@ class DataAbstract(object):
                 else:
                     toAppend = [firstVal]
                 if onlyStr:
-                    listIndString.append(":".join(map(str, toAppend)))
+                    listIndString.append(":".join(map(six.text_type, toAppend)))
                 else:
                     listInds.append(toAppend)
                 # listIndStringAndCount .append((theStr,theVal - firstVal + 1))
@@ -361,7 +362,7 @@ class DataAbstract(object):
                 else:
                     toAppend = [firstVal]
                 if onlyStr:
-                    listIndString.append(":".join(map(str, toAppend)))
+                    listIndString.append(":".join(map(six.text_type, toAppend)))
                 else:
                     listInds.append(toAppend)
                 # listIndStringAndCount .append((theStr,theVal - firstVal + 1))

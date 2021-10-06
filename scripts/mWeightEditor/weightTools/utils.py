@@ -1,6 +1,7 @@
 from maya import cmds
 import time, datetime
 from maya import OpenMaya
+import six
 
 
 # -------------------------------------------------------------------------------------------
@@ -334,7 +335,7 @@ def getComponentIndexList(componentList=[]):
     componentIndexList = {}
 
     # Check string input
-    if type(componentList) == str or type(componentList) == str:
+    if type(componentList) == str or type(componentList) == six.text_type:
         componentList = [componentList]
 
     # Get selection if componentList is empty
