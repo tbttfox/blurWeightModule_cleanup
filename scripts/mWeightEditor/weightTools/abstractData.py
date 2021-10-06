@@ -1,5 +1,6 @@
 # https://github.com/chadmv/cmt/blob/master/scripts/cmt/deform/skinio.py
 
+
 from Qt.QtWidgets import QApplication
 from maya import OpenMayaUI, OpenMaya, OpenMayaAnim
 import maya.api.OpenMaya as OpenMaya2
@@ -13,7 +14,7 @@ from ctypes import c_float, c_int
 
 import numpy as np
 import re
-from utils import (
+from .utils import (
     GlobalContext,
     getSoftSelectionValuesNEW,
     getThreeIndices,

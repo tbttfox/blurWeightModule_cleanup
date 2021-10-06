@@ -1,6 +1,6 @@
 from Qt import QtGui, QtCore, QtWidgets
 from maya import cmds
-from utils import toggleBlockSignals
+from .utils import toggleBlockSignals
 import math
 
 

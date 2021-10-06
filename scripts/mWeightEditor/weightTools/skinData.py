@@ -9,7 +9,7 @@ from ctypes import c_double
 
 import numpy as np
 import re
-from utils import GlobalContext, getSoftSelectionValuesNEW, getThreeIndices
+from .utils import GlobalContext, getSoftSelectionValuesNEW, getThreeIndices
 
 from .abstractData import DataAbstract, isin
 

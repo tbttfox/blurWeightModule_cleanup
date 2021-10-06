@@ -11,7 +11,7 @@ from ctypes import c_double, c_float
 
 import numpy as np
 import re
-from utils import (
+from .utils import (
     GlobalContext,
     getSoftSelectionValuesNEW,
     getThreeIndices,
