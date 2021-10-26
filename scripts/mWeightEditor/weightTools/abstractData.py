@@ -21,6 +21,7 @@ from .utils import (
     SettingWithRedraw,
 )
 import six
+from six.moves import range
 
 
 def isin(element, test_elements, assume_unique=False, invert=False):
@@ -830,7 +831,9 @@ class DataAbstract(object):
         # self.orig2dArray is the undo values
         if self.sub2DArrayToSet.any():
             np.put(
-                self.sub2DArrayToSet, range(self.sub2DArrayToSet.size), arrayForSetting
+                self.sub2DArrayToSet,
+                list(range(self.sub2DArrayToSet.size)),
+                arrayForSetting,
             )
 
     def getChunksFromVertices(self, listVertices):
@@ -1006,7 +1009,7 @@ class DataAbstract(object):
         print("! undoRedoFunction !")
         self.setValueInDeformer(arraySetting)
         if sub2DArrayToSet.any():
-            np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), arraySetting)
+            np.put(sub2DArrayToSet, list(range(sub2DArrayToSet.size)), arraySetting)
 
 
 ###################################################################################

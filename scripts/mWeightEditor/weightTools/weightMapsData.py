@@ -19,6 +19,7 @@ from .utils import (
 )
 
 from .abstractData import DataAbstract, isin
+from six.moves import range
 
 """
 cmds.getAttr("blendShape1.inputTarget[0].baseWeights") [0]

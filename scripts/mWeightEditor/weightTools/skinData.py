@@ -12,6 +12,7 @@ import re
 from .utils import GlobalContext, getSoftSelectionValuesNEW, getThreeIndices
 
 from .abstractData import DataAbstract, isin
+from six.moves import range
 
 
 ###################################################################################
@@ -722,7 +723,7 @@ class DataOfSkin(DataAbstract):
             # do the stting in the 2dArray -----
             # if sub2DArrayToSet != None:
             if sub2DArrayToSet is not None and sub2DArrayToSet.size != 0:
-                np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), new2dArray)
+                np.put(sub2DArrayToSet, list(range(sub2DArrayToSet.size)), new2dArray)
                 self.computeSumArray()
             # else :
             # self.undoMirrorValues.append([UndoValues, userComponents, influenceIndices] )

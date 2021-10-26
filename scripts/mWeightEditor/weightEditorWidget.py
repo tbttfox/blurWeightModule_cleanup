@@ -31,6 +31,7 @@ from .weightTools.utils import (
     ToggleHeaderVisibility,
 )
 import numpy as np
+from six.moves import range
 
 
 # -------------------------------------------------------------------------------------------

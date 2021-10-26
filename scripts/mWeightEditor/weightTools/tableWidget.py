@@ -2,6 +2,7 @@ from Qt import QtGui, QtCore, QtWidgets
 from functools import partial
 from maya import cmds, mel
 import numpy as np
+from six.moves import range
 
 
 class TableModel(QtCore.QAbstractTableModel):
