@@ -91,10 +91,8 @@ class GlobalContext(object):
         if self.doPrint:
             result = "{0} hours {1} mins {2} secs".format(*timeRes)
             print(
-                (
-                    "{0} executed in {1}[{2:.2f} secs]".format(
-                        self.message, result, completionTime
-                    )
+                "{0} executed in {1}[{2:.2f} secs]".format(
+                    self.message, result, completionTime
                 )
             )
 

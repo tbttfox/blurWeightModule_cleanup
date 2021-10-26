@@ -345,11 +345,7 @@ class DataOfOneDimensionalAttrs(DataAbstract):
     # -----------------------------------------------------------------------------------------------------------
     def setUsingUVs(self, using_U, normalize, opposite):
         print(
-            (
-                "using_U {}, normalize {}, opposite {}".format(
-                    using_U, normalize, opposite
-                )
-            )
+            "using_U {}, normalize {}, opposite {}".format(using_U, normalize, opposite)
         )
         axis = "u" if using_U else "v"
         if self.shapePath.apiType() != OpenMaya.MFn.kMesh:

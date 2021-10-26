@@ -1,4 +1,5 @@
 # https://github.com/chadmv/cmt/blob/master/scripts/cmt/deform/skinio.py
+
 from Qt.QtWidgets import QApplication
 from maya import OpenMayaUI, OpenMaya, OpenMayaAnim
 import maya.api.OpenMaya as OpenMaya2
