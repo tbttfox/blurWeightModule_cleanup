@@ -36,6 +36,7 @@ from .brushTools.brushPythonFunctions import (
     deleteExistingColorSets,
     setSoloMode,
 )
+from six.moves import range
 
 
 class ValueSettingPE(ValueSetting):
@@ -1800,6 +1801,22 @@ class InfluenceTree(QtWidgets.QTreeWidget):
 
 class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
     isZeroDfm = False
+    _colors = [
+        (161, 105, 48),
+        (159, 161, 48),
+        (104, 161, 48),
+        (48, 161, 93),
+        (48, 161, 161),
+        (48, 103, 161),
+        (111, 48, 161),
+        (161, 48, 105),
+    ]
+
+    def getColors(self):
+        self._colors = []
+        for i in range(1, 9):
+            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True)
+            self._colors.append([int(el * 255) for el in col])
 
     def __init__(self, influence, index, col, skinCluster):
         shortName = influence.split(":")[-1]

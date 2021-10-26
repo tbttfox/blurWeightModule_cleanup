@@ -13,6 +13,7 @@ from pymel.core import PyNode
 
 from Qt import QtGui
 from mWeightEditor.tools.utils import GlobalContext
+from six.moves import range
 
 # To make your color choice reproducible, uncomment the following line:
 # random.seed(10)
