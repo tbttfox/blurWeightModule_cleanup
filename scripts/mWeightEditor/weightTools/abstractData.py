@@ -464,6 +464,9 @@ class DataAbstract(object):
 
         return
         """
+        if self.shapePath.apiType() != OpenMaya.MFn.kMesh:
+            return
+
         if self.verbose:
             print("getConnectVertices")
         # shapePath = getMObject(None, "restShape")
