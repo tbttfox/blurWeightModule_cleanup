@@ -702,6 +702,7 @@ class SkinPaintWin(Window):
                 mel.eval("setToolTo $gMove;")
 
     def enterPaint(self):
+        self.enterPaint_btn.setEnabled(False)
         with UndoContext("enterPaint"):
             if not cmds.pluginInfo("brSkinBrush", query=True, loaded=True):
                 cmds.loadPlugin("brSkinBrush")
@@ -1714,6 +1715,7 @@ class SkinPaintWin(Window):
         self.previousInfluenceName = cmds.brSkinBrushContext(
             "brSkinBrushContext1", query=True, influenceName=True
         )
+        self.enterPaint_btn.setEnabled(True)
         # self.changeMultiSolo(-1)
 
     def paintStart(self):  # called by the brush
@@ -1721,6 +1723,7 @@ class SkinPaintWin(Window):
             for btnName in self.uiToActivateWithPaint:
                 self.__dict__[btnName].setEnabled(True)
             self.uiInfluenceTREE.setStyleSheet("QWidget {border : 2px solid red}\n")
+            self.enterPaint_btn.setEnabled(False)
             # self.updateUIwithContextValues()
 
             dicValues = {
