@@ -16,6 +16,7 @@ from .brushPythonFunctions import (
     disableUndoContext,
 )
 from . import meshFnIntersection
+from past.builtins import int
 
 EVENTCATCHER = None
 ROOTWINDOW = None
