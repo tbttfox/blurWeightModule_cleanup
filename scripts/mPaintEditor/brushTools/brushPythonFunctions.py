@@ -14,6 +14,7 @@ from pymel.core import PyNode
 from Qt import QtGui
 from mWeightEditor.tools.utils import GlobalContext
 from six.moves import range
+import six
 
 # To make your color choice reproducible, uncomment the following line:
 # random.seed(10)
@@ -776,7 +777,7 @@ def fixOptionVarContext(**inputKargsToChange):
             # now rebuild command ---------------------------------
             kwargs.update(inputKargsToChange)
             cmdNew = "brSkinBrushContext "
-            for key, value in kwargs.items():
+            for key, value in six.iteritems(kwargs):
                 if isinstance(value, bool):
                     cmdNew += "-{} ".format(key)
                 else:
