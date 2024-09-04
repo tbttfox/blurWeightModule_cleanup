@@ -1,123 +1,152 @@
+from __future__ import print_function
+from __future__ import absolute_import
+import sys
+import time
+import datetime
+from contextlib import contextmanager
+
+
 from maya import cmds
-import time, datetime
 from maya import OpenMaya
 import six
 from six.moves import range
-
+from six.moves import zip
 
 # -------------------------------------------------------------------------------------------
 # ------------------------ global functions -------------------------------------------------
 # -------------------------------------------------------------------------------------------
-class SettingWithRedraw(object):
-    def __init__(self, theWindow, raise_error=True):
-        self.theWindow = theWindow
-
-    def __enter__(self):
-        self.theWindow.storeSelection()
-        self.theWindow._tm.beginResetModel()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.theWindow._tm.endResetModel()
-        self.theWindow.retrieveSelection()
-        # add a refresh of the locator ?
 
 
-class SettingVariable(object):
-    def __init__(self, variableHolder, variableName, valueOn=True, valueOut=False):
-        self.variableHolder = variableHolder
-        self.variableName = variableName
-        self.valueOn = valueOn
-        self.valueOut = valueOut
+@contextmanager
+def SettingWithRedraw(theWindow):
+    """GUILLAUME
 
-    def __enter__(self):
-        if isinstance(self.variableHolder, dict):
-            self.variableHolder[self.variableName] = self.valueOn
+    Arguments:
+        theWindow (QMainWindow): GUILLAUME
+    """
+    theWindow.storeSelection()
+    theWindow._tm.beginResetModel()
+    try:
+        yield
+    finally:
+        theWindow._tm.endResetModel()
+        theWindow.retrieveSelection()
+
+
+@contextmanager
+def SettingVariable(variableHolder, variableName, valueOn=True, valueOut=False):
+    """A context manager for temporarily setting a variable to a value on an object
+
+    Arguments:
+        variableHolder (object or dict): The object that will have its values set
+            If it's a dict, just set the value in the dict. If it's an object, then
+            use setattr to set the value
+        variableName (str): The name of the variable to set on the holder
+        valueOn (object): The value to store when entering the context
+        valueOut (object): The value to store when exiting the context
+    """
+    if isinstance(variableHolder, dict):
+        variableHolder[variableName] = valueOn
+    else:
+        setattr(variableHolder, variableName, valueOn)
+    try:
+        yield
+    finally:
+        if isinstance(variableHolder, dict):
+            variableHolder[variableName] = valueOut
         else:
-            self.variableHolder.__dict__[self.variableName] = self.valueOn
+            setattr(variableHolder, variableName, valueOut)
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if isinstance(self.variableHolder, dict):
-            self.variableHolder[self.variableName] = self.valueOut
+
+@contextmanager
+def ToggleHeaderVisibility(HH):
+    """Hide the header while in this context
+
+    Arguments:
+        HH (QHeaderView): The header to hide/show
+    """
+    HH.hide()
+    try:
+        yield
+    finally:
+        HH.show()
+
+
+@contextmanager
+def GlobalContext(
+    message="processing",
+    raise_error=True,
+    openUndo=True,
+    suspendRefresh=False,
+    doPrint=True,
+):
+    """A context for undos, refreshes, and timing
+
+    Arguments:
+        message (str): A message to print with the timing data, and
+            the name of the chunk. Defaults to "processing"
+        raise_error (bool): Whether to raise any exceptions caught in the
+            context (True), or capture them and print (False), Defaults to True
+        openUndo (bool): Whether to wrap the context in an undo bead.
+            Defaults to True
+        suspendRefresh (bool): Turn off UI refreshing while running this context
+            Defaults to False
+        doPrint (bool): Print the time and message
+            Defaults to True
+
+
+    """
+    startTime = time.time()
+    cmds.waitCursor(state=True)
+    if openUndo:
+        cmds.undoInfo(openChunk=True, chunkName=message)
+    if suspendRefresh:
+        cmds.refresh(suspend=True)
+
+    try:
+        yield
+
+    except Exception as e:
+        if raise_error:
+            import traceback
+
+            traceback.print_exc()
+            raise
         else:
-            self.variableHolder.__dict__[self.variableName] = self.valueOut
+            sys.stderr.write("%s" % e)
 
-
-class ToggleHeaderVisibility(object):
-    def __init__(self, HH, raise_error=True):
-        self.HH = HH
-
-    def __enter__(self):
-        self.HH.hide()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.HH.show()
-
-
-# with SettingVariable(locals(), ""):
-
-
-class GlobalContext(object):
-    def __init__(
-        self,
-        message="processing",
-        raise_error=True,
-        openUndo=True,
-        suspendRefresh=False,
-        doPrint=True,
-    ):
-        self.raise_error = raise_error
-        self.openUndo = openUndo
-        self.suspendRefresh = suspendRefresh
-        self.message = message
-        self.doPrint = doPrint
-
-    def __enter__(self):
-        self.startTime = time.time()
-        cmds.waitCursor(state=True)
-        if self.openUndo:
-            cmds.undoInfo(openChunk=True, chunkName=self.message)
-        if self.suspendRefresh:
-            cmds.refresh(suspend=True)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    finally:
         if cmds.waitCursor(query=True, state=True):
             cmds.waitCursor(state=False)
-        if self.openUndo:
+        if openUndo:
             cmds.undoInfo(closeChunk=True)
-        if self.suspendRefresh:
+        if suspendRefresh:
             cmds.refresh(suspend=False)
             cmds.refresh()
-
-        completionTime = time.time() - self.startTime
+        completionTime = time.time() - startTime
         timeRes = str(datetime.timedelta(seconds=int(completionTime))).split(":")
-        if self.doPrint:
+        if doPrint:
             result = "{0} hours {1} mins {2} secs".format(*timeRes)
             print(
                 "{0} executed in {1}[{2:.2f} secs]".format(
-                    self.message, result, completionTime
+                    message, result, completionTime
                 )
             )
 
-        if exc_type is not None:
-            if self.raise_error:
-                import traceback
 
-                traceback.print_tb(exc_tb)
-                raise exc_type(exc_val)
-            else:
-                sys.stderr.write("%s" % exc_val)
+@contextmanager
+def toggleBlockSignals(listOfWidgets):
+    """Block signals for the given list of widgets
 
-
-class toggleBlockSignals(object):
-    def __init__(self, listWidgets, raise_error=True):
-        self.listWidgets = listWidgets
-
-    def __enter__(self):
-        for widg in self.listWidgets:
-            widg.blockSignals(True)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        for widg in self.listWidgets:
+    Arguments:
+        listOfWidgets (list): Block signals for these widgets
+    """
+    for widg in listOfWidgets:
+        widg.blockSignals(True)
+    try:
+        yield
+    finally:
+        for widg in listOfWidgets:
             widg.blockSignals(False)
 
 
@@ -125,12 +154,17 @@ class toggleBlockSignals(object):
 # ------------------------ softSelections ---------------------------------------------------
 # -------------------------------------------------------------------------------------------
 def getSoftSelectionValues():
+    """Get the per-vertex weight values of the current soft selection
+
+    Returns:
+        list: The list of indices
+        list: The list of weights
+    """
     richSel = OpenMaya.MRichSelection()
     try:
         OpenMaya.MGlobal.getRichSelection(richSel)
     except RuntimeError:
         return []
-
     richSelList = OpenMaya.MSelectionList()
     richSel.getSelection(richSelList)
 
@@ -140,16 +174,26 @@ def getSoftSelectionValues():
 
     try:
         componentFn = OpenMaya.MFnSingleIndexedComponent(component)
-    except:
+    except Exception:
         return []
     count = componentFn.elementCount()
-    # elementIndicesWeights = [(componentFn.element(i), componentFn.weight(i).influence() ) for i in range(count)]
     elementIndices = [componentFn.element(i) for i in range(count)]
     elementWeights = [componentFn.weight(i).influence() for i in range(count)]
     return elementIndices, elementWeights
 
 
 def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False):
+    """Get the per-vertex weight values of the current soft selection
+
+    Arguments:
+        returnSimpleIndices (bool): If True, return the index into the flattened array
+            otherwise return a tuple giving the index per component
+        forceReturnWeight (bool): If True, return the weights
+
+    Returns:
+        dict: A dictionary of {nodeName: data, ...} where data is either a list of indices
+            or a tuple of (indices, weights) depending on forceReturnWeight
+    """
     softOn = cmds.softSelect(query=True, softSelectEnabled=True)
     richSelList = OpenMaya.MSelectionList()
 
@@ -162,7 +206,6 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
         richSel.getSelection(richSelList)
     else:
         OpenMaya.MGlobal.getActiveSelectionList(richSelList)
-
     uVal = OpenMaya.MScriptUtil()
     uVal.createFromInt(0)
     ptru = uVal.asIntPtr()
@@ -183,23 +226,15 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
             dagPath = OpenMaya.MDagPath()
             try:
                 iterSel.getDagPath(dagPath, component)
-            except:
-                next(iterSel)
+            except Exception:
+                iterSel.next()
                 continue
-            transform = dagPath.transform()
-            node = dagPath.node()
-            depNode = OpenMaya.MFnDependencyNode(node)
             depNode_name = dagPath.fullPathName()
-            # depNode.absoluteName()
 
-            # print depNode_name,
-
-            # print depNode.name()
             elementIndices = []
             elementWeights = []
             if not component.isNull():
                 componentFn = OpenMaya.MFnComponent(component)
-                # if componentFn.hasWeights():
                 count = componentFn.elementCount()
                 if componentFn.componentType() in [
                     OpenMaya.MFn.kCurveCVComponent,
@@ -220,13 +255,12 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
                             polyIter.getVertices(connectedVertices)
                             for j in range(connectedVertices.length()):
                                 setOfVerts.add(connectedVertices[j])
-                            next(polyIter)
+                            polyIter.next()
                         lstVerts = list(setOfVerts)
                         lstVerts.sort()
                         for vtx in lstVerts:
                             elementIndices.append(vtx)
                             elementWeights.append(1)
-
                         # convert
                     elif (
                         componentFn.componentType() == OpenMaya.MFn.kMeshEdgeComponent
@@ -236,7 +270,7 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
                         while not edgeIter.isDone():
                             for j in [0, 1]:
                                 setOfVerts.add(edgeIter.index(j))
-                            next(edgeIter)
+                            edgeIter.next()
                         lstVerts = list(setOfVerts)
                         lstVerts.sort()
                         for vtx in lstVerts:
@@ -247,10 +281,8 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
                             weight = componentFn.weight(i).influence() if softOn else 1
                             elementIndices.append(singleFn.element(i))
                             elementWeights.append(weight)
-                            # returnValues.append((singleFn.element( i),weight ))
-                            # print  "      Component[" , singleFn.element( i) , "] has influence weight " , weight.influence() , " and seam weight " , weight.seam()
                 elif componentFn.componentType() == OpenMaya.MFn.kSurfaceCVComponent:
-                    numCVsInV_ = cmds.getAttr(depNode_name + ".spansV") + cmds.getAttr(
+                    numCVsInV = cmds.getAttr(depNode_name + ".spansV") + cmds.getAttr(
                         depNode_name + ".degreeV"
                     )
 
@@ -261,20 +293,11 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
                         u = uVal.getInt(ptru)
                         v = vVal.getInt(ptrv)
                         if returnSimpleIndices:
-                            elementIndices.append(numCVsInV_ * u + v)
+                            elementIndices.append(numCVsInV * u + v)
                         else:
                             elementIndices.append((u, v))
                         elementWeights.append(weight)
-                        # returnValues.append(((u,v),weight ))
-                        # print  "      Component[" , u , "," , v , "] has influence weight " , weight.influence() , " and seam weight " , weight.seam()
                 elif componentFn.componentType() == OpenMaya.MFn.kLatticeComponent:
-                    """
-                    outLattFn = OpenMayaUI.MFnLattice(node)
-                    lattFn.getDivisions( ptru, ptrv, ptrw)
-                    div_s = uVal.getInt(ptru)
-                    div_t = vVal.getInt(ptrv)
-                    div_u = wVal.getInt(ptrw)
-                    """
                     div_s = cmds.getAttr(depNode_name + ".sDivisions")
                     div_t = cmds.getAttr(depNode_name + ".tDivisions")
                     div_u = cmds.getAttr(depNode_name + ".uDivisions")
@@ -285,15 +308,7 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
                         s = uVal.getInt(ptru)
                         t = vVal.getInt(ptrv)
                         u = wVal.getInt(ptrw)
-                        # simpleIndex = u*div_s + v*div_t + w
-                        simpleIndex = getThreeIndices(
-                            div_s, div_t, div_u, s, t, u
-                        )  # u*div_s*div_t + t*div_s + s
-                        """
-                        s = full %div_s 
-                        t =(full -s)/div_s % div_t 
-                        u =(full -s - t*div_s)/(div_s*div_t) 
-                        """
+                        simpleIndex = getThreeIndices(div_s, div_t, div_u, s, t, u)
                         weight = componentFn.weight(i).influence() if softOn else 1
 
                         if returnSimpleIndices:
@@ -301,18 +316,25 @@ def getSoftSelectionValuesNEW(returnSimpleIndices=True, forceReturnWeight=False)
                         else:
                             elementIndices.append((s, t, u))
                         elementWeights.append(weight)
-                        # returnValues.append(((u,v, w),weight ))
-                        # print  "      Component[" , u , "," , v , "," , w , "] has influence weight " , weight.influence() , " and seam weight " , weight.seam()
             if forceReturnWeight or softOn:
                 toReturn[depNode_name] = (elementIndices, elementWeights)
             else:
                 toReturn[depNode_name] = elementIndices
-
-            next(iterSel)
+            iterSel.next()
     return toReturn
 
 
 def getThreeIndices(div_s, div_t, div_u, *args):
+    """Convert to/from 3-component flattened indices
+
+    Arguments:
+        div_s (int): The length of indices in S
+        div_t (int): The length of indices in T
+        div_u (int): The length of indices in U
+        args (int or tuple): If an int is passed, treat it as the
+            flattened index, and convert it to a 3-tuple
+            If a 3-tuple is passed, convert it to a flattened index
+    """
     if len(args) == 1:
         (simpleIndex,) = args
         s = simpleIndex % div_s
@@ -325,31 +347,33 @@ def getThreeIndices(div_s, div_t, div_u, *args):
         return simpleIndex
 
 
-def getComponentIndexList(componentList=[]):
+def getComponentIndexList(componentList=None):
+    """Return an list of integer component index values
+
+    Arguments:
+        componentList (list): A list of component names. if empty will default to selection.
+
+    Returns:
+        dict: A dictionary of {path: (components)}
+    """
     # https://github.com/bungnoid/glTools/blob/master/utils/component.py
-    """
-    Return an list of integer component index values
-    @param componentList: A list of component names. if empty will default to selection.
-    @type componentList: list
-    """
+    componentList = componentList or []
+
     # Initialize return dictionary
     componentIndexList = {}
 
     # Check string input
     if type(componentList) == str or type(componentList) == six.text_type:
         componentList = [componentList]
-
     # Get selection if componentList is empty
     if not componentList:
-        componentList = mc.ls(sl=True, fl=True) or []
+        componentList = cmds.ls(selection=True, flatten=True) or []
     if not componentList:
         return []
-
     # Get MSelectionList
     selList = OpenMaya.MSelectionList()
     for i in componentList:
         selList.add(str(i))
-
     # Iterate through selection list
     selPath = OpenMaya.MDagPath()
     componentObj = OpenMaya.MObject()
@@ -371,7 +395,6 @@ def getComponentIndexList(componentList=[]):
                 selPath.numberOfShapesDirectlyBelow(numShapesPtr)
                 numShapes = OpenMaya.MScriptUtil(numShapesPtr).asUint()
                 selPath.extendToShapeDirectlyBelow(numShapes - 1)
-
             # Mesh
             if selPath.apiType() == OpenMaya.MFn.kMesh:
                 meshFn = OpenMaya.MFnMesh(selPath.node())
@@ -386,29 +409,23 @@ def getComponentIndexList(componentList=[]):
             # Surface
             elif selPath.apiType() == OpenMaya.MFn.kNurbsSurface:
                 surfaceFn = OpenMaya.MFnNurbsSurface(selPath.node())
-                componentSelList.add(
-                    objName
-                    + ".cv[0:"
-                    + str(surfaceFn.numCVsInU() - 1)
-                    + "][0:"
-                    + str(surfaceFn.numCVsInV() - 1)
-                    + "]"
+                toAdd = "{0}.cv[0:{1}][0:{2}]".format(
+                    objName,
+                    surfaceFn.numCVsInU() - 1,
+                    surfaceFn.numCVsInV() - 1,
                 )
+                componentSelList.add(toAdd)
+
             # Lattice
             elif selPath.apiType() == OpenMaya.MFn.kLattice:
-                sDiv = mc.getAttr(objName + ".sDivisions")
-                tDiv = mc.getAttr(objName + ".tDivisions")
-                uDiv = mc.getAttr(objName + ".uDivisions")
-                componentSelList.add(
-                    objName
-                    + ".pt[0:"
-                    + str(sDiv - 1)
-                    + "][0:"
-                    + str(tDiv - 1)
-                    + "][0:"
-                    + str(uDiv - 1)
-                    + "]"
+                sDiv = cmds.getAttr(objName + ".sDivisions")
+                tDiv = cmds.getAttr(objName + ".tDivisions")
+                uDiv = cmds.getAttr(objName + ".uDivisions")
+
+                toAdd = "{0}.pt[0:{1}][0:{2}][0:{3}]".format(
+                    objName, sDiv - 1, tDiv - 1, uDiv - 1
                 )
+                componentSelList.add(toAdd)
 
             # Get object component MObject
             componentSelList.getDagPath(0, selPath, componentObj)
@@ -449,8 +466,21 @@ def getComponentIndexList(componentList=[]):
 # -------------------------------------------------------------------------------------------
 # get UV Map
 def getMapForSelectedVerticesFromSelection(normalize=True, opp=False, axis="uv"):
+    """GUILLAUME
+
+    Arguments:
+        normalize (bool): If true, normalize the values
+            Defaults to True
+        opp (bool): Return the opposite of the uv values
+            Defaults to False
+        axis ("uv" "u" or "v"): What data to return
+            Defaults to "uv"
+
+    Returns:
+        list:
+            A list of tuples of [(ind, u)] [(ind, v)] or [(ind, u, v)]
+    """
     # Get MSelectionList
-    startSel = cmds.ls(selection=True)
     selList = OpenMaya.MSelectionList()
     OpenMaya.MGlobal.getActiveSelectionList(selList)
 
@@ -467,21 +497,15 @@ def getMapForSelectedVerticesFromSelection(normalize=True, opp=False, axis="uv")
         if not component.isNull():
             componentFn = OpenMaya.MFnComponent(component)
             if componentFn.componentType() == OpenMaya.MFn.kMeshVertComponent:  # vertex
-                transform = dagPath.transform()
-                node = dagPath.node()
-                depNode = OpenMaya.MFnDependencyNode(node)
-                depNode_name = dagPath.fullPathName()
-
                 vertIter = OpenMaya.MItMeshVertex(dagPath, component)
                 while not vertIter.isDone():
                     theVert = vertIter.index()
                     vertIter.getUV(uvPoint)
-                    u = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 0)
-                    v = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 1)
-                    # print theVert, u, v
-                    indicesValues.append((theVert, u, v))
-                    next(vertIter)
-        next(iterSel)
+                    uPt = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 0)
+                    vPt = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 1)
+                    indicesValues.append((theVert, uPt, vPt))
+                    vertIter.next()
+        iterSel.next()
     if normalize:
         maxV = max(indicesValues, key=lambda x: x[2])[2]
         minV = min(indicesValues, key=lambda x: x[2])[2]
@@ -492,37 +516,45 @@ def getMapForSelectedVerticesFromSelection(normalize=True, opp=False, axis="uv")
         diffU = maxU - minU
 
         indicesValues = [
-            (theVert, (u - minU) / diffU, (v - minU) / diffV)
-            for (theVert, u, v) in indicesValues
+            (vert, (u - minU) / diffU, (v - minU) / diffV)
+            for (vert, u, v) in indicesValues
         ]
     if opp:
-        indicesValues = [
-            (theVert, -1.0 * u, -1.0 * v) for (theVert, u, v) in indicesValues
-        ]
+        indicesValues = [(vert, -1.0 * u, -1.0 * v) for (vert, u, v) in indicesValues]
     if axis != "uv":
         indReturn = "uv".index(axis) + 1
         indicesValues = [(el[0], el[indReturn]) for el in indicesValues]
-
     return indicesValues
 
 
 def getMapForSelectedVertices(vertIter, normalize=True, opp=False, axis="uv"):
+    """GUILLAUME
+
+    Arguments:
+        normalize (bool): If true, normalize the values
+            Defaults to True
+        opp (bool): Return the opposite of the uv values
+            Defaults to False
+        axis ("uv" "u" or "v"): What data to return
+            Defaults to "uv"
+
+    Returns:
+        list:
+            A list of tuples of [(ind, u)] [(ind, v)] or [(ind, u, v)]
+    """
     # Get MSelectionList
     util = OpenMaya.MScriptUtil()
     util.createFromList([0.0, 0.0], 2)
     uvPoint = util.asFloat2Ptr()
     indicesValues = []
 
-    # vertIter = OpenMaya.MItMeshVertex(dagPath, component)
     while not vertIter.isDone():
         theVert = vertIter.index()
         vertIter.getUV(uvPoint)
-        u = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 0)
-        v = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 1)
-        # print theVert, u, v
-        indicesValues.append((theVert, u, v))
-        next(vertIter)
-
+        uPt = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 0)
+        vPt = OpenMaya.MScriptUtil.getFloat2ArrayItem(uvPoint, 0, 1)
+        indicesValues.append((theVert, uPt, vPt))
+        vertIter.next()
     if normalize:
         maxV = max(indicesValues, key=lambda x: x[2])[2]
         minV = min(indicesValues, key=lambda x: x[2])[2]
@@ -533,17 +565,14 @@ def getMapForSelectedVertices(vertIter, normalize=True, opp=False, axis="uv"):
         diffU = maxU - minU
 
         indicesValues = [
-            (theVert, (u - minU) / diffU, (v - minU) / diffV)
-            for (theVert, u, v) in indicesValues
+            (vert, (u - minU) / diffU, (v - minU) / diffV)
+            for (vert, u, v) in indicesValues
         ]
     if opp:
-        indicesValues = [
-            (theVert, 1.0 - u, 1.0 - v) for (theVert, u, v) in indicesValues
-        ]
+        indicesValues = [(vert, 1.0 - u, 1.0 - v) for (vert, u, v) in indicesValues]
     if axis != "uv":
         indReturn = "uv".index(axis) + 1
         indicesValues = [(el[0], el[indReturn]) for el in indicesValues]
-
     return indicesValues
 
 
@@ -551,6 +580,12 @@ def getMapForSelectedVertices(vertIter, normalize=True, opp=False, axis="uv"):
 # ------------------------ callBacks --------------------------------------------------------
 # -------------------------------------------------------------------------------------------
 def deleteTheJobs(toSearch="BrushFunctions.callAfterPaint"):
+    """Delete the given scriptJobs
+
+    Arguments:
+        toSearch: The name of the scriptJob to delete
+            Defaults to "BrushFunctions.callAfterPaint"
+    """
     res = cmds.scriptJob(listJobs=True)
     for job in res:
         if toSearch in job:
@@ -559,7 +594,15 @@ def deleteTheJobs(toSearch="BrushFunctions.callAfterPaint"):
 
 
 def addNameChangedCallback(callback):
-    def omcallback(mobject, oldname, _):  # (1)
+    """Add a callback for when an object gets renamed
+
+    Arguments:
+        callback (function): A function that will get called when an object
+            is renamed
+
+    """
+
+    def omcallback(mobject, oldname, _):
         newname = OpenMaya.MFnDependencyNode(mobject).name()
         callback(oldname, newname)  #
 
@@ -567,11 +610,16 @@ def addNameChangedCallback(callback):
     return OpenMaya.MNodeMessage.addNameChangedCallback(listenTo, omcallback)
 
 
-# OpenMaya.MNodeMessage.addNodeAboutToDeleteCallback()
-
-
 def addNameDeletedCallback(callback):
-    def omcallback(mobject, _):  # (1)
+    """Add a callback for when an object gets deleted
+
+    Arguments:
+        callback (function): A function that will get called when an object
+            is deleted
+
+    """
+
+    def omcallback(mobject, _):
         nodeName = OpenMaya.MFnDependencyNode(mobject).name()
         callback(nodeName)  #
 
@@ -579,38 +627,11 @@ def addNameDeletedCallback(callback):
     return OpenMaya.MNodeMessage.addNodeAboutToDeleteCallback(listenTo, omcallback)
 
 
-# OpenMaya.MNodeMessage.addNodeAboutToDeleteCallback()
-
-
 def removeNameChangedCallback(callbackId):
+    """Remove a callback by ID
+
+    Arguments:
+        callbackId (int): The ID of the callback to remove
+
+    """
     OpenMaya.MNodeMessage.removeCallback(callbackId)
-
-
-"""
-from maya import OpenMaya, cmds
-
-def beforeDelete(nm):
-    print "DELETING ", nm
-
-def omcallback(mobject, *args): #(1)
-    nodeName = OpenMaya.MFnDependencyNode(mobject).name()
-    beforeDelete( nodeName) #
-
-
-dag_iter= OpenMaya.MItDag()
-found= False
-
-def beforeDelete(nm):
-    print "DELETING ", nm
-
-while not dag_iter.isDone() and found == False:
-    curr= dag_iter.currentItem()
-    fn= OpenMaya.MFnDependencyNode(curr)
-    if fn.name() == "pCube1":
-        on_node_destroyed_id = OpenMaya.MNodeMessage.addNodeAboutToDeleteCallback(curr, omcallback )
-        found= True
-        print "FOUND"
-    dag_iter.next()
-
-
-"""

@@ -1,10 +1,16 @@
-from Qt import QtGui, QtCore, QtWidgets
+from __future__ import print_function
+from __future__ import absolute_import
+from ..Qt import QtGui, QtCore, QtWidgets
 from maya import cmds
 from .utils import toggleBlockSignals
 import math
 
 
 class ButtonWithValue(QtWidgets.QPushButton):
+    """A button that allows for a middle-click drag to change precision
+    and a scroll wheel to change values
+    """
+
     _valueChanged = QtCore.Signal(int, name="valChanged")
 
     def __init__(
@@ -33,10 +39,6 @@ class ButtonWithValue(QtWidgets.QPushButton):
         self.setMinimumHeight(minHeight)
         self._metrics = QtGui.QFontMetrics(self.font())
         self.getValuePrecision()
-
-    def mousePressEvent(self, event):
-        if self.clickable:
-            super(ButtonWithValue, self).mousePressEvent(event)
 
     def getValuePrecision(self):
         self.precision = (
@@ -83,6 +85,8 @@ class ButtonWithValue(QtWidgets.QPushButton):
     startPrecision = 0
 
     def mousePressEvent(self, event):
+        if not self.clickable:
+            return
         if event.button() == QtCore.Qt.MidButton:
             self.startDrag = True
             self.startPos = event.globalPos()
@@ -96,7 +100,6 @@ class ButtonWithValue(QtWidgets.QPushButton):
         super(ButtonWithValue, self).mouseReleaseEvent(event)
 
     def mouseMoveEvent(self, event):
-        isMid = event.button() == QtCore.Qt.MidButton
         if self.startDrag:
             offset = event.globalPos() - self.startPos
             xVal = offset.x()
@@ -110,7 +113,6 @@ class ButtonWithValue(QtWidgets.QPushButton):
 
                 self._valueChanged.emit(self.precision)
                 self.updateName()
-
         super(ButtonWithValue, self).mouseMoveEvent(event)
 
 
@@ -120,9 +122,18 @@ class ButtonWithValue(QtWidgets.QPushButton):
 #
 ###################################################################################
 class ValueSetting(QtWidgets.QWidget):
-    theStyleSheet = """QDoubleSpinBox {color: black; background-color:rgb(200,200,200) ; border: 1px solid black;text-align: center;}
-                       QDoubleSpinBox:disabled {color: grey; background-color:rgb(170,170,170) ; border: 1px solid black;text-align: center;}
-                    """
+    theStyleSheet = """
+    QDoubleSpinBox {
+        color: black;
+        background-color:rgb(200,200,200) ;
+        border: 1px solid black;text-align: center;
+    }
+    QDoubleSpinBox:disabled {
+        color: grey;
+        background-color:rgb(170,170,170) ;
+        border: 1px solid black;text-align: center;
+    }
+    """
 
     def __init__(
         self, parent=None, singleStep=0.01, precision=2, spacing=0, maximumValue=100.0
@@ -133,7 +144,6 @@ class ValueSetting(QtWidgets.QWidget):
 
         self.theProgress.prt = self
         self.mainWindow = parent
-        # self.displayText = QtWidgets.QLabel (self)
 
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -145,8 +155,6 @@ class ValueSetting(QtWidgets.QWidget):
         self.theSpinner.setDecimals(precision)
         self.theSpinner.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
         self.theSpinner.setStyleSheet(self.theStyleSheet)
-
-        # self.theSpinner.valueChanged.connect (self.valueEntered)
 
         newPolicy = QtWidgets.QSizePolicy(
             QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum
@@ -170,7 +178,6 @@ class ValueSetting(QtWidgets.QWidget):
         layout.addWidget(self.theSpinner)
         layout.addWidget(self.theProgress)
 
-        # self.theProgress.valueChanged.connect (self.setVal)
         self.theProgress.punched.connect(self.setVal)
 
     def theSpinner_focusInEvent(self, event):
@@ -181,14 +188,13 @@ class ValueSetting(QtWidgets.QWidget):
         return True
 
     def doSet(self, theVal):
-        pass  # print theVal
+        pass
 
     def postSet(self):
         return True
 
     def spinnerValueEntered(self):
         theVal = self.theSpinner.value()
-        # print "value Set {0}".format (theVal)
 
         self.preSet()
         self.doSet(theVal / 100.0)
@@ -199,19 +205,16 @@ class ValueSetting(QtWidgets.QWidget):
         self.postSet()
 
     def setVal(self, val):
-        # print "setVal  [" , val,"]"
-        # theVal = val/100.
         if self.addMode:
             theVal = (val - 50.0) / 50.0
         else:
             theVal = val / 100.0
-        # ------- SETTING FUNCTION ---------------------
+        # SETTING FUNCTION
         if self.theProgress.startDrag:
             self.doSet(theVal)
         else:
             self.postSet()
 
-        # else : # wheelEvent
         self.theSpinner.setValue(theVal * 100.0)
 
     def setAddMode(self, addMode, autoReset=True):
@@ -240,26 +243,39 @@ class ValueSettingWE(ValueSetting):
 
 
 class ProgressItem(QtWidgets.QProgressBar):
-    theStyleSheet = """QProgressBar {{color: black; background-color:{bgColor} ; border: 1px solid black;text-align: center;
-    border-bottom-right-radius: {szrad}px;
-    border-bottom-left-radius: {szrad}px;
-    border-top-right-radius: {szrad}px;
-    border-top-left-radius: {szrad}px;}}
-    QProgressBar:disabled {{color: black; background-color:{bgColorDisabled} ; border: 1px solid black;text-align: center;
-    border-bottom-right-radius: {szrad}px;
-    border-bottom-left-radius: {szrad}px;
-    border-top-right-radius: {szrad}px;
-    border-top-left-radius: {szrad}px;}}            
-    QProgressBar::chunk {{background:{chunkColor};
-    border-bottom-right-radius: {szrad}px;
-    border-bottom-left-radius: {szrad}px;
-    border-top-right-radius: {szrad}px;
-    border-top-left-radius: {szrad}px;}}
-    QProgressBar::chunk:disabled {{background:{chunkColorDisabled};
-    border-bottom-right-radius: {szrad}px;
-    border-bottom-left-radius: {szrad}px;
-    border-top-right-radius: {szrad}px;
-    border-top-left-radius: {szrad}px;}}
+    theStyleSheet = """
+    QProgressBar {{
+        color: black;
+        background-color:{bgColor};
+        border: 1px solid black;text-align: center;
+        border-bottom-right-radius: {szrad}px;
+        border-bottom-left-radius: {szrad}px;
+        border-top-right-radius: {szrad}px;
+        border-top-left-radius: {szrad}px;
+    }}
+    QProgressBar:disabled {{
+        color: black;
+        background-color:{bgColorDisabled};
+        border: 1px solid black;text-align: center;
+        border-bottom-right-radius: {szrad}px;
+        border-bottom-left-radius: {szrad}px;
+        border-top-right-radius: {szrad}px;
+        border-top-left-radius: {szrad}px;
+    }}
+    QProgressBar::chunk {{
+        background:{chunkColor};
+        border-bottom-right-radius: {szrad}px;
+        border-bottom-left-radius: {szrad}px;
+        border-top-right-radius: {szrad}px;
+        border-top-left-radius: {szrad}px;
+    }}
+    QProgressBar::chunk:disabled {{
+        background:{chunkColorDisabled};
+        border-bottom-right-radius: {szrad}px;
+        border-bottom-left-radius: {szrad}px;
+        border-top-right-radius: {szrad}px;
+        border-top-left-radius: {szrad}px;
+    }}
     """
     prt = None
     shiftKeyValue = 0.0
@@ -272,7 +288,6 @@ class ProgressItem(QtWidgets.QProgressBar):
         super(ProgressItem, self).__init__()
         self.multiplier = 1
 
-        # self.setFormat (theName+" %p%")
         self.setFormat("")
         self.dicStyleSheet = dict(
             {
@@ -282,7 +297,7 @@ class ProgressItem(QtWidgets.QProgressBar):
                 "chunkColor": "rgb(200,200,200)",
                 "chunkColorDisabled": "rgb(170,170,170)",
             },
-            **kwargs,
+            **kwargs
         )
 
         self.setStyleSheet(self.theStyleSheet.format(**self.dicStyleSheet))
@@ -291,7 +306,7 @@ class ProgressItem(QtWidgets.QProgressBar):
     def changeColor(self, **kwargs):
         self.dicStyleSheet = dict(
             {"szrad": 7, "bgColor": "rgb(200,200,230)", "chunkColor": "#FF0350"},
-            **kwargs,
+            **kwargs
         )
         self.setStyleSheet(self.theStyleSheet.format(**self.dicStyleSheet))
 
@@ -301,7 +316,7 @@ class ProgressItem(QtWidgets.QProgressBar):
         if not val:
             tmpDic = dict(
                 self.dicStyleSheet,
-                **{"szrad": 7, "bgColor": "rgb(100,100,100)", "chunkColor": "#FF0350"},
+                **{"szrad": 7, "bgColor": "rgb(100,100,100)", "chunkColor": "#FF0350"}
             )
             self.setStyleSheet(self.theStyleSheet.format(**tmpDic))
         else:
@@ -311,27 +326,11 @@ class ProgressItem(QtWidgets.QProgressBar):
         val *= self.multiplier
         if self.minimum() == -100:
             val = val * 2 - 1
-        # self.setValue(int(val*100))
         self.currentValue = val
 
         val *= 100.0
-        # print "applyVal {0}".format (val)
         self.punched.emit(val)
         self.setValue(val)
-
-    """
-    def wheelEvent  (self, e):
-        delta = e.delta ()
-        #print delta
-        val = self.value () /100.
-        if self.minimum () == -100 : val = val*.5 + .5
-
-        offset = -.1 if delta < 0 else .1
-        val += offset
-        if val >1. : val = 1.0
-        elif val <0. : val = 0.
-        self.applyVal (val)
-    """
 
     startDrag = False
 
@@ -351,10 +350,8 @@ class ProgressItem(QtWidgets.QProgressBar):
             self.startDrag = False
         else:
             cmds.undoInfo(stateWithoutFlush=False)
-            # ------------- PREPARE FUNCTION -------------------------------------------------------------------------------------
-            self.startDrag = (
-                self.prt.preSet()
-            )  # self.mainWindow.prepareToSetValue()#self.prt.preSet()
+            # ------------- PREPARE FUNCTION -----------------------------
+            self.startDrag = self.prt.preSet()
             if self.startDrag:
                 self.applyTheEvent(event)
 
@@ -367,11 +364,9 @@ class ProgressItem(QtWidgets.QProgressBar):
             self.setMouseTracking(False)
             cmds.undoInfo(stateWithoutFlush=True)
             super(ProgressItem, self).mouseReleaseEvent(event)
-
         if self.autoReset:
             self.setValue(self.releasedValue)
             self.punched.emit(self.releasedValue)
-
         else:
             self.prt.postSet()
 
@@ -389,10 +384,7 @@ class ProgressItem(QtWidgets.QProgressBar):
         self.shiftHold = shitIsHold
 
         theWdth = self.width()
-        # print e.mouseButtons()
-        # print "moving {0}".format (e.x())
         val = e.x() / float(theWdth)
-        # if shitIsHold : val = round(val*4.0) / 4.
         if self.shiftHold:
             diff = val - self.shiftKeyValue
             val = self.shiftKeyValue + 0.05 * diff
@@ -400,7 +392,6 @@ class ProgressItem(QtWidgets.QProgressBar):
                 val = round(val * 1000.0) / 1000.0
         elif ctrlIsHold:
             val = round(val * 100.0) / 100.0
-        # print (val)
 
         if val > 1.0:
             val = 1.0
@@ -409,8 +400,6 @@ class ProgressItem(QtWidgets.QProgressBar):
         self.applyVal(val)
 
     def mouseMoveEvent(self, event):
-        isLeft = event.button() == QtCore.Qt.LeftButton
-        # print "mouseMoveEvent ", isLeft, isCtr
         if self.startDrag:
             self.applyTheEvent(event)
         super(ProgressItem, self).mouseMoveEvent(event)
