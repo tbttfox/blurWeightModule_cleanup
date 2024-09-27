@@ -138,7 +138,7 @@ def addInfluences():
 
         deformedShape = cmds.skinCluster(skn, query=True, geometry=True)
         prt = (
-            cmds.listRelatives(deformedShape, path=-True, parent=True)[0]
+            cmds.listRelatives(deformedShape, path=True, parent=True)[0]
             if not cmds.nodeType(deformedShape) == "transform"
             else deformedShape
         )
@@ -269,7 +269,7 @@ def getShapesSelected(returnTransform=False):
         typeSurf = ["mesh", "nurbsSurface"]
         selectionShapes = cmds.ls(selection=True, objectsOnly=True, type=typeSurf)
         if not selectionShapes:
-            selection = cmds.ls(selection=True, transforms=True) + cmds.ls(hilite=True)
+            selection = cmds.ls(selection=True, transformsr=True) + cmds.ls(hilite=True)
             selectedMesh = cmds.listRelatives(selection, type=typeSurf)
             selectionShapes = cmds.ls(selection=True, objectsOnly=True, type=typeSurf)
             if selectedMesh:
