@@ -1,19 +1,18 @@
 from __future__ import print_function
 from __future__ import absolute_import
-from .Qt import QtGui, QtCore, QtWidgets, QtCompat
+from Qt import QtGui, QtCore, QtWidgets, QtCompat
 
 from functools import partial
 from maya import cmds, OpenMaya
 import os
 import re
 import difflib
-import weakref
 from six.moves import zip, range
 
 try:
     from blurdev.gui import Window
 except ImportError:
-    from .Qt.QtWidgets import QMainWindow as Window
+    from Qt.QtWidgets import QMainWindow as Window
 
 from .weightTools.skinData import DataOfSkin
 from .weightTools.abstractData import DataQuickSet
@@ -35,6 +34,7 @@ from .weightTools.utils import (
     SettingVariable,
     ToggleHeaderVisibility,
     getListDeformersFromSel,
+    orderMelList,
 )
 
 
@@ -88,7 +88,7 @@ class SkinWeightWin(Window):
         QtCompat.loadUi(uiPath, self)
 
         # Get the names of all the child objects recursively
-        allobjs = self.findChildren(QtCore.QRegExp(".*"))
+        allobjs = self.findChildren(QtWidgets.QWidget, QtCore.QRegExp(".*"))
         self._allobjs = {c.objectName(): c for c in allobjs}
 
         if not cmds.pluginInfo("undoPlug", query=True, loaded=True):
@@ -957,7 +957,7 @@ class SkinWeightWin(Window):
         vtx = self.dataOfDeformer.fixAroundVertices(
             tolerance=self.problemVertsBTN.precision
         )
-        selVertices = self.dataOfDeformer.orderMelList(vtx)
+        selVertices = orderMelList(vtx)
         inList = [
             "{1}.vtx[{0}]".format(el, self.dataOfDeformer.deformedShape)
             for el in selVertices

@@ -5,6 +5,7 @@ from functools import partial
 from maya import cmds, mel
 from six.moves import range
 import numpy as np
+from .skinData import DataOfSkin
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -29,7 +30,7 @@ class TableModel(QtCore.QAbstractTableModel):
 
     def columnCount(self, parent=None):
         assert self.datatable is not None
-        if self.datatable.isSkinData:
+        if isinstance(self.datatable, DataOfSkin):
             return self.datatable.columnCount + 1
         else:
             return self.datatable.columnCount
@@ -96,7 +97,10 @@ class TableModel(QtCore.QAbstractTableModel):
     def isSumColumn(self, index):
         assert self.datatable is not None
         column = index.column()
-        return self.datatable.isSkinData and column >= self.datatable.nbDrivers
+        return (
+            isinstance(self.datatable, DataOfSkin)
+            and column >= self.datatable.nbDrivers
+        )
 
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
         if role == QtCore.Qt.DisplayRole:
@@ -143,7 +147,10 @@ class TableModel(QtCore.QAbstractTableModel):
             if not index.isValid():
                 return QtCore.Qt.ItemIsEnabled
             column = index.column()
-            if self.datatable.isSkinData and column == self.datatable.nbDrivers:
+            if (
+                isinstance(self.datatable, DataOfSkin)
+                and column == self.datatable.nbDrivers
+            ):
                 result = QtCore.Qt.ItemIsEnabled
             elif self.isLocked(index):
                 result = QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
@@ -407,12 +414,20 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         assert isinstance(model, TableModel)
         assert model.datatable is not None
 
-        if not model.datatable.isSkinData:
+        if not isinstance(model.datatable, DataOfSkin):
             return [255, 155, 55]
 
         colName = model.fullColumnNames()[ind]
-        wireRGB = cmds.getAttr(colName + ".wireColorRGB")[0]
-        return [int(255 * el) for el in wireRGB]
+
+        wireColor = cmds.getAttr(colName + ".wireColorRGB")[0]
+        if wireColor == (0.0, 0.0, 0.0):
+            objColor = cmds.getAttr(colName + ".objectColor")
+            wireColor = cmds.displayRGBColor(
+                "userDefined{0}".format(objColor + 1), query=True
+            )
+
+        ret = [int(255 * el) for el in wireColor]
+        return ret
 
     def setColor(self, pos, index):
         menu = ColorMenu(self)
@@ -440,7 +455,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         assert isinstance(model, TableModel)
         assert model.datatable is not None
 
-        if model.datatable.isSkinData:
+        if isinstance(model.datatable, DataOfSkin):
             lastCol = self.count() - 1
             if lastCol in selectedIndices:
                 selectedIndices.remove(lastCol)
@@ -516,7 +531,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         model = self.model()
         assert isinstance(model, TableModel)
         assert model.datatable is not None
-        if model.datatable.isSkinData:
+        if isinstance(model.datatable, DataOfSkin):
             selAction = popMenu.addAction("select deformers")
             selAction.triggered.connect(self.selectDeformers)
             selAction.setEnabled(not selectionIsEmpty)
@@ -525,7 +540,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         selVertices.triggered.connect(partial(self.displayVertices, True))
         selVertices.setEnabled(not selectionIsEmpty)
 
-        if model.datatable.isSkinData:
+        if isinstance(model.datatable, DataOfSkin):
             popMenu.addSeparator()
 
             lockAction = popMenu.addAction("lock selected")
@@ -590,7 +605,10 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         assert isinstance(model, TableModel)
         assert model.datatable is not None
 
-        isLastColumn = model.datatable.isSkinData and index >= model.datatable.nbDrivers
+        isLastColumn = (
+            isinstance(model.datatable, DataOfSkin)
+            and index >= model.datatable.nbDrivers
+        )
         data = self._get_data(index)
 
         if isLastColumn:
