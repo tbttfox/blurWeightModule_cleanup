@@ -12,7 +12,7 @@ from maya import cmds
 from six.moves import range, zip
 
 from ..utils import rootWindow
-from .. import PAINT_EDITOR_CONTEXT_OPTIONS
+from .. import PAINT_EDITOR_CONTEXT_OPTIONS, GET_CONTEXT
 
 
 @contextmanager
@@ -95,7 +95,9 @@ def setColorsOnJoints():
 
 def doRemoveColorSets():
     with UndoContext("doRemoveColorSets"):
-        msh = cmds.brSkinBrushContext(cmds.currentCtx(), query=True, meshName=True)
+        msh = cmds.brSkinBrushContext(
+            GET_CONTEXT.getLatest(), query=True, meshName=True
+        )
         if not msh or not cmds.objExists(msh):
             return
         skinnedMesh_history = (
@@ -174,7 +176,7 @@ def toolOnSetupStart():  # Called directly from cpp
         shapeSelected = getShapesSelected(returnTransform=True)
         if not shapeSelected:  # if nothing selected
             mshShape = cmds.brSkinBrushContext(
-                cmds.currentCtx(), query=True, meshName=True
+                GET_CONTEXT.getLatest(), query=True, meshName=True
             )
             if mshShape and cmds.objExists(mshShape):
                 (theMesh,) = cmds.listRelatives(mshShape, parent=True, path=True)
@@ -183,8 +185,6 @@ def toolOnSetupStart():  # Called directly from cpp
             cmds.select(shapeSelected)
 
         mshShapeSelected = getShapesSelected(returnTransform=False)
-        # here we duplicate the mesh?
-        # mshShapeSelected = createTempMesh(mshShapeSelected)
         if cmds.optionVar(query="brushSwapShaders"):
             restoreShading()
             swapShading(mshShapeSelected)
@@ -212,6 +212,10 @@ def toolOnSetupStart():  # Called directly from cpp
             cmds.setAttr(mshShape + ".displayColors", 1)
             cmds.setAttr(mshShape + ".displaySmoothMesh", 0)
         callEventCatcher()
+
+
+def toolOnSetupEnd():
+    pass
 
 
 def createMeshFromNurbs(att, prt):
@@ -364,7 +368,7 @@ def showBackNurbs(theMesh):
 
 
 def cleanTheNurbs():  # Called directly by cpp
-    if cmds.contextInfo(cmds.currentCtx(), c=True) != "brSkinBrushContext":
+    if cmds.contextInfo(GET_CONTEXT.getLatest(), c=True) != "brSkinBrushContext":
         nurbsTessellateAttrs = cmds.ls("*.nurbsTessellate")
         if not nurbsTessellateAttrs:
             return
@@ -405,13 +409,15 @@ def updateWireFrameColorSoloMode(soloColor):
 
 
 def doUpdateWireFrameColorSoloMode():
-    soloColor = cmds.brSkinBrushContext(cmds.currentCtx(), query=True, soloColor=True)
+    soloColor = cmds.brSkinBrushContext(
+        GET_CONTEXT.getLatest(), query=True, soloColor=True
+    )
     updateWireFrameColorSoloMode(soloColor)
 
 
 def setSoloMode(soloColor):
     with UndoContext("setSoloMode"):
-        cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, soloColor=soloColor)
+        cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), edit=True, soloColor=soloColor)
         updateWireFrameColorSoloMode(soloColor)
 
 

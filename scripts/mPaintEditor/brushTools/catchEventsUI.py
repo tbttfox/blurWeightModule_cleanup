@@ -1,7 +1,7 @@
 from __future__ import print_function
 from __future__ import absolute_import
 
-from Qt import QtCore, QtWidgets, QtCompat
+from Qt import QtCore, QtGui, QtWidgets, QtCompat
 
 from maya import OpenMayaUI, cmds, mel
 from .brushPythonFunctions import (
@@ -143,6 +143,7 @@ class HandleEventsQt:
         self.isSmoothKeyPressed = False
         self.isRemoveKeyPressed = False
         self.catcher = catcher
+        self.hookup()
 
     def hookup(self):
         self.catcher.RemoveKeyReleased.connect(self.removeKeyReleased)
@@ -382,7 +383,7 @@ class HandleEventsMaya:
         cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, soloColorType=colorIdx)
 
 
-class CatchEventsWidget(QtCore.QObject):
+class CatchEventsWidget(QtWidgets.QWidget):
     """Custom QObject event filter so we can catch right-clicks
 
     Maya made the decision to *NOT* allow their normal contexts
@@ -415,7 +416,7 @@ class CatchEventsWidget(QtCore.QObject):
     def __init__(self):
         super(CatchEventsWidget, self).__init__(ROOTWINDOW)
         self.QApplicationInstance = QtWidgets.QApplication.instance()
-
+        self.setMask(QtGui.QRegion(0, 0, 1, 1))
         self.markingMenuKeyPressed = False
         self.markingMenuShown = False
         self.closingNextPressMarkingMenu = False
@@ -453,7 +454,7 @@ class CatchEventsWidget(QtCore.QObject):
         """process is stopped when returning True
         keeps when returning False
         """
-        # only for the marking menu always checked
+        # Always check for the marking menu
         if (
             self.markingMenuKeyPressed
             or self.markingMenuShown
