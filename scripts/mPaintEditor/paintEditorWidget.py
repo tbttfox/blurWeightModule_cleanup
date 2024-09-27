@@ -498,10 +498,11 @@ class SkinPaintWin(Window):
         removeUserEventCallback(self.sizeCallBack)
 
         deleteTheJobs("SkinPaintWin.refreshCallBack")
-        cmds.scriptJob(kill=self.refreshSJ, force=True)
+        if self.refreshSJ is not None:
+            cmds.scriptJob(kill=self.refreshSJ, force=True)
         self.refreshSJ = None
-
-        cmds.scriptJob(kill=self.connectToEventHandlerSJ, force=True)
+        if self.connectToEventHandlerSJ is not None:
+            cmds.scriptJob(kill=self.connectToEventHandlerSJ, force=True)
         self.connectToEventHandlerSJ = None
 
         for callBck in self.close_callback:
