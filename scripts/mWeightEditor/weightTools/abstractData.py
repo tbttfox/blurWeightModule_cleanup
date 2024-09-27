@@ -211,7 +211,7 @@ class DataAbstract(object):
                 cmds.setAttr(
                     pointsDisplayNode + ".inputComponents",
                     *([len(inList)] + inList),
-                    type="componentList"
+                    type="componentList",
                 )
 
     # functions utils
@@ -1143,7 +1143,7 @@ class DataQuickSet(object):
             cmds.setAttr(
                 self.blurSkinNode + ".inputComponents",
                 *([len(inListVertices)] + inListVertices),
-                type="componentList"
+                type="componentList",
             )
 
     def setSkinValue(self, newArray):

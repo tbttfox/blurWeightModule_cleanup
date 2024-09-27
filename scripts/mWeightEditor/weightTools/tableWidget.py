@@ -48,15 +48,10 @@ class TableModel(QtCore.QAbstractTableModel):
         return self.datatable.columnsNames
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
-        if role == QtCore.Qt.EditRole:
-            editData = self.realData(index) * 100
-            return editData
-        elif role == QtCore.Qt.DisplayRole:
-            ff = math.floor(self.realData(index) * 10000) / 100
-            ff = "{0:.2f}".format(ff)
-            if ff[-2:] == "00":
-                ff = ff[:-1]
-            return ff
+        if role == QtCore.Qt.DisplayRole:
+            return "{0:g}".format(round(self.realData(index) * 100, 1))
+        elif role == QtCore.Qt.EditRole:
+            return self.realData(index) * 100
         elif role == QtCore.Qt.TextAlignmentRole:
             return QtCore.Qt.AlignCenter
         return None
@@ -250,12 +245,12 @@ class VertHeaderView(QtWidgets.QHeaderView):
         if not model.datatable.isRowLocked(index):
             theBGBrush = self.regularBG
             if model.isSoftOn():
-                col = multVal * 255 * 2
+                col = int(multVal * 255 * 2)
                 if col > 255:
                     RCol = 255
                     GCol = col - 255
                 else:
-                    GCol = 0.0
+                    GCol = 0
                     RCol = col
                 theBGBrush = QtGui.QColor(RCol, GCol, 0, 100)
 
@@ -345,7 +340,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             index = self.visualIndexAt(event.pos().x())
 
             pos = event.globalPos() - QtCore.QPoint(355, 100)
-            theColor = [el / 255.0 for el in self.color(index)]
+            theColor = [int(el / 255) for el in self.color(index)]
             cmds.colorEditor(mini=True, position=[pos.x(), pos.y()], rgbValue=theColor)
             if cmds.colorEditor(query=True, result=True, mini=True):
                 col = cmds.colorEditor(query=True, rgbValue=True)
@@ -383,9 +378,9 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             else:
                 attr = obj + ".wireColorRGB"
                 els = cmds.getAttr(attr)[0]
-            return [255.0 * el for el in els]
+            return [int(255 * el) for el in els]
         else:
-            return [255.0, 155.0, 55.0]
+            return [255, 155, 55]
 
     def setColor(self, pos, index):
         menu = ColorMenu(self)
@@ -463,7 +458,6 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         selVertices.setEnabled(not selectionIsEmpty)
 
         if self.model().datatable.isSkinData:
-
             popMenu.addSeparator()
 
             lockAction = popMenu.addAction("lock selected")

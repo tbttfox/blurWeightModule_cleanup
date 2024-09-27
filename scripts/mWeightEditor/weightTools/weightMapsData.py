@@ -271,7 +271,7 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                     cmds.setAttr(
                         att + "[{0}:{1}]".format(start, finish),
                         *weightArray,
-                        size=length
+                        size=length,
                     )
                 else:
                     index, value = indices, weightArray
@@ -295,7 +295,6 @@ class DataOfOneDimensionalAttrs(DataAbstract):
         if self.storeUndo:
             undoValues = []
         with GlobalContext(message="smoothVertices", doPrint=True):
-
             editedColumns = np.any(self.sumMasks, axis=0).tolist()
             for colIndex, isColumnChanged in enumerate(editedColumns):
                 if isColumnChanged:

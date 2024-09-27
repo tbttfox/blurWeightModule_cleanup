@@ -77,8 +77,8 @@ class DataOfSkin(DataAbstract):
         if self.isNurbsSurface:
             listCVsIndices = []
             for indVtx in selectedVertices:
-                indexV = indVtx % self.numCVsInV
-                indexU = indVtx / self.numCVsInV
+                indexV = int(indVtx % self.numCVsInV)
+                indexU = int(indVtx // self.numCVsInV)
                 listCVsIndices.append((indexU, indexV))
             cmds.blurSkinCmd(
                 command="smooth",
@@ -259,18 +259,24 @@ class DataOfSkin(DataAbstract):
             if driverNames_oppIndices[indInfluence] != -1:
                 continue
             oppInfluence = influence
-            for i, leftSearch in enumerate(leftSpl):
-                rightSearch = rightSpl[i].replace("*", ".*")
-                leftSearch = leftSpl[i].replace("*", ".*")
-                rightReplace = rightSpl[i].replace("*", "")
-                leftReplace = leftSpl[i].replace("*", "")
 
-                if re.search(leftSearch, influence, re.IGNORECASE) is not None:
-                    oppInfluence = influence.replace(leftReplace, rightReplace)
+            breaker = False
+            for a, b in zip(leftSpl, rightSpl):
+                for left, right in [(a, b), (b, a)]:
+                    if left[-1] not in "*.":
+                        left = left + "$"
+                    if left[0] not in "*.":
+                        left = "^" + left
+                    rightSearch = right.replace("*", "")
+                    leftSearch = left.replace("*", "")
+
+                    oppInfluence = re.sub(leftSearch, rightSearch, influence)
+                    if oppInfluence in self.driverNames and oppInfluence != influence:
+                        breaker = True
+                        break
+                if breaker:
                     break
-                elif re.search(rightSearch, influence, re.IGNORECASE) is not None:
-                    oppInfluence = influence.replace(rightReplace, leftReplace)
-                    break
+
             if oppInfluence in self.driverNames and oppInfluence != influence:
                 oppDriverNames[influence] = oppInfluence
                 oppDriverNames[oppInfluence] = influence
@@ -351,7 +357,7 @@ class DataOfSkin(DataAbstract):
             cmds.setAttr(
                 self.blurSkinNode + ".inputComponents",
                 *([len(inList)] + inList),
-                type="componentList"
+                type="componentList",
             )
 
     def copyArray(self):
@@ -698,7 +704,7 @@ class DataOfSkin(DataAbstract):
                     cmds.setAttr(
                         self.blurSkinNode + ".inputComponents",
                         *([len(inList)] + inList),
-                        type="componentList"
+                        type="componentList",
                     )
 
     def actuallySetValue(
@@ -783,6 +789,7 @@ class DataOfSkin(DataAbstract):
 
         fnComponent = OpenMaya.MFnSingleIndexedComponent()
         self.isNurbsSurface = False
+        self.isNurbsCurve = False
         self.isLattice = False
         componentAlreadyBuild = False
         if self.softOn:
@@ -790,6 +797,7 @@ class DataOfSkin(DataAbstract):
         else:
             revertSortedIndices = indices
         if self.shapePath.apiType() == OpenMaya.MFn.kNurbsCurve:
+            self.isNurbsCurve = True
             componentType = OpenMaya.MFn.kCurveCVComponent
             crvFn = OpenMaya.MFnNurbsCurve(self.shapePath)
             vertexCount = crvFn.numCVs()
@@ -806,8 +814,8 @@ class DataOfSkin(DataAbstract):
                 fnComponent.setCompleteData(numCVsInU, self.numCVsInV)
             else:
                 for indVtx in revertSortedIndices:
-                    indexV = indVtx % self.numCVsInV
-                    indexU = indVtx / self.numCVsInV
+                    indexV = int(indVtx % self.numCVsInV)
+                    indexU = int(indVtx // self.numCVsInV)
                     fnComponent.addElement(indexU, indexV)
         elif self.shapePath.apiType() == OpenMaya.MFn.kLattice:  # lattice
             self.isLattice = True
@@ -823,7 +831,7 @@ class DataOfSkin(DataAbstract):
             else:
                 for indVtx in revertSortedIndices:
                     s, t, v = getThreeIndices(div_s, div_t, div_u, indVtx)
-                    fnComponent.addElement(s, t, v)
+                    fnComponent.addElement(int(s), int(t), int(v))
         elif self.shapePath.apiType() == OpenMaya.MFn.kMesh:
             componentType = OpenMaya.MFn.kMeshVertComponent
             mshFn = OpenMaya.MFnMesh(self.shapePath)
@@ -836,7 +844,10 @@ class DataOfSkin(DataAbstract):
                 fnComponent.setCompleteData(vertexCount)
             else:
                 for ind in revertSortedIndices:
-                    fnComponent.addElement(ind)
+                    fnComponent.addElement(int(ind))
+
+        if self.isNurbsSurface or self.isNurbsCurve:
+            return self.getValuesSkinClusterCmds(inputSkinCluster, indices)
 
         weights = OpenMaya.MDoubleArray()
         if not getskinWeights:
@@ -845,8 +856,50 @@ class DataOfSkin(DataAbstract):
         intptrUtil.createFromInt(0)
         intPtr = intptrUtil.asUintPtr()
 
-        self.sknFn.getWeights(self.shapePath, self.fullComponent, weights, intPtr)
+        with GlobalContext(message="sknFn.getWeights", doPrint=self.verbose):
+            self.sknFn.getWeights(self.shapePath, self.fullComponent, weights, intPtr)
         return weights
+
+    def getValuesSkinClusterCmds(self, inputSkinCluster, allIndices):
+        recomputedIndices = False
+        if not allIndices:
+            allIndices = cmds.getAttr(
+                inputSkinCluster + ".weightList", multiIndices=True
+            )
+            recomputedIndices = True
+        orderLst = self.orderMelList(allIndices)
+
+        skinValues = []
+        for order in orderLst:
+            skinValues.extend(
+                cmds.getAttr(
+                    "{}.weightList[{}].weights".format(inputSkinCluster, order)
+                )
+            )
+        skinValues = list(map(list, skinValues))
+
+        # now extend the skinCluster
+        nbInfluences = len(
+            cmds.getAttr(inputSkinCluster + ".matrix", multiIndices=True)
+        )
+        skinValuesCorrected = []
+        verticesIndices = []
+        for indVertex, values in zip(allIndices, skinValues):
+            if not values:
+                continue
+            nbValues = len(values)
+            if nbValues < nbInfluences:
+                values.extend([0.0] * (nbInfluences - nbValues))
+            skinValuesCorrected.append(values)
+            verticesIndices.append(indVertex)
+
+        if recomputedIndices:
+            self.vertices = verticesIndices  # cmds.getAttr("{0}.weightList".format(self.theSkinCluster), multiIndices=True)
+            self.verticesWeight = [1.0] * len(self.vertices)
+            self.sortedIndices = list(range(len(self.vertices)))
+            self.opposite_sortedIndices = list(range(len(self.vertices)))
+
+        return numpyToMaya(np.array(skinValuesCorrected), OpenMaya.MDoubleArray)
 
     def convertRawSkinToNumpyArray(self):
         """Convert the raw skin data to a numpy array
@@ -988,7 +1041,7 @@ class DataOfSkin(DataAbstract):
         getskinWeights=True,
         force=True,
         inputVertices=None,
-        **kwargs
+        **kwargs,
     ):
         """Load all the data from the current selection into the current instance
 
@@ -1006,7 +1059,7 @@ class DataOfSkin(DataAbstract):
             typeOfDeformer="skinCluster",
             force=force,
             inputVertices=inputVertices,
-            **kwargs
+            **kwargs,
         )
         if not success or self.theDeformer == "":
             if not force:
@@ -1098,7 +1151,7 @@ class DataOfSkin(DataAbstract):
 
             for indVtx in self.indicesVertices:
                 indexV = int(indVtx % self.numCVsInV)
-                indexU = int(indVtx / self.numCVsInV)
+                indexU = int(indVtx // self.numCVsInV)
                 fnComponent.addElement(indexU, indexV)
         elif self.isLattice:
             componentType = OpenMaya.MFn.kLatticeComponent
@@ -1109,7 +1162,7 @@ class DataOfSkin(DataAbstract):
             div_u = cmds.getAttr(self.deformedShape + ".uDivisions")
             for indVtx in self.indicesVertices:
                 s, t, v = getThreeIndices(div_s, div_t, div_u, indVtx)
-                fnComponent.addElement(s, t, v)
+                fnComponent.addElement(int(s), int(t), int(v))
         else:  # single component
             if self.shapePath.apiType() == OpenMaya.MFn.kNurbsCurve:
                 componentType = OpenMaya.MFn.kCurveCVComponent
@@ -1269,8 +1322,8 @@ class DataOfSkin(DataAbstract):
         if self.isNurbsSurface:
             toSel = []
             for indVtx in selectedVertices:
-                indexV = indVtx % self.numCVsInV
-                indexU = indVtx / self.numCVsInV
+                indexV = int(indVtx % self.numCVsInV)
+                indexU = int(indVtx // self.numCVsInV)
                 toSel += ["{0}.cv[{1}][{2}]".format(self.deformedShape, indexU, indexV)]
         elif self.isLattice:
             toSel = []
