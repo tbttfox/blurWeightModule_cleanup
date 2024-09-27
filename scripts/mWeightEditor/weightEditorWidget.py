@@ -17,7 +17,11 @@ except ImportError:
 
 from .weightTools.skinData import DataOfSkin
 from .weightTools.abstractData import DataQuickSet
-from .weightTools.weightMapsData import DataOfBlendShape, DataOfDeformers
+from .weightTools.weightMapsData import (
+    DataOfBlendShape,
+    DataOfDeformers,
+    DataOfOneDimensionalAttrs,
+)
 
 from .weightTools.tableWidget import FastTableView, TableModel
 from .weightTools.spinnerSlider import ValueSettingWE, ButtonWithValue
@@ -34,9 +38,9 @@ from .weightTools.utils import (
 )
 
 
-# -----------------------------------------------------------------
-# styleSheet and icons --------------------------------------------
-# -----------------------------------------------------------------
+#
+# styleSheet and icons
+#
 def getIcon(iconNm):
     fileVar = os.path.realpath(__file__)
     uiFolder, filename = os.path.split(fileVar)
@@ -111,9 +115,9 @@ class SkinWeightWin(Window):
         self.applyDisplayColumnsFilters(None)
         self.refreshCurrentSelectionOrder()
 
-    # -------------------------------------------------------------
-    # window events -----------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # window events
+    #
     def showEvent(self, event):
         super(SkinWeightWin, self).showEvent(event)
         self.getOptionVars()
@@ -136,9 +140,9 @@ class SkinWeightWin(Window):
             self._tv.clearSelection()
         super(SkinWeightWin, self).mousePressEvent(event)
 
-    # -------------------------------------------------------------
-    # widget creation/edition  ------------------------------------
-    # -------------------------------------------------------------
+    #
+    # widget creation/edition
+    #
     def addMinButton(self):
         self.setWindowFlags(QtCore.Qt.Window)
 
@@ -407,19 +411,24 @@ class SkinWeightWin(Window):
         self.option_BTN.setText("")
         self.option_BTN.mousePressEvent = self.showRightClickMenu
 
-        # ------ Copy / Paste -----------------------------------------------
+        # Copy / Paste
         self.copyBTN.clicked.connect(self.doCopyArray)
         self.pasteBTN.clicked.connect(self.doPasteArray)
 
-    # -------------------------------------------------------------
-    # export import  ----------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # export import
+    #
     def exportAction(self):
         colIndices = self._tv.HHeaderView.getSelectedColumns()
+        if not isinstance(self.dataOfDeformer, DataOfOneDimensionalAttrs):
+            raise ValueError("Cannot export data for this deformer type")
         self.dataOfDeformer.exportColumns(colIndices)
 
     def importAction(self):
         colIndices = self._tv.HHeaderView.getSelectedColumns()
+        if not isinstance(self.dataOfDeformer, DataOfOneDimensionalAttrs):
+            raise ValueError("Cannot import data for this deformer type")
+
         resultImport = self.dataOfDeformer.importColumns(colIndices)
         if resultImport is not None:
             self.associationXml_tbl.lstComboxes = []
@@ -456,6 +465,9 @@ class SkinWeightWin(Window):
             self.refresh(force=True)
 
     def doImportXmlCouples(self):
+        if not isinstance(self.dataOfDeformer, DataOfOneDimensionalAttrs):
+            raise ValueError("Cannot import xml couples for this deformer type")
+
         for inCol, comboB in enumerate(self.associationXml_tbl.lstComboxes):
             currentText = comboB.currentText()
             if currentText in self.dicNmFilePath:
@@ -464,11 +476,11 @@ class SkinWeightWin(Window):
 
     def exportButtonsVis(self, val):
         for btn in [self.exportBTN, self.importBTN]:
-            btn.setEnabled(not self.dataOfDeformer.isSkinData and val)
+            btn.setEnabled(not isinstance(self.dataOfDeformer, DataOfSkin) and val)
 
-    # -------------------------------------------------------------
-    # callBacks ---------------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # callBacks
+    #
     def renameCB(self, oldName, newName):
         if self.dataOfDeformer:
             self.dataOfDeformer.renameCB(oldName, newName)
@@ -503,9 +515,9 @@ class SkinWeightWin(Window):
         with ResettingModel(self._tm):
             self.dataOfDeformer.clearData()
 
-    # -------------------------------------------------------------
-    # right click menu --------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # right click menu
+    #
     def buildRCMenu(self):
         self.popMenu = QtWidgets.QMenu(self)
 
@@ -551,9 +563,9 @@ class SkinWeightWin(Window):
         ]:
             self.popMenu.exec_(self.mapToGlobal(pos))
 
-    # -------------------------------------------------------------
-    # optionVars --------------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # optionVars
+    #
     def getOptionVars(self):
         self.autoPrune = (
             cmds.optionVar(query="autoPrune")
@@ -601,27 +613,32 @@ class SkinWeightWin(Window):
 
     def changeOrder(self, orderType):
         HH = self._tv.HHeaderView
+        if not isinstance(self.dataOfDeformer, DataOfSkin):
+            raise ValueError("Cannot change order of non-skin deformer")
 
         with ToggleHeaderVisibility(HH):
             if orderType == "Default":
                 self.produceOrder(HH, self.dataOfDeformer.driverNames)
-
-            if orderType == "Alphabetical":
+            elif orderType == "Alphabetical":
                 newOrderDriverNames = sorted(self.dataOfDeformer.driverNames)
                 self.produceOrder(HH, newOrderDriverNames)
             elif orderType == "Side Alphabetical":
-                allNewNames = []
-                for el in self.dataOfDeformer.driverNames:
+
+                def sidekey(el):
                     spl = el.split("_")
                     if len(spl) > 2:
                         spl.append(spl.pop(1))
-                    newName = "_".join(spl)
-                    allNewNames.append((newName, el))
-                newOrderDriverNames = [el for newel, el in sorted(allNewNames)]
+                    return "_".join(spl)
+
+                newOrderDriverNames = sorted(
+                    self.dataOfDeformer.driverNames, key=sidekey
+                )
                 self.produceOrder(HH, newOrderDriverNames)
 
             elif orderType == "Value":
                 self.produceOrder(HH, self.dataOfDeformer.getNamesHighestColumns())
+            else:
+                raise ValueError("Unknown OrderType")
         self.applyDisplayColumnsFilters(None)
 
     def produceOrder(self, HH, newOrderDriverNames):
@@ -637,7 +654,7 @@ class SkinWeightWin(Window):
 
     def applyDisplayColumnsFilters(self, newText):
         displayColumns = [True] * self.dataOfDeformer.columnCount
-        # first apply the Text ---------------------
+        # first apply the Text
         if newText is None:
             newText = self.searchInfluences_le.text()
         if newText:
@@ -652,19 +669,19 @@ class SkinWeightWin(Window):
                     if foundText:
                         break
                 displayColumns[ind] = foundText
-        # then apply the Zero Colums: -----------------------------
+        # then apply the Zero Colums:
         if self.hideZeroColumn:
             for ind in self.dataOfDeformer.hideColumnIndices:
                 displayColumns[ind] = False
 
-        # then apply the Lock Colums: -----------------------------
+        # then apply the Lock Colums:
         if self.hideLockColumn:
             for ind, isLocked in enumerate(self.dataOfDeformer.lockedColumns):
                 if isLocked:
                     displayColumns[ind] = False
 
-        # now apply how many to show: -----------------------------
-        if self.dataOfDeformer.isSkinData:
+        # now apply how many to show:
+        if isinstance(self.dataOfDeformer, DataOfSkin):
             nbToShow = self.nbColumns_CB.currentText()
             if nbToShow != "All":
                 nbToShow = int(nbToShow)
@@ -678,13 +695,14 @@ class SkinWeightWin(Window):
                             displayColumns[columnIndex] = False
 
         with ToggleHeaderVisibility(self._tv.HHeaderView):
-            # now do the hidding --------------------------------------------
+            # now do the hidding
             for ind, isVisible in enumerate(displayColumns):
                 if isVisible:
                     self._tv.showColumn(ind)
                 else:
                     self._tv.hideColumn(ind)
-            if self.dataOfDeformer.isSkinData:  # show the sum column, always
+            if isinstance(self.dataOfDeformer, DataOfSkin):
+                # show the sum column, always
                 self._tv.showColumn(self.dataOfDeformer.columnCount + 1)
 
     def toggleDisplayLockColumn(self, checked):
@@ -710,7 +728,7 @@ class SkinWeightWin(Window):
         cmds.optionVar(intValue=["useShortestNames", checked])
         self.useShortestNames = checked
         self.dataOfDeformer.useShortestNames = checked
-        if self.dataOfDeformer.isSkinData:
+        if isinstance(self.dataOfDeformer, DataOfSkin):
             self.dataOfDeformer.getDriversShortNames()
         else:
             self.dataOfDeformer.getShortNames()
@@ -728,9 +746,9 @@ class SkinWeightWin(Window):
             self.dataOfDeformer.removeDisplayLocator()
         self.popMenu.close()
 
-    # -------------------------------------------------------------
-    # Refresh -----------------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # Refresh
+    #
     def refreshPosition(self):
         vals = cmds.optionVar(query="SkinWeightWindow")
         if vals:
@@ -759,9 +777,10 @@ class SkinWeightWin(Window):
             mPaintEditor.PAINT_EDITOR.refreshColorsAndLocks()
 
     def refreshSkinDisplay(self):  # call by skinBrush
-        with ResettingModel(self._tm):
-            self.dataOfDeformer.rebuildRawSkin()
-            self.dataOfDeformer.convertRawSkinToNumpyArray()
+        if isinstance(self.dataOfDeformer, DataOfSkin):
+            with ResettingModel(self._tm):
+                self.dataOfDeformer.rebuildRawSkin()
+                self.dataOfDeformer.convertRawSkinToNumpyArray()
         self._tv.repaint()
 
     def selectionCallBackRefresh(self):
@@ -769,12 +788,14 @@ class SkinWeightWin(Window):
         # if it changed it refreshed automatically
         # if it didn't change but maps are available, we do refresh
         # if it is a skin, we refresh to enalbe highlight of deformers
-        if (not changing and mapsAreAvailable) or self.dataOfDeformer.isSkinData:
+        if (not changing and mapsAreAvailable) or isinstance(
+            self.dataOfDeformer, DataOfSkin
+        ):
             self.refresh()
 
     def refresh(self, force=False):
         if self.unLock or force:
-            if self.dataOfDeformer.isSkinData:
+            if isinstance(self.dataOfDeformer, DataOfSkin):
                 self.changeOrder("Default")
 
             with ResettingModel(self._tm):
@@ -791,33 +812,35 @@ class SkinWeightWin(Window):
 
             self.setColumnVisSize()
             self.applyDisplayColumnsFilters(None)
-            if not resultData and self.dataOfDeformer.isSkinData:
+            if not resultData and isinstance(self.dataOfDeformer, DataOfSkin):
                 self.highlightSelectedDeformers()
             self._tv.selEmptied.emit(False)
             self._tv.repaint()
 
-            if self.dataOfDeformer.isSkinData:
+            if isinstance(self.dataOfDeformer, DataOfSkin):
                 self.refreshCurrentSelectionOrder()
                 self.changeOrder(self.orderType_CB.currentText())
 
-        elif not self.unLock and self.dataOfDeformer.isSkinData:
+        elif not self.unLock and isinstance(self.dataOfDeformer, DataOfSkin):
             self.highlightSelectedDeformers()
 
     def refreshCurrentSelectionOrder(self):
-        if self.dataOfDeformer.isSkinData:
-            self.currentSectionsOrder = dict(
-                [(el, ind) for ind, el in enumerate(self.dataOfDeformer.driverNames)]
-            )
-            self.currentSectionsOrderReverse = dict(
-                [(ind, el) for ind, el in enumerate(self.dataOfDeformer.driverNames)]
-            )
+        if isinstance(self.dataOfDeformer, DataOfSkin):
+            self.currentSectionsOrder = {
+                el: ind for ind, el in enumerate(self.dataOfDeformer.driverNames)
+            }
+            self.currentSectionsOrderReverse = {
+                ind: el for ind, el in enumerate(self.dataOfDeformer.driverNames)
+            }
         else:
             self.currentSectionsOrder, self.currentSectionsOrderReverse = {}, {}
 
-    # -------------------------------------------------------------
-    # Functions ---------------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # Functions
+    #
     def reassignLocally(self):
+        if not isinstance(self.dataOfDeformer, DataOfSkin):
+            raise ValueError("Can't reassign locally on non-skin deformer")
         chunks = self.getRowColumnsSelected()
         if chunks:
             actualyVisibleColumns = [
@@ -849,6 +872,8 @@ class SkinWeightWin(Window):
             self.postSetValue()
 
     def doNormalize(self):
+        if not isinstance(self.dataOfDeformer, DataOfSkin):
+            raise ValueError("Can't normalize on non-skin deformer")
         chunks = self.getRowColumnsSelected()
         if not chunks:
             chunks = [
@@ -867,11 +892,15 @@ class SkinWeightWin(Window):
             self.postSetValue()
 
     def doCopyArray(self):
+        if not isinstance(self.dataOfDeformer, DataOfSkin):
+            raise ValueError("Can't copy on non-skin deformer")
         self.prepareToSetValue(selectAllIfNothing=True)
         self.dataOfDeformer.copyArray()
         self.pasteBTN.setEnabled(True)
 
     def doPasteArray(self):
+        if not isinstance(self.dataOfDeformer, DataOfSkin):
+            raise ValueError("Can't paste on non-skin deformer")
         with SettingWithRedraw(self):
             self.prepareToSetValue(selectAllIfNothing=True)
             result = self.dataOfDeformer.pasteArray()
@@ -889,7 +918,7 @@ class SkinWeightWin(Window):
 
     def smooth(self):
         with SettingWithRedraw(self):
-            if self.dataOfDeformer.isSkinData:
+            if isinstance(self.dataOfDeformer, DataOfSkin):
                 chunks = self.getRowColumnsSelected()
                 if not chunks:
                     chunks = [
@@ -923,6 +952,8 @@ class SkinWeightWin(Window):
                     self.postSetValue()
 
     def selProbVerts(self):
+        if not isinstance(self.dataOfDeformer, DataOfSkin):
+            raise ValueError("Can't select problem verts on non-skin deformer")
         vtx = self.dataOfDeformer.fixAroundVertices(
             tolerance=self.problemVertsBTN.precision
         )
@@ -934,6 +965,9 @@ class SkinWeightWin(Window):
         cmds.select(inList)
 
     def setUsingUvs(self):
+        if not isinstance(self.dataOfDeformer, DataOfOneDimensionalAttrs):
+            raise ValueError("Can't Set Using UVs on multi dimensional attrs")
+
         using_U = self.uiURBTN.isChecked()
         normalize = self.uiNormalizeUVsCBOX.isChecked()
         opposite = self.uiOppositeUVsCBOX.isChecked()
@@ -943,9 +977,9 @@ class SkinWeightWin(Window):
                 self.dataOfDeformer.setUsingUVs(using_U, normalize, opposite)
                 self.postSetValue()
 
-    # -------------------------------------------------------------
-    # Basic set Values --------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # Basic set Values
+    #
     def prepareToSetValue(self, selectAllIfNothing=False):
         chunks = self.getRowColumnsSelected()
         actualyVisibleColumns = [
@@ -968,7 +1002,7 @@ class SkinWeightWin(Window):
         return False
 
     def postSetValue(self):
-        if self.dataOfDeformer.isSkinData:
+        if isinstance(self.dataOfDeformer, DataOfSkin):
             self.dataOfDeformer.postSkinSet()
             undoArgs = (self.dataOfDeformer.undoValues,)
             redoArgs = (self.dataOfDeformer.redoValues,)
@@ -986,7 +1020,7 @@ class SkinWeightWin(Window):
     def doAddValue(self, val, forceAbsolute=False, average=False):
         with SettingWithRedraw(self):
             if self.valueSetter.addMode and not forceAbsolute:
-                if self.dataOfDeformer.isSkinData:
+                if isinstance(self.dataOfDeformer, DataOfSkin):
                     self.dataOfDeformer.setSkinData(
                         val,
                         percent=self.addPercentage,
@@ -1003,9 +1037,9 @@ class SkinWeightWin(Window):
             else:
                 self.dataOfDeformer.absoluteVal(val)
 
-    # -------------------------------------------------------------
-    # Selection ---------------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # Selection
+    #
     def storeSelection(self):
         selection = self._tv.selectionModel().selection()
         self.topLeftBotRightSel = [
@@ -1026,6 +1060,9 @@ class SkinWeightWin(Window):
         self._tv.selEmptied.emit(somethingSelected)
 
     def highlightSelectedDeformers(self):
+        if not isinstance(self.dataOfDeformer, DataOfSkin):
+            raise ValueError("Can't highlight selected deformers on non-skin deformer")
+
         selection = cmds.ls(selection=True)
         selection = set(cmds.ls(selection=True))
         intersect = selection.intersection(self.dataOfDeformer.driverNames)
@@ -1059,16 +1096,16 @@ class SkinWeightWin(Window):
             chunks.append((item.top(), item.bottom(), item.left(), item.right()))
         return chunks
 
-    # -------------------------------------------------------------
-    # Mesh Paintable ----------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # Mesh Paintable
+    #
     def displayInfoPaintAttr(self, displayName):
         if displayName in self.dicDisplayNames:
             print(self.dicDisplayNames[displayName])
 
-    # -------------------------------------------------------------
-    # Misc --------------------------------------------------------
-    # -------------------------------------------------------------
+    #
+    # Misc
+    #
     def changeTypeOfData(self, ind):
         UvsEnabled = False
         if ind == 0:  # skinCluster
@@ -1112,11 +1149,12 @@ class SkinWeightWin(Window):
             self.dataOfDeformer.getAllData()
         return self.dataOfDeformer
 
-    # --------------------------------------------------------------
-    # Table UI functions  ------------------------------------------
-    # --------------------------------------------------------------
+    #
+    # Table UI functions
+    #
     def setColumnVisSize(self):
         if self.dataOfDeformer.columnCount:
+            i = -1
             for i in range(self.dataOfDeformer.columnCount):
                 self._tv.setColumnWidth(i, self.colWidth)
             self._tv.setColumnWidth(i + 1, self.colWidth + 10)
