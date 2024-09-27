@@ -1,52 +1,37 @@
 from __future__ import print_function
 from __future__ import absolute_import
-from maya import cmds, mel
-import re
-import time
+
+import json
 import random
-from collections import OrderedDict
-
-from ..Qt import QtGui
-from mWeightEditor.weightTools.utils import GlobalContext
-from ..utils import rootWindow
-
+import re
 import six
-from six.moves import range
-from six.moves import map
-from six.moves import zip
+import time
+
+from Qt import QtGui
+from collections import OrderedDict
+from contextlib import contextmanager
+
+from maya import cmds, mel
+from six.moves import map, range, zip
+
+from ..utils import rootWindow, GlobalContext
 
 
-class disableUndoContext(object):
-    """
-    **CONTEXT** class(*use* ``with`` *statement*)
-    """
-
-    def __init__(self, raise_error=True, disableUndo=True):
-        self.raise_error = raise_error
-        self.disableUndo = disableUndo
-
-    def __enter__(self):
-        if self.disableUndo:
-            cmds.undoInfo(stateWithoutFlush=False)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Turn refresh on again and raise errors if asked"""
-        if self.disableUndo:
-            cmds.undoInfo(stateWithoutFlush=True)
+@contextmanager
+def disableUndoContext():
+    cmds.undoInfo(stateWithoutFlush=False)
+    try:
+        yield
+    finally:
+        cmds.undoInfo(stateWithoutFlush=True)
 
 
-class UndoContext(object):
-    """
-    **CONTEXT** class(*use* ``with`` *statement*)
-    """
-
-    def __init__(self, chunkName="myProcessTrue"):
-        self.chunkName = chunkName
-
-    def __enter__(self):
-        cmds.undoInfo(openChunk=True, chunkName=self.chunkName)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
+@contextmanager
+def UndoContext(chunkName="myProcessTrue"):
+    cmds.undoInfo(openChunk=True, chunkName=chunkName)
+    try:
+        yield
+    finally:
         cmds.undoInfo(closeChunk=True)
 
 
@@ -96,6 +81,7 @@ def setColorsOnJoints():
         for i in range(1, 9):
             col = cmds.displayRGBColor("userDefined{0}".format(i), query=True)
             _colors.append(col)
+
         for jnt in cmds.ls(type="joint"):
             theInd = cmds.getAttr(jnt + ".objectColor")
             currentCol = cmds.getAttr(jnt + ".wireColorRGB")[0]
@@ -127,6 +113,7 @@ def filterInfluences():
             newTexts = newText.split(" ")
             while "" in newTexts:
                 newTexts.remove("")
+
         for i, nm in enumerate(items):
             isLocked = cmds.getAttr(nm + ".lockInfluenceWeights")
 
@@ -242,15 +229,18 @@ def createWireframe(meshNode, hideOther=True, valAlpha=0.25):
             )
             if wireDisplay:
                 cmds.hide(wireDisplay)
+
         meshes = cmds.listRelatives(meshNode, shapes=True, path=True, type="mesh")
         if not meshes:
             return None
+
         meshes = [
             shp for shp in meshes if not cmds.getAttr(shp + ".intermediateObject")
         ]
 
         if cmds.objExists("SkinningWireframe"):
             cmds.delete("SkinningWireframe")
+
         prt = cmds.createNode("transform", name="SkinningWireframe", parent=meshNode)
         for msh in meshes:
             loc = cmds.createNode(
@@ -373,7 +363,14 @@ def toolOnSetupStart():
                 cmds.select(theMesh)
         else:
             cmds.select(shapeSelected)
+
         mshShapeSelected = getShapesSelected(returnTransform=False)
+        # here we duplicate the mesh?
+        # mshShapeSelected = createTempMesh(mshShapeSelected)
+        if cmds.optionVar(query="brushSwapShaders"):
+            restoreShading()
+            swapShading(mshShapeSelected)
+
         # add nurbs Tesselate
         selectedNurbs = cmds.ls(mshShapeSelected, type="nurbsSurface")
 
@@ -413,6 +410,74 @@ def createMeshFromNurbs(att, prt):
 
     cmds.sets(msh, edit=True, forceElement="initialShadingGroup")
     return msh
+
+
+def swapShading(origMshes):
+    for node in origMshes:
+        shadingConns = cmds.listConnections(
+            node,
+            source=False,
+            destination=True,
+            plugs=True,
+            connections=True,
+            type="shadingEngine",
+        )
+        if not shadingConns:
+            continue
+        storedConns = []
+        for src, dst in zip(shadingConns[0::2], shadingConns[1::2]):
+            if ".dagSetMembers" in dst:
+                cmds.disconnectAttr(src, dst)
+                cmds.connectAttr(
+                    src, "initialShadingGroup.dagSetMembers", nextAvailable=True
+                )
+                storedConns.append((src, dst))
+        if not cmds.objExists(node + ".shadingInfos"):
+            cmds.addAttr(node, longName="shadingInfos", dataType="string")
+        cmds.setAttr(node + ".shadingInfos", json.dumps(storedConns), type="string")
+
+
+def restoreShading():
+    allShadingInfosAttrs = set(cmds.ls("*.shadingInfos"))
+    for att in allShadingInfosAttrs:
+        storedConns = json.loads(cmds.getAttr(att))
+        for src, dst in storedConns:
+            if not cmds.objExists(src):
+                continue
+            shadingConn = cmds.listConnections(
+                src, destination=True, source=False, plugs=True
+            )
+            if shadingConn:
+                cmds.disconnectAttr(src, shadingConn[0])
+            if not cmds.objExists(dst):
+                continue
+            cmds.connectAttr(src, dst, force=True)
+        # delete
+        cmds.deleteAttr(att)
+
+
+def createTempMesh(origMshes):
+    toReturn = []
+    for origMsh in origMshes:
+        (prt,) = cmds.listRelatives(origMsh, parent=True, path=True)
+
+        msh = cmds.createNode(
+            "mesh", parent=prt, skipSelect=True, name="brushTmpDELETEthisMesh"
+        )
+        (inMeshConn,) = cmds.listConnections(
+            origMsh + ".inMesh", source=True, destination=False, plugs=True
+        )
+        visibilityAttr = origMsh + ".v"
+        cmds.setAttr(visibilityAttr, False)
+        cmds.connectAttr(inMeshConn, msh + ".inMesh")
+        cmds.disconnectAttr(inMeshConn, origMsh + ".inMesh")
+        cmds.sets(msh, edit=True, forceElement="initialShadingGroup")
+
+        cmds.addAttr(msh, longName="origMesh", attributeType="bool", defaultValue=True)
+        cmds.connectAttr(visibilityAttr, msh + ".origMesh", force=True)
+        toReturn.append(msh)
+
+    return toReturn
 
 
 def setSkinCluster(nrbs, state=True):
@@ -466,6 +531,7 @@ def addNurbsTessellate(selectedNurbs):
         )
 
         origShape = getOrigShape(nrbs)
+        assert origShape is not None
         att = origShape + ".local"
         origMsh = createMeshFromNurbs(att, prt)
         cmds.setAttr(origMsh + ".v", 0)
@@ -564,7 +630,7 @@ def toolOnSetupEndDeferred():
         mshShape = cmds.brSkinBrushContext(currentContext, query=True, meshName=True)
         mel.eval('global string $gSkinBrushMesh; $gSkinBrushMesh="' + mshShape + '";')
         cmds.evalDeferred(doUpdateWireFrameColorSoloMode)
-        # ------ compute time ----------------------------------
+        # compute time
         startTime = cmds.optionVar(query="startTime")
         completionTime = time.time() - startTime
 
@@ -601,9 +667,11 @@ def toolOffCleanupDeferred():
                 )
                 if wireDisplay:
                     cmds.showHidden(wireDisplay)
-            except RuntimeError:  # RuntimeError: Unknown object type: wireframeDisplay
+            except RuntimeError:
+                # RuntimeError: Unknown object type: wireframeDisplay
                 pass
         showBackNurbs(theMesh)
+        restoreShading()
 
         # delete colors on Q pressed
         doRemoveColorSets()
@@ -615,6 +683,7 @@ def toolOffCleanupDeferred():
             and cmds.optionVar(query="autoSaveEnable") == 1
         ):
             cmds.autoSave(enable=True)
+
         callPaintEditorFunction("paintEnd")
         if cmds.optionVar(exists="brushPreviousSelection"):
             cmds.select(cmds.optionVar(query="brushPreviousSelection"))
@@ -665,7 +734,8 @@ def fixOptionVarContext(**inputKargsToChange):
         kwargs = OrderedDict()
         if cmds.optionVar(exists="brSkinBrushContext1"):
             cmd = cmds.optionVar(query="brSkinBrushContext1")
-            # remove command name and command object at the end : brSkinBrushContext anmd brSkinBrushContext1;
+            # remove command name and command object at the
+            # end : brSkinBrushContext and brSkinBrushContext1;
             splitofspaces = cmd.split(" ")
             cmd2 = " ".join(splitofspaces[1:-1])
             spl = cmd2.split("-")
@@ -715,7 +785,7 @@ def fixOptionVarContext(**inputKargsToChange):
                         kwargs[dicOfName[lineSplit[0]]] = True
                 newSpl.append(lne)
 
-            # now rebuild command ---------------------------------
+            # now rebuild command
             kwargs.update(inputKargsToChange)
             cmdNew = "brSkinBrushContext "
             for key, value in six.iteritems(kwargs):
@@ -758,7 +828,7 @@ def deleteExistingColorSets():
                     cmds.polyColorSet(obj, delete=True, colorSet=colSet)
 
 
-# --------------CALL FROM BRUSH-------------------------
+# CALL FROM BRUSH
 def cleanOpenUndo():
     print("CALL cleanOpenUndo - pass")
 
@@ -768,19 +838,18 @@ def cleanCloseUndo():
 
 
 def getPaintEditor():
-    with UndoContext("getPaintEditor"):
-        import mPaintEditor
+    import mPaintEditor
 
-        editor = mPaintEditor.PAINT_EDITOR
-        if editor is not None and editor.isVisible():
-            return editor
-        return None
+    editor = mPaintEditor.PAINT_EDITOR
+    if editor is not None and editor.isVisible():
+        return editor
+    return None
 
 
 def afterPaint():
     with UndoContext("afterPaint"):
         import mWeightEditor
-        from ..Qt.QtWidgets import QApplication
+        from Qt.QtWidgets import QApplication
 
         editor = mWeightEditor.WEIGHT_EDITOR
         if editor is not None and editor in QApplication.instance().topLevelWidgets():

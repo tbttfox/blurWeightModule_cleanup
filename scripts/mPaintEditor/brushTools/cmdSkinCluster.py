@@ -2,8 +2,7 @@ from __future__ import print_function
 from __future__ import absolute_import
 from maya import cmds, OpenMaya as om, OpenMayaAnim as oma
 import six
-from six.moves import range
-from six.moves import zip
+from six.moves import range, zip
 
 
 def getThreeIndices(div_s, div_t, div_u, *args):
