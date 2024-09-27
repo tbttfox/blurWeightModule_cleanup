@@ -11,6 +11,8 @@ import numpy as np
 from Qt import QtGui, QtCore, QtWidgets, QtCompat
 from functools import partial
 
+
+from . import PAINT_EDITOR_CONTEXT
 from .brushTools import cmdSkinCluster
 from .brushTools.brushPythonFunctions import (
     UndoContext,
@@ -45,13 +47,13 @@ class ValueSettingPE(ValueSetting):
 
     def postSet(self):
         if not self.blockPostSet:
-            if cmds.currentCtx() == "brSkinBrushContext1":
+            if self.isInPaint():
                 value = self.theSpinner.value()
                 if self.commandArg in ["strength", "smoothStrength"]:
                     value /= 100.0
                 kArgs = {"edit": True}
                 kArgs[self.commandArg] = value
-                cmds.brSkinBrushContext("brSkinBrushContext1", **kArgs)
+                cmds.brSkinBrushContext(cmds.currentCtx(), **kArgs)
 
     def progressValueChanged(self, val):
         pos = self.theProgress.pos().x() + val / 100.0 * (
@@ -281,9 +283,7 @@ class SkinPaintWin(Window):
 
         self.refreshWeightEditor(getLocks=False)
         if self.isInPaint():
-            cmds.brSkinBrushContext(
-                "brSkinBrushContext1", edit=True, refreshDfmColor=ind
-            )
+            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, refreshDfmColor=ind)
 
     def refreshWeightEditor(self, getLocks=True):
         if self.weightEditor is not None:
@@ -390,9 +390,7 @@ class SkinPaintWin(Window):
             for i in range(3):
                 self.subMenuSoloColor.actions()[i].setChecked(i == ind)
             if self.isInPaint():
-                cmds.brSkinBrushContext(
-                    "brSkinBrushContext1", edit=True, soloColorType=ind
-                )
+                cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, soloColorType=ind)
 
     def showZeroDefmChecked(self, checked):
         cmds.optionVar(intValue=["showZeroDeformers", checked])
@@ -426,7 +424,7 @@ class SkinPaintWin(Window):
         """Connect and disconnect from the eventhandler"""
         from .brushTools.catchEventsUI import EVENTCATCHER, HandleEventsQt
 
-        if cmds.currentCtx() == "brSkinBrushContext1":
+        if self.isInPaint():
             if EVENTCATCHER is not None and self._eventHandler is None:
                 self._eventHandler = HandleEventsQt(self, EVENTCATCHER)
         else:
@@ -436,20 +434,18 @@ class SkinPaintWin(Window):
 
     def influencesReorderedCB(self):
         orderOfJoints = cmds.brSkinBrushContext(
-            "brSkinBrushContext1", query=True, weightOrderedIndices=True
+            cmds.currentCtx(), query=True, weightOrderedIndices=True
         )
         self.updateOrderOfInfluences(orderOfJoints)
 
     def strengthChangedCB(self):
         newStrength = cmds.brSkinBrushContext(
-            "brSkinBrushContext1", query=True, dragValue=True
+            cmds.currentCtx(), query=True, dragValue=True
         )
         self.updateStrengthVal(newStrength)
 
     def sizeChangedCB(self):
-        newSize = cmds.brSkinBrushContext(
-            "brSkinBrushContext1", query=True, dragValue=True
-        )
+        newSize = cmds.brSkinBrushContext(cmds.currentCtx(), query=True, dragValue=True)
         self.updateSizeVal(newSize)
 
     def addCallBacks(self):
@@ -534,29 +530,27 @@ class SkinPaintWin(Window):
             self.valueSetter.setEnabled(False)
             self.widgetAbs.setEnabled(False)
         else:
-            contextExists = cmds.brSkinBrushContext(
-                "brSkinBrushContext1", query=True, exists=True
-            )
             self.valueSetter.setEnabled(True)
             self.widgetAbs.setEnabled(True)
+
+            contextExists = cmds.brSkinBrushContext(
+                PAINT_EDITOR_CONTEXT, query=True, exists=True
+            )
             if commandText == "smooth":
-                theValue = (
-                    cmds.brSkinBrushContext(
-                        "brSkinBrushContext1", query=True, smoothStrength=True
-                    )
-                    if contextExists
-                    else self.smoothStrengthVarStored
-                )
                 self.valueSetter.commandArg = "smoothStrength"
-            else:
-                theValue = (
-                    cmds.brSkinBrushContext(
-                        "brSkinBrushContext1", query=True, strength=True
+                theValue = self.smoothStrengthVarStored
+                if contextExists:
+                    theValue = cmds.brSkinBrushContext(
+                        PAINT_EDITOR_CONTEXT, query=True, smoothStrength=True
                     )
-                    if contextExists
-                    else self.strengthVarStored
-                )
+            else:
                 self.valueSetter.commandArg = "strength"
+                theValue = self.strengthVarStored
+                if contextExists:
+                    theValue = cmds.brSkinBrushContext(
+                        PAINT_EDITOR_CONTEXT, query=True, strength=True
+                    )
+
             try:
                 cmds.floatSliderGrp("brSkinBrushStrength", edit=True, value=theValue)
             except Exception:
@@ -565,7 +559,7 @@ class SkinPaintWin(Window):
 
         if self.isInPaint():
             cmds.brSkinBrushContext(
-                "brSkinBrushContext1", edit=True, commandIndex=newCommand
+                cmds.currentCtx(), edit=True, commandIndex=newCommand
             )
 
     def closeEvent(self, event):
@@ -647,7 +641,7 @@ class SkinPaintWin(Window):
 
     def isInPaint(self):
         currentContext = cmds.currentCtx()
-        if currentContext.startswith("brSkinBrushContext"):
+        if cmds.contextInfo(currentContext, c=True) == "brSkinBrushContext":
             return currentContext
         return False
 
@@ -669,7 +663,6 @@ class SkinPaintWin(Window):
         with UndoContext("enterPaint"):
             if self.dataOfSkin.theSkinCluster:
                 setColorsOnJoints()
-                context = "brSkinBrushContext1"
                 dic = {
                     "soloColor": int(self.solo_rb.isChecked()),
                     "soloColorType": self.soloColor_cb.currentIndex(),
@@ -681,15 +674,28 @@ class SkinPaintWin(Window):
                 selectedInfluences = self.selectedInfluences()
                 if selectedInfluences:
                     dic["influenceName"] = selectedInfluences[0]
-                fixOptionVarContext(**dic)
 
-                if not cmds.contextInfo(context, exists=True):
-                    context = cmds.brSkinBrushContext(context)
+                # Maya doesn't let you delete a context, but we *can* overwrite it
+                # so on plugin unload, we overwrite the default "brSkinBrushContext1"
+                # with an arbitrary context (manipMoveContext was chosen for no reason)
+                buildNewContext = False
+                if cmds.contextInfo(PAINT_EDITOR_CONTEXT, exists=True):
+                    # can't use name "class" in python, so "c="
+                    if (
+                        cmds.contextInfo(PAINT_EDITOR_CONTEXT, c=True)
+                        != "brSkinBrushContext"
+                    ):
+                        buildNewContext = True
+                else:
+                    buildNewContext = True
+
+                if buildNewContext:
+                    cmds.brSkinBrushContext(PAINT_EDITOR_CONTEXT)
 
                 # getMirrorInfluenceArray
                 # let's select the shape first
                 cmds.select(self.dataOfSkin.deformedShape, replace=True)
-                cmds.setToolTo(context)
+                cmds.setToolTo(PAINT_EDITOR_CONTEXT)
                 self.getMirrorInfluenceArray()
             else:
                 self.enterPaint_btn.setEnabled(True)
@@ -763,7 +769,7 @@ class SkinPaintWin(Window):
 
     def changeMultiSolo(self, val):
         if self.isInPaint():
-            cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, soloColor=val)
+            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, soloColor=val)
             setSoloMode(val)
 
     def addInfluences(self):
@@ -943,7 +949,7 @@ class SkinPaintWin(Window):
             item.setColor(values)
 
         if self.isInPaint():
-            cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, refresh=True)
+            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, refresh=True)
 
     def createWindow(self):
         self.unLock = True
@@ -1202,7 +1208,7 @@ class SkinPaintWin(Window):
         if self.isInPaint():
             kArgs = {"edit": True}
             kArgs[nm] = val
-            cmds.brSkinBrushContext("brSkinBrushContext1", **kArgs)
+            cmds.brSkinBrushContext(cmds.currentCtx(), **kArgs)
 
     def displayOptions(self, val):
         heightOption = 480
@@ -1332,7 +1338,7 @@ class SkinPaintWin(Window):
         )
         if driverNames_oppIndices and self.isInPaint():
             cmds.brSkinBrushContext(
-                "brSkinBrushContext1",
+                cmds.currentCtx(),
                 edit=True,
                 mirrorInfluences=driverNames_oppIndices,
             )
@@ -1342,51 +1348,46 @@ class SkinPaintWin(Window):
     # --------------------------------------------------------------
     def pickMaxInfluence(self):
         if self.isInPaint():
-            cmds.brSkinBrushContext(
-                "brSkinBrushContext1", edit=True, pickMaxInfluence=True
-            )
+            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, pickMaxInfluence=True)
 
     def pickInfluence(self, vertexPicking=False):
         if self.isInPaint():
-            cmds.brSkinBrushContext(
-                "brSkinBrushContext1", edit=True, pickInfluence=True
-            )
+            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, pickInfluence=True)
 
     def selectedInfluences(self):
         return [item.influence() for item in self.uiInfluenceTREE.selectedItems()]
 
     def influenceDoubleClicked(self, item, column):
         txt = item._influence
-        if cmds.objExists(txt):
-            currentCursor = QtGui.QCursor().pos()
-            autoHide = not self.showLocks_btn.isChecked()
-            if column == 1:
-                pos = self.uiInfluenceTREE.mapFromGlobal(currentCursor)
-                if pos.x() > 40:
-                    cmds.select(txt)
-                else:
-                    item.setLocked(not item.isLocked(), autoHide=autoHide)
-                    if self.isInPaint():
-                        cmds.brSkinBrushContext(
-                            "brSkinBrushContext1",
-                            edit=True,
-                            refreshDfmColor=item._index,
-                        )  # refresh lock color
-            elif column == 0:
-                pos = currentCursor - QtCore.QPoint(355, 100)
-                self.colorDialog.item = item
-                with toggleBlockSignals([self.colorDialog]):
-                    self.colorDialog.cancelColor = QtGui.QColor(*item.color())
-                    self.colorDialog.setCurrentColor(self.colorDialog.cancelColor)
-                self.colorDialog.move(pos)
-                self.colorDialog.show()
+        if not cmds.objExists(txt):
+            return
+        currentCursor = QtGui.QCursor().pos()
+        autoHide = not self.showLocks_btn.isChecked()
+        if column == 1:
+            pos = self.uiInfluenceTREE.mapFromGlobal(currentCursor)
+            if pos.x() > 40:
+                cmds.select(txt)
+            else:
+                item.setLocked(not item.isLocked(), autoHide=autoHide)
+                if self.isInPaint():
+                    # refresh lock color
+                    cmds.brSkinBrushContext(
+                        cmds.currentCtx(), edit=True, refreshDfmColor=item._index
+                    )
+
+        elif column == 0:
+            pos = currentCursor - QtCore.QPoint(355, 100)
+            self.colorDialog.item = item
+            with toggleBlockSignals([self.colorDialog]):
+                self.colorDialog.cancelColor = QtGui.QColor(*item.color())
+                self.colorDialog.setCurrentColor(self.colorDialog.cancelColor)
+            self.colorDialog.move(pos)
+            self.colorDialog.show()
 
     def influenceClicked(self, item, column):
         text = item._influence
         if self.isInPaint():
-            cmds.brSkinBrushContext(
-                "brSkinBrushContext1", edit=True, influenceName=text
-            )
+            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, influenceName=text)
 
     def applyLock(self, typeOfLock):
         autoHide = not self.showLocks_btn.isChecked()
@@ -1427,7 +1428,7 @@ class SkinPaintWin(Window):
             self.refreshWeightEditor(getLocks=True)
 
         if self.isInPaint():
-            cmds.brSkinBrushContext("brSkinBrushContext1", edit=True, refresh=True)
+            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, refresh=True)
 
     def resetBindPreMatrix(self):
         selectedItems = self.uiInfluenceTREE.selectedItems()
@@ -1576,7 +1577,7 @@ class SkinPaintWin(Window):
                 thebtn.setEnabled(False)
         self.uiInfluenceTREE.paintEnd()
         self.previousInfluenceName = cmds.brSkinBrushContext(
-            "brSkinBrushContext1", query=True, influenceName=True
+            PAINT_EDITOR_CONTEXT, query=True, influenceName=True
         )
         self.enterPaint_btn.setEnabled(True)
 
@@ -1616,7 +1617,7 @@ class SkinPaintWin(Window):
                 checkBox = self.findChild(QtWidgets.QCheckBox, att + "_cb")
                 if checkBox:
                     dicValues[att] = checkBox.isChecked()
-            cmds.brSkinBrushContext("brSkinBrushContext1", **dicValues)
+            cmds.brSkinBrushContext(PAINT_EDITOR_CONTEXT, **dicValues)
 
     def buttonByCommandIndex(self, cmdIdx):
         ret = {

@@ -11,9 +11,10 @@ from collections import OrderedDict
 from contextlib import contextmanager
 
 from maya import cmds
-from six.moves import map, range, zip
+from six.moves import range, zip
 
 from ..utils import rootWindow, GlobalContext
+from .. import PAINT_EDITOR_CONTEXT
 
 
 @contextmanager
@@ -96,15 +97,14 @@ def setColorsOnJoints():
 
 def doRemoveColorSets():
     with UndoContext("doRemoveColorSets"):
-        # TODO: GET RID OF THE GLOBAL VARIABLE
-        msh = LAST_MESH
-        if cmds.objExists(msh):
-            skinnedMesh_history = (
-                cmds.listHistory(msh, levels=0, pruneDagObjects=True) or []
-            )
-            cmds.setAttr(msh + ".displayColors", 0)
-        else:
+        msh = cmds.brSkinBrushContext(cmds.currentCtx(), query=True, meshName=True)
+        if not msh or not cmds.objExists(msh):
             return
+        skinnedMesh_history = (
+            cmds.listHistory(msh, levels=0, pruneDagObjects=True) or []
+        )
+        cmds.setAttr(msh + ".displayColors", 0)
+
         while skinnedMesh_history:
             nd = skinnedMesh_history.pop(0)
             if cmds.nodeType(nd) != "createColorSet":
@@ -112,20 +112,11 @@ def doRemoveColorSets():
             cmds.delete(nd)
 
 
-def getMeshTransfrom():
-    currentContext = cmds.currentCtx()
-    mshShape = cmds.brSkinBrushContext(currentContext, query=True, meshName=True)
-    if mshShape and cmds.objExists(mshShape):
-        (theMesh,) = cmds.listRelatives(mshShape, parent=True, path=True)
-        return theMesh
-    return None
-
-
 def getShapesSelected(returnTransform=False):
     typeSurf = ["mesh", "nurbsSurface"]
     selectionShapes = cmds.ls(selection=True, objectsOnly=True, type=typeSurf)
     if not selectionShapes:
-        selection = cmds.ls(selection=True, transformsr=True) + cmds.ls(hilite=True)
+        selection = cmds.ls(selection=True, transforms=True) + cmds.ls(hilite=True)
         selectedMesh = cmds.listRelatives(selection, type=typeSurf)
         selectionShapes = cmds.ls(selection=True, objectsOnly=True, type=typeSurf)
         if selectedMesh:
@@ -184,8 +175,9 @@ def toolOnSetupStart():
             cmds.optionVar(stringValueAppend=["brushPreviousSelection", obj])
         shapeSelected = getShapesSelected(returnTransform=True)
         if not shapeSelected:  # if nothing selected
-            # TODO: GET RID OF THE GLOBAL VARIABLE
-            mshShape = LAST_MESH
+            mshShape = cmds.brSkinBrushContext(
+                cmds.currentCtx(), query=True, meshName=True
+            )
             if mshShape and cmds.objExists(mshShape):
                 (theMesh,) = cmds.listRelatives(mshShape, parent=True, path=True)
                 cmds.select(theMesh)
@@ -373,8 +365,8 @@ def showBackNurbs(theMesh):
         cmds.showHidden(shps)
 
 
-def cleanTheNurbs(force=False):  # Called directly by cpp
-    if cmds.currentCtx() != "brSkinBrushContext1" or force:
+def cleanTheNurbs():  # Called directly by cpp
+    if cmds.contextInfo(cmds.currentCtx(), c=True) != "brSkinBrushContext":
         nurbsTessellateAttrs = cmds.ls("*.nurbsTessellate")
         if not nurbsTessellateAttrs:
             return
@@ -405,18 +397,16 @@ def closeEventCatcher():
         catchEventsUI.EVENTCATCHER.close()
 
 
-LAST_MESH = None
+def toolOnSetupEnd():
+    with UndoContext("toolOnSetupEnd"):
+        toolOnSetupEndDeferred()
 
 
 def toolOnSetupEndDeferred():
     with GlobalContext(message="toolOnSetupEndDeferred", doPrint=False):
         disconnectNurbs()
         cmds.select(clear=True)
-        currentContext = cmds.currentCtx()
-        mshShape = cmds.brSkinBrushContext(currentContext, query=True, meshName=True)
-        # TODO: GET RID OF THE GLOBAL VARIABLE
-        global LAST_MESH
-        LAST_MESH = mshShape
+        mshShape = cmds.brSkinBrushContext(cmds.currentCtx(), query=True, meshName=True)
         cmds.evalDeferred(doUpdateWireFrameColorSoloMode)
         # compute time
         startTime = cmds.optionVar(query="startTime")
@@ -430,11 +420,6 @@ def toolOnSetupEndDeferred():
         )
 
 
-def toolOnSetupEnd():
-    with UndoContext("toolOnSetupEnd"):
-        toolOnSetupEndDeferred()
-
-
 def toolOffCleanup():
     with UndoContext("toolOffCleanup"):
         toolOffCleanupDeferred()
@@ -445,19 +430,27 @@ def toolOffCleanupDeferred():
         if cmds.objExists("SkinningWireframe"):
             cmds.delete("SkinningWireframe")
         closeEventCatcher()
-        # unhide previous wireFrames :
-        theMesh = getMeshTransfrom()
-        if theMesh:
+        # unhide previous wireFrames
+
+        # This is the cleanup step before the context finishes switching
+        # so the current context must be a skin brush context
+        mshShape = cmds.brSkinBrushContext(
+            PAINT_EDITOR_CONTEXT, query=True, meshName=True
+        )
+        if mshShape and cmds.objExists(mshShape):
+            (theMesh,) = cmds.listRelatives(mshShape, parent=True, path=True)
             try:
                 wireDisplay = cmds.listRelatives(
                     theMesh, shapes=True, path=True, type="wireframeDisplay"
                 )
-                if wireDisplay:
-                    cmds.showHidden(wireDisplay)
             except RuntimeError:
                 # RuntimeError: Unknown object type: wireframeDisplay
                 pass
-        showBackNurbs(theMesh)
+            else:
+                if wireDisplay:
+                    cmds.showHidden(wireDisplay)
+            showBackNurbs(theMesh)
+
         restoreShading()
 
         # delete colors on Q pressed
@@ -486,32 +479,28 @@ def updateWireFrameColorSoloMode(soloColor):
 
 
 def doUpdateWireFrameColorSoloMode():
-    currentContext = cmds.currentCtx()
-    soloColor = cmds.brSkinBrushContext(currentContext, query=True, soloColor=True)
+    soloColor = cmds.brSkinBrushContext(cmds.currentCtx(), query=True, soloColor=True)
     updateWireFrameColorSoloMode(soloColor)
 
 
 def setSoloMode(soloColor):
     with UndoContext("setSoloMode"):
-        ctx = cmds.currentCtx()
-        cmds.brSkinBrushContext(ctx, edit=True, soloColor=soloColor)
+        cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, soloColor=soloColor)
         updateWireFrameColorSoloMode(soloColor)
 
 
 def fixOptionVarContext(**inputKargsToChange):
     with UndoContext("fixOptionVarContext"):
         kwargs = OrderedDict()
-        if not cmds.optionVar(exists="brSkinBrushContext1"):
+        if not cmds.optionVar(exists="brSkinBrushContextOptions"):
             return kwargs
 
-        cmd = cmds.optionVar(query="brSkinBrushContext1")
-        # remove command name and command object at the
-        # end : brSkinBrushContext and brSkinBrushContext1;
-        splitofspaces = cmd.split(" ")
-        cmd2 = " ".join(splitofspaces[1:-1])
-        spl = cmd2.split("-")
-        hlp = cmds.help("brSkinBrushContext")
+        cmd = cmds.optionVar(query="brSkinBrushContextOptions")
+        spl = cmd.split("-")
 
+        # TODO: Why are we even parsing the help file?
+        # This should be explicitly maintained
+        hlp = cmds.help("brSkinBrushContext")
         dicOfName = {}
         dicExpectedArgs = {}
         lsMulti = set()
@@ -569,7 +558,7 @@ def fixOptionVarContext(**inputKargsToChange):
                 except ValueError:
                     cmdNew += '-{} "{}" '.format(key, value)
         cmdNew += splitofspaces[-1]
-        cmds.optionVar(stringValue=["brSkinBrushContext1", cmdNew])
+        cmds.optionVar(stringValue=["brSkinBrushContextOptions", cmdNew])
         return kwargs
 
 
