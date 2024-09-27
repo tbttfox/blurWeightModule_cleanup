@@ -28,6 +28,8 @@ from mWeightEditor.weightTools.utils import (
     deleteTheJobs,
     addNameChangedCallback,
     removeNameChangedCallback,
+    addUserEventCallback,
+    removeUserEventCallback,
     SettingVariable,
     orderMelList,
 )
@@ -163,9 +165,9 @@ INFLUENCE_COLORS = [
     (224, 32, 160),
 ]
 
-lstShortCuts = [
-    ("Remove ", "Shift + LMB"),
-    ("Smooth", "Ctrl + LMB"),
+LST_SHORT_CUTS = [
+    ("Remove ", "Ctrl + LMB"),
+    ("Smooth", "Shift + LMB"),
     ("Sharpen", "Ctrl + Shift + LMB"),
     ("Size", "MMB left right"),
     ("Strength", "MMB up down"),
@@ -243,8 +245,12 @@ class SkinPaintWin(Window):
         ).read()
         self.setStyleSheet(styleSheet)
 
+        self.refreshSJ = None
+        self.connectToEventHandlerSJ = None
+        self._eventHandler = None
+
     def addShortCutsHelp(self):
-        for nm1, nm2 in lstShortCuts:
+        for nm1, nm2 in LST_SHORT_CUTS:
             helpItem = QtWidgets.QTreeWidgetItem()
             helpItem.setText(0, nm2)
             helpItem.setText(1, nm1)
@@ -416,10 +422,54 @@ class SkinPaintWin(Window):
             if oldName in lst:
                 self.refresh(force=False, renamedCalled=True)
 
+    def eventHandlerConnectCallBack(self):
+        """Connect and disconnect from the eventhandler"""
+        from .brushTools.catchEventsUI import EVENTCATCHER, HandleEventsQt
+
+        if cmds.currentCtx() == "brSkinBrushContext1":
+            if EVENTCATCHER is not None and self._eventHandler is None:
+                self._eventHandler = HandleEventsQt(self, EVENTCATCHER)
+        else:
+            if self._eventHandler is not None:
+                self._eventHandler.disconnect()
+                self._eventHandler = None
+
+    def influencesReorderedCB(self):
+        orderOfJoints = cmds.brSkinBrushContext(
+            "brSkinBrushContext1", query=True, weightOrderedIndices=True
+        )
+        self.updateOrderOfInfluences(orderOfJoints)
+
+    def strengthChangedCB(self):
+        newStrength = cmds.brSkinBrushContext(
+            "brSkinBrushContext1", query=True, dragValue=True
+        )
+        self.updateStrengthVal(newStrength)
+
+    def sizeChangedCB(self):
+        newSize = cmds.brSkinBrushContext(
+            "brSkinBrushContext1", query=True, dragValue=True
+        )
+        self.updateSizeVal(newSize)
+
     def addCallBacks(self):
         self.renameCallBack = addNameChangedCallback(self.renameCB)
+
+        self.reorderCallBack = addUserEventCallback(
+            "brSkinBrush_influencesReordered", self.influencesReorderedCB
+        )
+        self.strengthCallBack = addUserEventCallback(
+            "brSkinBrush_updateDisplayStrength", self.strengthChangedCB
+        )
+        self.sizeCallBack = addUserEventCallback(
+            "brSkinBrush_updateDisplaySize", self.sizeChangedCB
+        )
+
         self.refreshSJ = cmds.scriptJob(
             event=["SelectionChanged", self.refreshCallBack]
+        )
+        self.connectToEventHandlerSJ = cmds.scriptJob(
+            event=["PostToolChanged", self.eventHandlerConnectCallBack]
         )
 
         sceneUpdateCallback = OpenMaya.MSceneMessage.addCallback(
@@ -441,9 +491,19 @@ class SkinPaintWin(Window):
         try:
             removeNameChangedCallback(self.renameCallBack)
         except RuntimeError:
-            print("can't remove it ")
+            print("Can't remove the rename callback")
+
+        removeUserEventCallback(self.reorderCallBack)
+        removeUserEventCallback(self.strengthCallBack)
+        removeUserEventCallback(self.sizeCallBack)
+
         deleteTheJobs("SkinPaintWin.refreshCallBack")
         cmds.scriptJob(kill=self.refreshSJ, force=True)
+        self.refreshSJ = None
+
+        cmds.scriptJob(kill=self.connectToEventHandlerSJ, force=True)
+        self.connectToEventHandlerSJ = None
+
         for callBck in self.close_callback:
             OpenMaya.MSceneMessage.removeCallback(callBck)
         print("callBack deleted")
@@ -623,25 +683,18 @@ class SkinPaintWin(Window):
                 fixOptionVarContext(**dic)
 
                 if not cmds.contextInfo(context, exists=True):
-                    importPython = (
-                        "from mPaintEditor.brushTools.brushPythonFunctions import "
-                    )
-                    context = cmds.brSkinBrushContext(
-                        context, importPython=importPython
-                    )
+                    context = cmds.brSkinBrushContext(context)
 
                 # getMirrorInfluenceArray
                 # let's select the shape first
                 cmds.select(self.dataOfSkin.deformedShape, replace=True)
                 cmds.setToolTo(context)
-                # try to fix bug
                 self.getMirrorInfluenceArray()
             else:
                 self.enterPaint_btn.setEnabled(True)
 
     def setFocusToPanel(self):
         QtCore.QTimer.singleShot(10, self.parent().setFocus)
-        print("setFocusToPanel")
         for panel in cmds.getPanel(visiblePanels=True):
             if cmds.getPanel(typeOf=panel) == "modelPanel":
                 cmds.setFocus(panel)
@@ -667,25 +720,22 @@ class SkinPaintWin(Window):
             self.sizeBrushSetter.theProgress.setValue(int(value))
 
     def updateOrderOfInfluences(self, orderOfJoints):
-        allItems = dict(
-            [
-                (
-                    self.uiInfluenceTREE.topLevelItem(ind)._index,
-                    self.uiInfluenceTREE.topLevelItem(ind),
-                )
-                for ind in range(self.uiInfluenceTREE.topLevelItemCount())
-            ]
-        )
+        allItems = {
+            self.uiInfluenceTREE.topLevelItem(
+                ind
+            )._index: self.uiInfluenceTREE.topLevelItem(ind)
+            for ind in range(self.uiInfluenceTREE.topLevelItemCount())
+        }
         for i, influenceIndex in enumerate(orderOfJoints):
             allItems[influenceIndex].setText(4, "{:09d}".format(i))
         if self.orderType_cb.currentIndex() == 3:
             self.uiInfluenceTREE.sortByColumn(4, QtCore.Qt.AscendingOrder)  # 0
 
     def sortByColumn(self, ind):
-        dicColumnCorrespondance = dict([(0, 3), (1, 1), (2, 2), (3, 4)])
+        dicColumnCorrespondance = {0: 3, 1: 1, 2: 2, 3: 4}
         self.uiInfluenceTREE.sortByColumn(
             dicColumnCorrespondance[ind], QtCore.Qt.AscendingOrder
-        )  # 0
+        )
         selItems = self.uiInfluenceTREE.selectedItems()
         if selItems:
             self.uiInfluenceTREE.scrollToItem(selItems[-1])
@@ -766,7 +816,6 @@ class SkinPaintWin(Window):
             item = self.uiInfluenceTREE.topLevelItem(ind)
             if ind < count:
                 ind = item._index
-                item.color
                 values = generate_new_color(
                     colors,
                     pastel_factor=0.2,
@@ -1399,7 +1448,7 @@ class SkinPaintWin(Window):
                         break
                 it.setHidden(not foundText)
         else:
-            for nm, item in six.iteritems(self.uiInfluenceTREE.dicWidgName):
+            for item in six.itervalues(self.uiInfluenceTREE.dicWidgName):
                 item.setHidden(not self.showZeroDeformers and item.isZeroDfm)
 
     def refreshBtn(self):
