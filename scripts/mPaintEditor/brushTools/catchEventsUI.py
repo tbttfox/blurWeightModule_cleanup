@@ -176,13 +176,13 @@ class HandleEventsQt:
         elif self.isRemoveKeyPressed:
             btnToSelect = "rmv"
 
-        if self.isRemoveKeyPressed:
+        if self.isSmoothKeyPressed:
             value = cmds.brSkinBrushContext(
-                cmds.currentCtx(), query=True, smoothStrength=True
+                cmds.currentCtx(), query=True, strength=True
             )
         else:
             value = cmds.brSkinBrushContext(
-                cmds.currentCtx(), query=True, strength=True
+                cmds.currentCtx(), query=True, smoothStrength=True
             )
 
         self.paintEditor.highlightBtn(btnToSelect)
