@@ -82,7 +82,6 @@ class Orbit(object):
         self.active_view = self.getTheM3dView()
         if meshShpList:
             self.meshName = meshShpList[0]
-            # print self.meshName
             self.screenPos, self.screenWidth, self.screenHeight = self.getScreenPos(
                 self.active_view
             )
@@ -110,7 +109,6 @@ class Orbit(object):
             popsChildren = cmds.popupMenu("testMenu", query=True, itemArray=True)
             lbl = cmds.menuItem(popsChildren[0], query=True, label=True)
             return lbl.strip(".")
-            cmds.popupMenu("testMenu", edit=True, deleteAllItems=True)
         else:
             return ""
 
@@ -139,4 +137,3 @@ class Orbit(object):
         if underCursor and cmds.objExists(underCursor):
             hitPoint = self.getValues(underCursor)
             self.orbitCamera(hitPoint)
-            print(underCursor)
