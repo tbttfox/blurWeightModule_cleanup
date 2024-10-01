@@ -135,44 +135,44 @@ def setToDgMode():
         if cmds.evaluationManager(query=True, mode=True) != [goodMode]:
             val = cmds.optionVar(query="evaluationMode")
             cmds.evaluationManager(mode=goodMode)
-            cmds.optionVar(intValue=["revertParallelEvaluationMode", val])
+            cmds.optionVar(intValue=("revertParallelEvaluationMode", val))
             # Set everything in the entire scene dirty
             cmds.dgdirty(allPlugs=True)
         else:
-            cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
+            cmds.optionVar(intValue=("revertParallelEvaluationMode", 0))
 
 
 def retrieveParallelMode():
     with UndoContext("retrieveParallelMode"):
         val = cmds.optionVar(query="revertParallelEvaluationMode")
         if val != 0:
-            cmds.optionVar(intValue=["revertParallelEvaluationMode", 0])
+            cmds.optionVar(intValue=("revertParallelEvaluationMode", 0))
             mode = "parallel" if val == 3 else "serial"
             cmds.evaluationManager(mode=mode)
 
 
 def toolOnSetupStart():  # Called directly from cpp
     with UndoContext("toolOnSetupStart"):
-        cmds.optionVar(intValue=["startTime", time.time()])
+        cmds.optionVar(intValue=("startTime", time.time()))
 
         setToDgMode()
         # disable AutoSave --------------------------
         if cmds.autoSave(query=True, enable=True):
             if not cmds.optionVar(exists="autoSaveEnable"):
-                cmds.optionVar(intValue=["autoSaveEnable", 1])
+                cmds.optionVar(intValue=("autoSaveEnable", 1))
             cmds.autoSave(enable=False)
 
         # found that if not Shannon paint doesn't swap deformers
         cmds.optionVar(clearArray="colorShadedDisplay")
-        cmds.optionVar(intValueAppend=["colorShadedDisplay", 1])
+        cmds.optionVar(intValueAppend=("colorShadedDisplay", 1))
         cmds.optionVar(
-            intValueAppend=["colorShadedDisplay", 1], intValue=["colorizeSkeleton", 1]
+            intValueAppend=("colorShadedDisplay", 1), intValue=("colorizeSkeleton", 1)
         )
 
         sel = cmds.ls(selection=True)
         cmds.optionVar(clearArray="brushPreviousSelection")
         for obj in sel:
-            cmds.optionVar(stringValueAppend=["brushPreviousSelection", obj])
+            cmds.optionVar(stringValueAppend=("brushPreviousSelection", obj))
         shapeSelected = getShapesSelected(returnTransform=True)
         if not shapeSelected:  # if nothing selected
             mshShape = cmds.brSkinBrushContext(
@@ -297,7 +297,9 @@ def getOrigShape(nrbs):
 def addNurbsTessellate(selectedNurbs):
     mshs = []
     for nrbs in selectedNurbs:
-        if cmds.listConnections(nrbs, source=0, destination=1, type="nurbsTessellate"):
+        if cmds.listConnections(
+            nrbs, source=False, destination=True, type="nurbsTessellate"
+        ):
             continue
         (prt,) = cmds.listRelatives(nrbs, parent=True, path=True)
         att = nrbs + ".local"
