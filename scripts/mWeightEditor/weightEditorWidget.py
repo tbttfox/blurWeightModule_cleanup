@@ -1109,13 +1109,6 @@ class SkinWeightWin(Window):
         return chunks
 
     #
-    # Mesh Paintable
-    #
-    def displayInfoPaintAttr(self, displayName):
-        if displayName in self.dicDisplayNames:
-            print(self.dicDisplayNames[displayName])
-
-    #
     # Misc
     #
     def changeTypeOfData(self, ind):
