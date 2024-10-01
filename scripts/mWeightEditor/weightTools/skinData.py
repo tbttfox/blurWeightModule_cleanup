@@ -256,7 +256,7 @@ class DataOfSkin(DataAbstract):
 
     def mirrorArray(self, direction, leftInfluence="*_L_*", rightInfluence="*_R_*"):
         prt = (
-            cmds.listRelatives(self.deformedShape, path=-True, parent=True)[0]
+            cmds.listRelatives(self.deformedShape, path=True, parent=True)[0]
             if not cmds.nodeType(self.deformedShape) == "transform"
             else self.deformedShape
         )
