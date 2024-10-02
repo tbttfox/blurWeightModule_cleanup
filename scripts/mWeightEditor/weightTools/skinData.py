@@ -599,7 +599,10 @@ class DataOfSkin(DataAbstract):
     #
     # get data
     #
-    def exposeSkinData(self, inputSkinCluster, indices=[], getskinWeights=True):
+    def exposeSkinData(self, inputSkinCluster, indices=None, getskinWeights=True):
+        if indices is None:
+            indices = []
+
         self.skinClusterObj = self.getMObject(inputSkinCluster, returnDagPath=False)
         self.sknFn = OpenMayaAnim.MFnSkinCluster(self.skinClusterObj)
 
@@ -904,7 +907,7 @@ class DataOfSkin(DataAbstract):
                 self.verticesWeight = [1.0] * len(self.vertices)
                 self.sortedIndices = list(range(len(self.vertices)))
                 self.opposite_sortedIndices = list(range(len(self.vertices)))
-                self.softOn = 0
+                self.softOn = False
                 self.fullShapeIsUsed = True
                 self.rawSkinValues = self.exposeSkinData(
                     self.theSkinCluster, getskinWeights=getskinWeights
