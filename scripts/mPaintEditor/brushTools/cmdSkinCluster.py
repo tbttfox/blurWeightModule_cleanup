@@ -102,6 +102,8 @@ def skinClusterHasSparceArray(skinClusterName):
     matIndices = (
         cmds.getAttr("{}.matrix".format(skinClusterName), multiIndices=True) or []
     )
+    if not matIndices:
+        return False
     return len(matIndices) != max(matIndices) + 1
 
 
@@ -172,7 +174,7 @@ def reloadSkin(skinClusterName, newGeometrie=None, resetBindAtt=True):
             includeHiddenSelections=False,
         )[0]
     except RuntimeError as errorMessage:
-        if errorMessage.message.endswith(" is already connected to a skinCluster\n"):
+        if str(errorMessage).endswith(" is already connected to a skinCluster\n"):
             (prt,) = cmds.listRelatives(geometries, parent=True, path=True)
             origShapes = set(cmds.listRelatives(prt, path=True, shapes=True)) - set(
                 cmds.listRelatives(prt, path=True, shapes=True, noIntermediate=True)

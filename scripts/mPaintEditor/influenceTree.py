@@ -141,9 +141,10 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
         wireColor = cmds.getAttr(self._influence + ".wireColorRGB")[0]
         if wireColor == (0.0, 0.0, 0.0):
             objColor = cmds.getAttr(self._influence + ".objectColor")
-            wireColor = cmds.displayRGBColor(
-                "userDefined{0}".format(objColor + 1), query=True
-            )
+            if objColor is not None:
+                wireColor = cmds.displayRGBColor(
+                    "userDefined{0}".format(objColor + 1), query=True
+                )
 
         ret = [int(255 * el) for el in wireColor]
         return ret

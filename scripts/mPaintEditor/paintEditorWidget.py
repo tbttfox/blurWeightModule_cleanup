@@ -1298,12 +1298,16 @@ class SkinPaintWin(Window):
                 self.maxColor_sb.setValue(KArgs["maxColor"])
 
             if "toleranceMirror" in KArgs:
-                self.uiTolerance_SB.setValue(KArgs["maxColor"])
+                self.uiTolerance_SB.setValue(KArgs["toleranceMirror"])
 
             for att in self.listCheckBoxesDirectAction:
                 if att in KArgs:
                     val = bool(KArgs[att])
+                    # Both QPushButton and QCheckBox are checkable
                     checkBox = self.findChild(QtWidgets.QPushButton, att + "_cb")
+                    if not checkBox:
+                        checkBox = self.findChild(QtWidgets.QCheckBox, att + "_cb")
+
                     if checkBox:
                         checkBox.setChecked(val)
 

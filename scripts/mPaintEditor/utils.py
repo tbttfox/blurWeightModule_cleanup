@@ -65,9 +65,11 @@ def GlobalContext(
             cmds.refresh(suspend=False)
             cmds.refresh()
         completionTime = time.time() - startTime
-        timeRes = str(datetime.timedelta(seconds=int(completionTime))).split(":")
         if doPrint:
-            result = "{0} hours {1} mins {2} secs".format(*timeRes)
+            totalSecs = int(completionTime)
+            hours, rem = divmod(totalSecs, 3600)
+            minutes, seconds = divmod(rem, 60)
+            result = "{0} hours {1} mins {2} secs".format(hours, minutes, seconds)
             print(
                 "{0} executed in {1}[{2:.2f} secs]".format(
                     message, result, completionTime

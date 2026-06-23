@@ -92,6 +92,18 @@ class Orbit(object):
             arr = OpenMaya.MIntArray()
             self.meshFn.getPolygonVertices(face_idx, arr)
             theVert = arr[0]
+            minDist = float("inf")
+            for i in range(arr.length()):
+                vPt = OpenMaya.MPoint()
+                self.meshFn.getPoint(arr[i], vPt, OpenMaya.MSpace.kWorld)
+                d = (
+                    (hit_pnt.x - vPt.x) ** 2
+                    + (hit_pnt.y - vPt.y) ** 2
+                    + (hit_pnt.z - vPt.z) ** 2
+                )
+                if d < minDist:
+                    minDist = d
+                    theVert = arr[i]
             if returnVertex:
                 return theVert
             return [hit_pnt.x, hit_pnt.y, hit_pnt.z]

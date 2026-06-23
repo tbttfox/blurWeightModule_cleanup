@@ -176,6 +176,7 @@ class HandleEventsQt:
         elif self.isRemoveKeyPressed:
             btnToSelect = "rmv"
 
+        # Get the data from the opposite interaction smooth<->strength
         if self.isSmoothKeyPressed:
             value = cmds.brSkinBrushContext(
                 cmds.currentCtx(), query=True, strength=True
@@ -561,10 +562,10 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
     def closeEvent(self, e):
         """Make sure the eventFilter is removed"""
-        self.close()
+        self.teardown()
         return super(CatchEventsWidget, self).closeEvent(e)
 
-    def close(self):
+    def teardown(self):
         with disableUndoContext():
             self.SetPanelDisplayOff.emit()
 
