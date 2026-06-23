@@ -13,6 +13,7 @@
 #include "enums.h"
 #include "functions.h"
 #include "setOverloads.h"
+#include "skinBrushStructured.h"
 
 #include <math.h>
 #include <maya/M3dView.h>
@@ -481,227 +482,67 @@ class SkinBrushContext : public MPxContext {
     double mirrorMinDist = 0.05;
     bool useColorSetsWhilePainting = false;
 
-    bool drawTriangles = true;
-    bool drawPoints = false;
-    bool drawEdges = true;
-    bool drawTransparency = true;
+    bool verbose = false;
+    double interactiveValue = 1.0;  // for whateverUse in the code
+    double interactiveValue1 = 1.0; // for whateverUse in the code
+    double interactiveValue2 = 1.0; // for whateverUse in the code
 
-    // the tool settings
-    MColor colorVal = MColor(1.0, 0, 0);
-    int curveVal;
-    bool drawBrushVal;
-    bool drawRangeVal;
+    skinBrushTool *cmd;
 
-    MString moduleImportString;
-    MString enterToolCommandVal;
-    MString exitToolCommandVal;
-    bool fractionOversamplingVal;
-    bool ignoreLockVal;
+    int performRefreshViewPort;
+    int maxRefreshValue = 2;
 
-    int lineWidthVal;
-    int messageVal;
-    int oversamplingVal;
-    double rangeVal;
-    double sizeVal;
-    double strengthVal, smoothStrengthVal;
-    bool shiftMiddleDrag = false; // for the mniddleClick drag
-    double storedDistance = 0.0;  // for the mniddleClick drag
-
-    int undersamplingVal;
-    bool volumeVal;
-    bool coverageVal;
-    // if we're asking to pick max influence
-    bool pickMaxInfluenceVal = false, pickInfluenceVal = false;
-    MString orderedIndicesByWeights;
-    MIntArray orderedIndicesByWeightsVals;
-
-    // for me yep ----
-    int influenceIndex = 0, smoothRepeat = 4;
-    ModifierCommands commandIndex = ModifierCommands::Add;
-
-    int soloColorTypeVal = 1, soloColorVal = 0; // 1 lava
-    bool postSetting = true;                    // we apply paint as ssons as attr is changed
+    // Persistent state not covered by other structs
     bool doNormalize = true;
-
-    // brush settings for adjusting
-    bool initAdjust;                // True after the first drag event.
-                                    // Controls the adjust direction for
-                                    // the size and the strength.
-    MFloatPoint surfacePointAdjust; // Initital surface point of the press
-                                    // event.
-    MVector worldVectorAdjust;      // Initial view vector of the press
-                                    // event.
-    bool sizeAdjust;                // True, if the size is set.
-    double adjustValue;             // The new value for the size or
-                                    // strength.
-
+    bool foundBlurSkinAttribute = false;
+    double pruneWeight;
+    int nbJointsBig = 0;
+    MIntArray deformersIndices;
+    MIntArray cpIds; // vertex ids passed to update skin
+    std::vector<std::vector<std::pair<int, float>>> skin_weights_;
+    MIntArray VertexCountPerPolygon, fullVertexList;
+    int fullVertexListLength = 0;
+    MPointArray surfacePoints; // cursor positions on the mesh in world space
+    MPoint worldMirrorPoint;
+    MVector normalMirroredVector; // mirrored normal vector to camera
+    unsigned int influenceCount;
+    unsigned int maxInfluences;
+    bool maintainMaxInfluences;
+    bool normalize;
+    MDagPath origMeshDag;
+    MFnMesh meshOrigFn;
+    unsigned int numElements = 0;
+    bool UIsPeriodic_ = false, VIsPeriodic_ = false;
+    unsigned int UDeg_ = 0, VDeg_ = 0;
+    MIntArray vtxSelection; // currently selected vertices (flooding)
+    MObject attrValue;
+    MDoubleArray valuesForAttribute, paintArrayValues;
+    std::vector<bool> selectedIndices;
+    MObject allVtxCompObj;
+    std::vector<bool> influenceLocks;
+    MDGModifier colorSetMod;
+    bool toggleColorState = false;
+    std::vector<std::vector<int>> perVertexVerticesSet; // per vertex vertices
+    std::vector<std::vector<int>> perFaceVerticesSet;   // per face vertices
+    std::vector<std::vector<int>> normalsIds;           // vector of face normal ids
+    std::vector<MIntArray> perFaceVertices;             // per face vertices (MIntArray form)
+    MSelectionList prevSelection;
+    MSelectionList prevHilite;
     M3dView view;
     unsigned int width;
     unsigned int height;
-    short viewCenterX;
-    short viewCenterY;
 
-    // the cursor position
-    short screenX;
-    short screenY;
-    short startScreenX;
-    short startScreenY;
-
-    MPointArray surfacePoints; // The cursor positions on the mesh in
-                               // world space.
-    // the worldPosition
-    MPoint worldPoint;
-    MPoint worldMirrorPoint;
-    MVector worldVector;          // The view vector from the camera to
-                                  // the surface point.
-    MVector normalVector;         // The normal vector to camera
-    MVector normalMirroredVector; // The mirrored normal vector to camera
-
-    MFloatPoint centerOfBrush;       // store the center of the bursh to display
-    MFloatPoint centerOfMirrorBrush; // store the center of the bursh to display
-
-    MFloatPoint inMatrixHit;       // store the center of the bursh to display
-    MFloatPoint inMatrixHitMirror; // store the center of the bursh to display
-
-    float pressDistance; // The closest distance to the mesh on
-    MStatus pressStatus;
-
-    MFnMesh meshFn, meshOrigFn;
-    MFnNurbsSurface nurbsFn;
-    bool isNurbs = false;
-
-    MFloatMatrix inclusiveMatrix, inclusiveMatrixInverse;
-    MDagPath meshDag, nurbsDag;
-    MDagPath origMeshDag;
-    unsigned int numVertices = 0, numFaces = 0, numEdges = 0;
-
-    unsigned int numElements = 0;
-    unsigned int numCVsInV_ = 0, numCVsInU_ = 0;
-    bool UIsPeriodic_ = false, VIsPeriodic_ = false;
-    unsigned int UDeg_ = 0, VDeg_ = 0;
-
-    MIntArray vtxSelection; // The currently selected vertices. This
-                            // is used for flooding.
-
-    MObject attrValue;
-    MDoubleArray valuesForAttribute, paintArrayValues; // the array of values to paint
-
-    MMeshIntersector intersectorOrigShape;
-    MMeshIntersector intersector;
-
-    std::vector<bool> selectedIndices;
-
-    MObject allVtxCompObj;
-
-    // the skin cluster
-    MObject skinObj;
-    unsigned int influenceCount;
-    MIntArray influenceIndices;
-    MDagPathArray inflDagPaths;
-    std::vector<drawingDeformers> BBoxOfDeformers;
-
-    MStringArray inflNames;
-    MString pickedInfluence;
-    MIntArray inflNamePixelSize;
-    bool maintainMaxInfluences;
-    unsigned int maxInfluences;
-    bool normalize;
-
-    MSelectionList prevSelection;
-    MSelectionList prevHilite;
-
-    // guillaume values ----------
-    MMeshIsectAccelParams accelParams;
-    MMeshIsectAccelParams accelParamsOrigMesh;
-    bool foundBlurSkinAttribute = false;
-
-    // skinCluster values --------------------------
-    double pruneWeight;
-    int nbJoints = 0, nbJointsBig = 0;
-    MIntArray deformersIndices;
-    MIntArray cpIds; // the ids of the vertices passed as to update skin for
-    std::vector<std::vector<std::pair<int, float>>> skin_weights_;
-    MDoubleArray skinWeightList, fullUndoSkinWeightList, skinWeightsForUndo;
-    MIntArray indicesForInfluenceObjects; // on skinCluster for sparse array
-
-    // mirror things -----
-    MIntArray mirrorInfluences; // indices of the mirror influences
-
-    std::vector<bool> influenceLocks;
-    MIntArray lockJoints, ignoreLockJoints, lockVertices;
-
-    // colorSet ------------------------
-    MDGModifier colorSetMod;
-    MDoubleArray soloColorsValues;
-    MColor lockVertColor = MColor((float)0.2, (float)0.2, (float)0.2);
-    MColor lockJntColor = MColor((float)0.2, (float)0.2, (float)0.2);
-    MString fullColorSet = MString("multiColorsSet");
-    MString soloColorSet = MString("soloColorsSet");
-    MString fullColorSet2 = MString("multiColorsSet2");
-    MString soloColorSet2 = MString("soloColorsSet2");
-
-    bool toggleColorState = false; // use to swap from colorSet and colorSet2
-
-    double minSoloColor = 0.0;
-    double maxSoloColor = 1.0;
-
-    MColorArray multiCurrentColors, jointsColors,
-        soloCurrentColors; // lock vertices color are not stored inside these arrays
-
-    MIntArray VertexCountPerPolygon, fullVertexList;
-    std::vector<MIntArray> perVertexFaces;            // per vertex Faces
-    std::vector<MIntArray> perFaceVertices;           // per face vertices
-    std::vector<MIntArray> perVertexEdges;            // per face vertices
-    std::vector<std::pair<int, int>> perEdgeVertices; // to draw the wireframe
-    std::vector<std::vector<MIntArray>> perFaceTriangleVertices;
-
-    std::vector<std::vector<int>> perVertexVerticesSet; // per vertex vertices
-    std::vector<std::vector<int>> perFaceVerticesSet;   // per Face Vertices
-    std::vector<std::vector<int>> normalsIds;           // vector of faces Ids normals
-
-    // Try the Flat Version
-    std::vector<int> perVertexVerticesSetFLAT;
-    std::vector<int> perVertexVerticesSetINDEX;
-
-    std::vector<int> perFaceVerticesSetFLAT;
-    std::vector<int> perFaceVerticesSetINDEX;
-
-    MVectorArray verticesNormals;
-    MIntArray verticesNormalsIndices;
-
-    const float *rawNormals;
-    const float *mayaRawPoints;
-    const float *mayaOrigRawPoints;
-    MFloatPoint origHitPoint;
-
-    MPointArray meshPoints;
-    int fullVertexListLength = 0;
-
-    // HITs vairables ------------------------
-    bool successFullHit = false;
-    bool successFullMirrorHit = false; // need to transfer this info to doDragCommon I believe
-    bool successFullDragHit = false;
-    bool successFullDragMirrorHit = false;
-    bool refreshDone = false;
-
-    MFloatPointArray AllHitPoints, AllHitPointsMirror;
-
-    std::unordered_map<int, float> dicVertsDistSTART, previousPaint;
-    std::unordered_map<int, float> dicVertsMirrorDistSTART, previousMirrorPaint;
-    std::unordered_map<int, float> skinValuesToSet;
-    std::unordered_map<int, float> skinValuesMirrorToSet;
-    std::set<int> verticesPainted; // the vertices that have been painted for a redraw purpose
-
-    std::unordered_map<int, std::pair<float, float>> mirroredJoinedArray;
-    std::vector<float> intensityValuesOrig;   // (length, 0);
-    std::vector<float> intensityValuesMirror; // (length, 0);
-
-    ModifierKeys modifierNoneShiftControl = ModifierKeys::NoModifier; // store the modifier type
-    ModifierKeys smoothModifier = ModifierKeys::Control;              // store the modifier type
-    ModifierKeys removeModifier = ModifierKeys::Shift;                // store the modifier type
-
-    int previousfaceHit;  // the faceIndex that was hit during the press common
-    int biggestInfluence; // for while we search for biggest influence
+    // ── Structured state ────────────────────────────────────────────────────
+    MeshState mesh;                         // Mesh geometry, topology, and raw-pointer caches
+    NurbsData nurbs;                        // NURBS surface data
+    InfluenceData influence;                // Skin cluster influences, colors, locks
+    WeightData weights;                     // Per-vertex weights, colors, skin object
+    UserInputData input;                    // All tool settings from the UI / flags
+    InteractionStartData interStart;        // Press-time intersectors and screen anchors
+    InteractionPersistentData interPersist; // State that persists across drag frames
+    InteractionPerFrameData interFrame;     // Per-frame hit/mouse/modifier data
+    MirrorableData paint;                   // Paint-side hit/weight/intensity data
+    MirrorableData mirror;                  // Mirror-side hit/weight/intensity data
 };
 
 // ---------------------------------------------------------------------

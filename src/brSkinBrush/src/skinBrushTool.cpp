@@ -1,4 +1,4 @@
-#include "skinBrushTool.h"
+﻿#include "skinBrushTool.h"
 
 #include "skinBrushFlags.h"
 
@@ -23,30 +23,30 @@ skinBrushTool::skinBrushTool()
 {
     setCommandString("brSkinBrushCmd");
 
-    colorVal = MColor(1.0, 0.0, 0.0);
-    curveVal = 2;
-    drawBrushVal = true;
-    drawRangeVal = true;
-    moduleImportString = MString("from brSkinBrush_pythonFunctions import ");
-    enterToolCommandVal = "";
-    exitToolCommandVal = "";
-    fractionOversamplingVal = false;
-    ignoreLockVal = false;
-    lineWidthVal = 1;
-    messageVal = 2;
-    oversamplingVal = 1;
+    input.colorVal = MColor(1.0, 0.0, 0.0);
+    input.curveVal = 2;
+    input.drawBrushVal = true;
+    input.drawRangeVal = true;
+    input.moduleImportString = MString("from brSkinBrush_pythonFunctions import ");
+    input.enterToolCommandVal = "";
+    input.exitToolCommandVal = "";
+    input.fractionOversamplingVal = false;
+    input.ignoreLockVal = false;
+    input.lineWidthVal = 1;
+    input.messageVal = 2;
+    input.oversamplingVal = 1;
     rangeVal = 0.5;
-    sizeVal = 5.0;
-    strengthVal = 0.25;
-    smoothStrengthVal = 1.0;
-    undersamplingVal = 2;
-    volumeVal = false;
+    input.sizeVal = 5.0;
+    input.strengthVal = 0.25;
+    input.smoothStrengthVal = 1.0;
+    input.undersamplingVal = 2;
+    input.volumeVal = false;
     coverageVal = true;
 
-    commandIndex = ModifierCommands::Add;
-    soloColorTypeVal = 1; // 1 lava
-    soloColorVal = 0;
-    postSetting = true;
+    input.commandIndex = ModifierCommands::Add;
+    input.soloColorTypeVal = 1; // 1 lava
+    input.soloColorVal = 0;
+    input.postSetting = true;
 }
 
 skinBrushTool::~skinBrushTool() {}
@@ -116,62 +116,63 @@ MStatus skinBrushTool::parseArgs(const MArgList &args)
         double value;
         status = argData.getFlagArgument(kColorRFlag, 0, value);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        colorVal = MColor((float)value, colorVal.g, colorVal.b);
+        input.colorVal = MColor((float)value, input.colorVal.g, input.colorVal.b);
     }
     if (argData.isFlagSet(kColorGFlag)) {
         double value;
         status = argData.getFlagArgument(kColorGFlag, 0, value);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        colorVal = MColor(colorVal.r, (float)value, colorVal.b);
+        input.colorVal = MColor(input.colorVal.r, (float)value, input.colorVal.b);
     }
     if (argData.isFlagSet(kColorBFlag)) {
         double value;
         status = argData.getFlagArgument(kColorBFlag, 0, value);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        colorVal = MColor(colorVal.r, colorVal.g, (float)value);
+        input.colorVal = MColor(input.colorVal.r, input.colorVal.g, (float)value);
     }
     if (argData.isFlagSet(kCurveFlag)) {
-        status = argData.getFlagArgument(kCurveFlag, 0, curveVal);
+        status = argData.getFlagArgument(kCurveFlag, 0, input.curveVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kDrawBrushFlag)) {
-        status = argData.getFlagArgument(kDrawBrushFlag, 0, drawBrushVal);
+        status = argData.getFlagArgument(kDrawBrushFlag, 0, input.drawBrushVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kDrawRangeFlag)) {
-        status = argData.getFlagArgument(kDrawRangeFlag, 0, drawRangeVal);
+        status = argData.getFlagArgument(kDrawRangeFlag, 0, input.drawRangeVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kImportPythonFlag)) {
-        status = argData.getFlagArgument(kImportPythonFlag, 0, moduleImportString);
+        status = argData.getFlagArgument(kImportPythonFlag, 0, input.moduleImportString);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kEnterToolCommandFlag)) {
-        status = argData.getFlagArgument(kEnterToolCommandFlag, 0, enterToolCommandVal);
+        status = argData.getFlagArgument(kEnterToolCommandFlag, 0, input.enterToolCommandVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kExitToolCommandFlag)) {
-        status = argData.getFlagArgument(kExitToolCommandFlag, 0, exitToolCommandVal);
+        status = argData.getFlagArgument(kExitToolCommandFlag, 0, input.exitToolCommandVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kFractionOversamplingFlag)) {
-        status = argData.getFlagArgument(kFractionOversamplingFlag, 0, fractionOversamplingVal);
+        status =
+            argData.getFlagArgument(kFractionOversamplingFlag, 0, input.fractionOversamplingVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kIgnoreLockFlag)) {
-        status = argData.getFlagArgument(kIgnoreLockFlag, 0, ignoreLockVal);
+        status = argData.getFlagArgument(kIgnoreLockFlag, 0, input.ignoreLockVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kLineWidthFlag)) {
-        status = argData.getFlagArgument(kLineWidthFlag, 0, lineWidthVal);
+        status = argData.getFlagArgument(kLineWidthFlag, 0, input.lineWidthVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kMessageFlag)) {
-        status = argData.getFlagArgument(kMessageFlag, 0, messageVal);
+        status = argData.getFlagArgument(kMessageFlag, 0, input.messageVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kOversamplingFlag)) {
-        status = argData.getFlagArgument(kOversamplingFlag, 0, oversamplingVal);
+        status = argData.getFlagArgument(kOversamplingFlag, 0, input.oversamplingVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kRangeFlag)) {
@@ -179,23 +180,23 @@ MStatus skinBrushTool::parseArgs(const MArgList &args)
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kSizeFlag)) {
-        status = argData.getFlagArgument(kSizeFlag, 0, sizeVal);
+        status = argData.getFlagArgument(kSizeFlag, 0, input.sizeVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kStrengthFlag)) {
-        status = argData.getFlagArgument(kStrengthFlag, 0, strengthVal);
+        status = argData.getFlagArgument(kStrengthFlag, 0, input.strengthVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kUndersamplingFlag)) {
-        status = argData.getFlagArgument(kUndersamplingFlag, 0, undersamplingVal);
+        status = argData.getFlagArgument(kUndersamplingFlag, 0, input.undersamplingVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kVolumeFlag)) {
-        status = argData.getFlagArgument(kVolumeFlag, 0, volumeVal);
+        status = argData.getFlagArgument(kVolumeFlag, 0, input.volumeVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kSmoothStrengthFlag)) {
-        status = argData.getFlagArgument(kSmoothStrengthFlag, 0, smoothStrengthVal);
+        status = argData.getFlagArgument(kSmoothStrengthFlag, 0, input.smoothStrengthVal);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
 
@@ -204,46 +205,47 @@ MStatus skinBrushTool::parseArgs(const MArgList &args)
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kInfluenceIndexFlag)) {
-        status = argData.getFlagArgument(kInfluenceIndexFlag, 0, influenceIndex);
+        status = argData.getFlagArgument(kInfluenceIndexFlag, 0, input.influenceIndex);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kPaintMirrorToleranceFlag)) {
-        status = argData.getFlagArgument(kPaintMirrorToleranceFlag, 0, mirrorMinDist);
+        status = argData.getFlagArgument(kPaintMirrorToleranceFlag, 0, input.mirrorMinDist);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kPaintMirrorFlag)) {
-        status = argData.getFlagArgument(kPaintMirrorFlag, 0, paintMirror);
+        status = argData.getFlagArgument(kPaintMirrorFlag, 0, input.paintMirror);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kUseColorSetWhilePaintingFlag)) {
-        status =
-            argData.getFlagArgument(kUseColorSetWhilePaintingFlag, 0, useColorSetsWhilePainting);
+        status = argData.getFlagArgument(
+            kUseColorSetWhilePaintingFlag, 0, input.useColorSetsWhilePainting
+        );
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kMeshDragDrawTrianglesFlag)) {
-        status = argData.getFlagArgument(kMeshDragDrawTrianglesFlag, 0, drawTriangles);
+        status = argData.getFlagArgument(kMeshDragDrawTrianglesFlag, 0, input.drawTriangles);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kMeshDragDrawEdgesFlag)) {
-        status = argData.getFlagArgument(kMeshDragDrawEdgesFlag, 0, drawEdges);
+        status = argData.getFlagArgument(kMeshDragDrawEdgesFlag, 0, input.drawEdges);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kMeshDragDrawPointsFlag)) {
-        status = argData.getFlagArgument(kMeshDragDrawPointsFlag, 0, drawPoints);
+        status = argData.getFlagArgument(kMeshDragDrawPointsFlag, 0, input.drawPoints);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
     if (argData.isFlagSet(kMeshDragDrawTransFlag)) {
-        status = argData.getFlagArgument(kMeshDragDrawTransFlag, 0, drawTransparency);
+        status = argData.getFlagArgument(kMeshDragDrawTransFlag, 0, input.drawTransparency);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
 
     if (argData.isFlagSet(kMinColorFlag)) {
-        status = argData.getFlagArgument(kMinColorFlag, 0, minSoloColor);
+        status = argData.getFlagArgument(kMinColorFlag, 0, input.minSoloColor);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
 
     if (argData.isFlagSet(kMaxColorFlag)) {
-        status = argData.getFlagArgument(kMaxColorFlag, 0, maxSoloColor);
+        status = argData.getFlagArgument(kMaxColorFlag, 0, input.maxSoloColor);
         CHECK_MSTATUS_AND_RETURN_IT(status);
     }
 
@@ -267,8 +269,8 @@ MStatus skinBrushTool::doIt(const MArgList &args)
 MStatus skinBrushTool::redoIt()
 {
     MGlobal::displayInfo(
-        MString("skinBrushTool::redoIt is CALLED !!!! commandIndex : ") +
-        static_cast<int>(this->commandIndex)
+        MString("skinBrushTool::redoIt is CALLED !!!! input.commandIndex : ") +
+        static_cast<int>(this->input.commandIndex)
     );
     return setWeightsForDoit(true);
 }
@@ -293,33 +295,36 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
         MGlobal::displayError(MString("skinBrushTool::undoIt error getting the skin "));
         return status;
     }
-    MFnSkinCluster skinFn(skinObj, &status);
+    MFnSkinCluster skinFn(weights.skinObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    MFnMesh meshFn;
-    bool validMesh = meshDag.isValid();
+    MFnMesh mesh.meshFn;
+    bool validMesh = mesh.meshDag.isValid();
     if (validMesh) {
-        meshFn.setObject(meshDag);
+        mesh.meshFn.setObject(mesh.meshDag);
     }
     MFnNurbsSurface nrbsFn;
-    if (isNurbs) {
-        nrbsFn.setObject(nurbsDag);
+    if (interFrame.isNurbs) {
+        nrbsFn.setObject(nurbs.nurbsDag);
     }
 
-    if (this->commandIndex != ModifierCommands::LockVertices &&
-        this->commandIndex != ModifierCommands::UnlockVertices && theWeightsLength > 0) {
+    if (this->input.commandIndex != ModifierCommands::LockVertices &&
+        this->input.commandIndex != ModifierCommands::UnlockVertices && theWeightsLength > 0) {
         MObject weightsObj;
-        if (!isNurbs) {
+        if (!interFrame.isNurbs) {
             MFnSingleIndexedComponent compFn;
             weightsObj = compFn.create(MFn::kMeshVertComponent);
             compFn.addElements(this->undoVertices);
             if (isUndo) {
                 skinFn.setWeights(
-                    meshDag, weightsObj, influenceIndices, this->undoWeights, true, &redoWeights
+                    mesh.meshDag, weightsObj, influence.influenceIndices, this->undoWeights, true,
+                    &redoWeights
                 );
             }
             else {
-                skinFn.setWeights(meshDag, weightsObj, influenceIndices, this->redoWeights, true);
+                skinFn.setWeights(
+                    mesh.meshDag, weightsObj, influence.influenceIndices, this->redoWeights, true
+                );
             }
         }
         else {
@@ -328,28 +333,31 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
             // MFnSingleIndexedComponent theVertex;
             int uVal, vVal;
             for (int vert : this->undoVertices) {
-                vVal = (int)vert % (int)numCVsInV_;
-                uVal = (int)vert / (int)numCVsInV_;
+                vVal = (int)vert % (int)nurbs.numCVsInV_;
+                uVal = (int)vert / (int)nurbs.numCVsInV_;
                 doubleFn.addElement(uVal, vVal);
             }
             if (isUndo) {
                 skinFn.setWeights(
-                    nurbsDag, weightsObj, influenceIndices, this->undoWeights, true, &redoWeights
+                    nurbs.nurbsDag, weightsObj, influence.influenceIndices, this->undoWeights, true,
+                    &redoWeights
                 );
             }
             else {
-                skinFn.setWeights(nurbsDag, weightsObj, influenceIndices, this->redoWeights, true);
+                skinFn.setWeights(
+                    nurbs.nurbsDag, weightsObj, influence.influenceIndices, this->redoWeights, true
+                );
             }
             if (validMesh) {
-                transferPointNurbsToMesh(meshFn, nrbsFn); // we transfer the points postions
+                transferPointNurbsToMesh(mesh.meshFn, nrbsFn); // we transfer the points postions
             }
             else {
                 MGlobal::displayInfo("mesh not valid need to clean it");
             }
         }
     }
-    if (this->commandIndex == ModifierCommands::LockVertices ||
-        this->commandIndex == ModifierCommands::UnlockVertices) {
+    if (this->input.commandIndex == ModifierCommands::LockVertices ||
+        this->input.commandIndex == ModifierCommands::UnlockVertices) {
         MGlobal::displayInfo("undo it with refresh: lock / unlock vertices");
 
         MObjectArray objectsDeformed;
@@ -373,15 +381,15 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
             lockedVerticesPlug.setValue(tmpIntArray.create(theArrayValues)); // to set the attribute
         // we need a hard refresh of invalidate for the undo / redo ---
     }
-    if ((this->commandIndex == ModifierCommands::LockVertices ||
-         this->commandIndex == ModifierCommands::UnlockVertices) ||
-        (isNurbs && validMesh)) {
-        meshFn.updateSurface();
+    if ((this->input.commandIndex == ModifierCommands::LockVertices ||
+         this->input.commandIndex == ModifierCommands::UnlockVertices) ||
+        (interFrame.isNurbs && validMesh)) {
+        mesh.meshFn.updateSurface();
     }
 
     callBrushRefresh();
-    if (isNurbs) {
-        MGlobal::executePythonCommand(moduleImportString + MString("cleanTheNurbs\n"));
+    if (interFrame.isNurbs) {
+        MGlobal::executePythonCommand(input.moduleImportString + MString("cleanTheNurbs\n"));
         MGlobal::executePythonCommand("cleanTheNurbs()\n");
     }
     return status;
@@ -390,8 +398,8 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
 MStatus skinBrushTool::undoIt()
 {
     MGlobal::displayInfo(
-        MString("skinBrushTool::undoIt is CALLED ! commandIndex : ") +
-        static_cast<int>(this->commandIndex)
+        MString("skinBrushTool::undoIt is CALLED ! input.commandIndex : ") +
+        static_cast<int>(this->input.commandIndex)
     );
     return setWeightsForDoit(true);
 }
@@ -429,112 +437,112 @@ MStatus skinBrushTool::finalize()
     writer.String("vacantCell.svg");
 
     writer.Key(kColorRFlag);
-    writer.Double(colorVal.r);
+    writer.Double(input.colorVal.r);
 
     writer.Key(kColorGFlag);
-    writer.Double(colorVal.g);
+    writer.Double(input.colorVal.g);
 
     writer.Key(kColorBFlag);
-    writer.Double(colorVal.b);
+    writer.Double(input.colorVal.b);
 
     writer.Key(kCommandIndexFlag);
-    writer.Int(static_cast<int>(commandIndex));
+    writer.Int(static_cast<int>(input.commandIndex));
 
     writer.Key(kCoverageFlag);
     writer.Bool(coverageVal);
 
     writer.Key(kCurveFlag);
-    writer.Int(curveVal);
+    writer.Int(input.curveVal);
 
     writer.Key(kDrawBrushFlag);
-    writer.Bool(drawBrushVal);
+    writer.Bool(input.drawBrushVal);
 
     writer.Key(kDrawRangeFlag);
-    writer.Bool(drawRangeVal);
+    writer.Bool(input.drawRangeVal);
 
     writer.Key(kEnterToolCommandFlag);
-    writer.String(enterToolCommandVal.asChar());
+    writer.String(input.enterToolCommandVal.asChar());
 
     writer.Key(kExitToolCommandFlag);
-    writer.String(exitToolCommandVal.asChar());
+    writer.String(input.exitToolCommandVal.asChar());
 
     writer.Key(kFractionOversamplingFlag);
-    writer.Bool(fractionOversamplingVal);
+    writer.Bool(input.fractionOversamplingVal);
 
     writer.Key(kIgnoreLockFlag);
-    writer.Bool(ignoreLockVal);
+    writer.Bool(input.ignoreLockVal);
 
     writer.Key(kImportPythonFlag);
-    writer.String(moduleImportString.asChar());
+    writer.String(input.moduleImportString.asChar());
 
     writer.Key(kInfluenceNameFlag);
     writer.String(influenceName.asChar());
 
     writer.Key(kLineWidthFlag);
-    writer.Int(lineWidthVal);
+    writer.Int(input.lineWidthVal);
 
     writer.Key(kMaxColorFlag);
-    writer.Double(maxSoloColor);
+    writer.Double(input.maxSoloColor);
 
     writer.Key(kMeshDragDrawEdgesFlag);
-    writer.Bool(drawEdges);
+    writer.Bool(input.drawEdges);
 
     writer.Key(kMeshDragDrawPointsFlag);
-    writer.Bool(drawPoints);
+    writer.Bool(input.drawPoints);
 
     writer.Key(kMeshDragDrawTransFlag);
-    writer.Bool(drawTransparency);
+    writer.Bool(input.drawTransparency);
 
     writer.Key(kMeshDragDrawTrianglesFlag);
-    writer.Bool(drawTriangles);
+    writer.Bool(input.drawTriangles);
 
     writer.Key(kMessageFlag);
-    writer.Int(messageVal);
+    writer.Int(input.messageVal);
 
     writer.Key(kMinColorFlag);
-    writer.Double(minSoloColor);
+    writer.Double(input.minSoloColor);
 
     writer.Key(kOversamplingFlag);
-    writer.Int(oversamplingVal);
+    writer.Int(input.oversamplingVal);
 
     writer.Key(kPaintMirrorFlag);
-    writer.Int(paintMirror);
+    writer.Int(input.paintMirror);
 
     writer.Key(kPaintMirrorToleranceFlag);
-    writer.Double(mirrorMinDist);
+    writer.Double(input.mirrorMinDist);
 
     writer.Key(kPostSettingFlag);
-    writer.Bool(postSetting);
+    writer.Bool(input.postSetting);
 
     writer.Key(kRangeFlag);
     writer.Double(rangeVal);
 
     writer.Key(kSizeFlag);
-    writer.Double(sizeVal);
+    writer.Double(input.sizeVal);
 
     writer.Key(kSmoothRepeatFlag);
-    writer.Int(smoothRepeat);
+    writer.Int(input.smoothRepeat);
 
     writer.Key(kSmoothStrengthFlag);
-    writer.Double(smoothStrengthVal);
+    writer.Double(input.smoothStrengthVal);
 
     writer.Key(kSoloColorFlag);
-    writer.Int(soloColorVal);
+    writer.Int(input.soloColorVal);
 
     writer.Key(kSoloColorTypeFlag);
-    writer.Int(soloColorTypeVal);
+    writer.Int(input.soloColorTypeVal);
 
     writer.Key(kStrengthFlag);
-    writer.Double(strengthVal);
+    writer.Double(input.strengthVal);
 
     writer.Key(kUndersamplingFlag);
-    writer.Int(undersamplingVal);
+    writer.Int(input.undersamplingVal);
 
     writer.Key(kUseColorSetWhilePaintingFlag);
-    writer.Bool(useColorSetsWhilePainting);
+    writer.Bool(input.useColorSetsWhilePainting);
 
     writer.Key(kVolumeFlag);
-    writer.Bool(volumeVal);
+    writer.Bool(input.volumeVal);
 
     writer.EndObject();
     MGlobal::setOptionVarValue("brSkinBrushContextOptions", s.GetString());
@@ -551,77 +559,83 @@ MStatus skinBrushTool::finalize()
 // getting values from the command flags
 // ---------------------------------------------------------------------
 
-void skinBrushTool::setColor(MColor &value) { colorVal = value; }
+void skinBrushTool::setColor(MColor &value) { input.colorVal = value; }
 
-void skinBrushTool::setCurve(int value) { curveVal = value; }
+void skinBrushTool::setCurve(int value) { input.curveVal = value; }
 
-void skinBrushTool::setDrawBrush(bool value) { drawBrushVal = value; }
+void skinBrushTool::setDrawBrush(bool value) { input.drawBrushVal = value; }
 
-void skinBrushTool::setMinColor(double value) { minSoloColor = value; }
+void skinBrushTool::setMinColor(double value) { input.minSoloColor = value; }
 
-void skinBrushTool::setMaxColor(double value) { maxSoloColor = value; }
+void skinBrushTool::setMaxColor(double value) { input.maxSoloColor = value; }
 
-void skinBrushTool::setDrawRange(bool value) { drawRangeVal = value; }
+void skinBrushTool::setDrawRange(bool value) { input.drawRangeVal = value; }
 
-void skinBrushTool::setPythonImportPath(MString &value) { moduleImportString = value; }
+void skinBrushTool::setPythonImportPath(MString &value) { input.moduleImportString = value; }
 
-void skinBrushTool::setEnterToolCommand(MString &value) { enterToolCommandVal = value; }
+void skinBrushTool::setEnterToolCommand(MString &value) { input.enterToolCommandVal = value; }
 
-void skinBrushTool::setExitToolCommand(MString &value) { exitToolCommandVal = value; }
+void skinBrushTool::setExitToolCommand(MString &value) { input.exitToolCommandVal = value; }
 
-void skinBrushTool::setFractionOversampling(bool value) { fractionOversamplingVal = value; }
+void skinBrushTool::setFractionOversampling(bool value) { input.fractionOversamplingVal = value; }
 
-void skinBrushTool::setIgnoreLock(bool value) { ignoreLockVal = value; }
+void skinBrushTool::setIgnoreLock(bool value) { input.ignoreLockVal = value; }
 
-void skinBrushTool::setLineWidth(int value) { lineWidthVal = value; }
+void skinBrushTool::setLineWidth(int value) { input.lineWidthVal = value; }
 
-void skinBrushTool::setMessage(int value) { messageVal = value; }
+void skinBrushTool::setMessage(int value) { input.messageVal = value; }
 
-void skinBrushTool::setOversampling(int value) { oversamplingVal = value; }
+void skinBrushTool::setOversampling(int value) { input.oversamplingVal = value; }
 
 void skinBrushTool::setRange(double value) { rangeVal = value; }
 
-void skinBrushTool::setSize(double value) { sizeVal = value; }
+void skinBrushTool::setSize(double value) { input.sizeVal = value; }
 
-void skinBrushTool::setStrength(double value) { strengthVal = value; }
+void skinBrushTool::setStrength(double value) { input.strengthVal = value; }
 
-void skinBrushTool::setSmoothStrength(double value) { smoothStrengthVal = value; }
+void skinBrushTool::setSmoothStrength(double value) { input.smoothStrengthVal = value; }
 
-void skinBrushTool::setUndersampling(int value) { undersamplingVal = value; }
+void skinBrushTool::setUndersampling(int value) { input.undersamplingVal = value; }
 
-void skinBrushTool::setVolume(bool value) { volumeVal = value; }
+void skinBrushTool::setVolume(bool value) { input.volumeVal = value; }
 
-void skinBrushTool::setCommandIndex(ModifierCommands value) { commandIndex = value; }
+void skinBrushTool::setCommandIndex(ModifierCommands value) { input.commandIndex = value; }
 
-void skinBrushTool::setSmoothRepeat(int value) { smoothRepeat = value; }
+void skinBrushTool::setSmoothRepeat(int value) { input.smoothRepeat = value; }
 
-void skinBrushTool::setMirrorTolerance(double value) { mirrorMinDist = value; }
+void skinBrushTool::setMirrorTolerance(double value) { input.mirrorMinDist = value; }
 
-void skinBrushTool::setPaintMirror(int value) { paintMirror = value; }
+void skinBrushTool::setPaintMirror(int value) { input.paintMirror = value; }
 
-void skinBrushTool::setUseColorSetsWhilePainting(bool value) { useColorSetsWhilePainting = value; }
+void skinBrushTool::setUseColorSetsWhilePainting(bool value)
+{
+    input.useColorSetsWhilePainting = value;
+}
 
-void skinBrushTool::setDrawTriangles(bool value) { drawTriangles = value; }
+void skinBrushTool::setDrawTriangles(bool value) { input.drawTriangles = value; }
 
-void skinBrushTool::setDrawEdges(bool value) { drawEdges = value; }
+void skinBrushTool::setDrawEdges(bool value) { input.drawEdges = value; }
 
-void skinBrushTool::setDrawPoints(bool value) { drawPoints = value; }
+void skinBrushTool::setDrawPoints(bool value) { input.drawPoints = value; }
 
-void skinBrushTool::setDrawTransparency(bool value) { drawTransparency = value; }
+void skinBrushTool::setDrawTransparency(bool value) { input.drawTransparency = value; }
 
-void skinBrushTool::setSoloColorType(int value) { soloColorTypeVal = value; }
+void skinBrushTool::setSoloColorType(int value) { input.soloColorTypeVal = value; }
 
-void skinBrushTool::setSoloColor(int value) { soloColorVal = value; }
+void skinBrushTool::setSoloColor(int value) { input.soloColorVal = value; }
 
 void skinBrushTool::setCoverage(bool value) { coverageVal = value; }
 
-void skinBrushTool::setPostSetting(bool value) { postSetting = value; }
+void skinBrushTool::setPostSetting(bool value) { input.postSetting = value; }
 
 // ---------------------------------------------------------------------
 // public methods for setting the undo/redo variables
 // ---------------------------------------------------------------------
 
-void skinBrushTool::setInfluenceIndices(MIntArray &indices) { influenceIndices = indices; }
+void skinBrushTool::setInfluenceIndices(MIntArray &indices)
+{
+    influence.influenceIndices = indices;
+}
 
 void skinBrushTool::setInfluenceName(MString &name) { influenceName = name; }
 
@@ -635,26 +649,26 @@ MStatus skinBrushTool::getSkinClusterObj()
     if (status != MStatus::kSuccess) {
         return status;
     }
-    status = selList.getDependNode(0, skinObj);
+    status = selList.getDependNode(0, weights.skinObj);
 
-    MFnDependencyNode nodeFn(skinObj);
+    MFnDependencyNode nodeFn(weights.skinObj);
     MGlobal::displayInfo(MString("    input skin name: ") + nodeFn.name());
 
-    status = findMesh(skinObj, meshDag);
+    status = findMesh(weights.skinObj, mesh.meshDag);
     return status;
 }
 
-void skinBrushTool::setMesh(MDagPath &dagPath) { meshDag = dagPath; }
+void skinBrushTool::setMesh(MDagPath &dagPath) { mesh.meshDag = dagPath; }
 
-void skinBrushTool::setNurbs(MDagPath &dagPath) { nurbsDag = dagPath; }
+void skinBrushTool::setNurbs(MDagPath &dagPath) { nurbs.nurbsDag = dagPath; }
 
 void skinBrushTool::setNormalize(bool value) { normalize = value; }
 
-void skinBrushTool::setSkinCluster(MObject &skinCluster) { skinObj = skinCluster; }
+void skinBrushTool::setSkinCluster(MObject &skinCluster) { weights.skinObj = skinCluster; }
 
-void skinBrushTool::setIsNurbs(bool value) { isNurbs = value; }
+void skinBrushTool::setIsNurbs(bool value) { interFrame.isNurbs = value; }
 
-void skinBrushTool::setnumCVInV(int value) { numCVsInV_ = value; }
+void skinBrushTool::setnumCVInV(int value) { nurbs.numCVsInV_ = value; }
 
 void skinBrushTool::setSkinClusterName(MString &skinClusterName) { skinName = skinClusterName; }
 

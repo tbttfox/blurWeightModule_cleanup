@@ -1,87 +1,87 @@
-#include "skinBrushTool.h"
+﻿#include "skinBrushTool.h"
 
 // ---------------------------------------------------------------------
 // setting values from the command flags
 // ---------------------------------------------------------------------
 void SkinBrushContext::setColorR(float value)
 {
-    colorVal.r = value;
+    input.colorVal.r = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setColorG(float value)
 {
-    colorVal.g = value;
+    input.colorVal.g = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setColorB(float value)
 {
-    colorVal.b = value;
+    input.colorVal.b = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setCurve(int value)
 {
-    curveVal = value;
+    input.curveVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setDrawBrush(bool value)
 {
-    drawBrushVal = value;
+    input.drawBrushVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setDrawRange(bool value)
 {
-    drawRangeVal = value;
+    input.drawRangeVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setPythonImportPath(MString &value)
 {
-    moduleImportString = value;
+    input.moduleImportString = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setEnterToolCommand(MString &value)
 {
-    enterToolCommandVal = value;
+    input.enterToolCommandVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setExitToolCommand(MString &value)
 {
-    exitToolCommandVal = value;
+    input.exitToolCommandVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setFlood()
 {
-    this->verticesPainted.clear();
-    this->skinValuesToSet.clear();
-    double value = strengthVal;
+    this->interPersist.verticesPainted.clear();
+    this->paint.skinValuesToSet.clear();
+    double value = input.strengthVal;
 
     // 0 Add - 1 Remove - 2 AddPercent - 3 Absolute - 4 Smooth - 5 Sharpen - 6 LockVertices - 7
     // UnLockVertices
-    ModifierCommands theCommandIndex = this->commandIndex;
-    if (this->modifierNoneShiftControl == ModifierKeys::Shift) {
+    ModifierCommands theCommandIndex = this->input.commandIndex;
+    if (this->interFrame.modifierNoneShiftControl == ModifierKeys::Shift) {
         theCommandIndex = ModifierCommands::Smooth; // smooth always
     }
-    if (this->modifierNoneShiftControl == ModifierKeys::ControlShift) {
+    if (this->interFrame.modifierNoneShiftControl == ModifierKeys::ControlShift) {
         theCommandIndex = ModifierCommands::Sharpen; // sharpen always
     }
 
     if (theCommandIndex == ModifierCommands::Smooth ||
-        this->modifierNoneShiftControl == ModifierKeys::Shift ||
-        this->modifierNoneShiftControl == ModifierKeys::ControlShift) {
-        value = smoothStrengthVal;
+        this->interFrame.modifierNoneShiftControl == ModifierKeys::Shift ||
+        this->interFrame.modifierNoneShiftControl == ModifierKeys::ControlShift) {
+        value = input.smoothStrengthVal;
     }
 
-    for (int i = 0; i < this->numVertices; ++i) {
-        this->verticesPainted.insert(i);
-        this->skinValuesToSet.insert(std::make_pair(i, value));
+    for (int i = 0; i < this->mesh.numVertices; ++i) {
+        this->interPersist.verticesPainted.insert(i);
+        this->paint.skinValuesToSet.insert(std::make_pair(i, value));
     }
     doTheAction();
     if (verbose) {
@@ -97,25 +97,25 @@ void SkinBrushContext::setVerbose(bool value) { verbose = value; }
 
 void SkinBrushContext::setFractionOversampling(bool value)
 {
-    fractionOversamplingVal = value;
+    input.fractionOversamplingVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setIgnoreLock(bool value)
 {
-    ignoreLockVal = value;
+    input.ignoreLockVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setLineWidth(int value)
 {
-    lineWidthVal = value;
+    input.lineWidthVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setMessage(int value)
 {
-    messageVal = value;
+    input.messageVal = value;
     MToolsInfo::setDirtyFlag(*this);
 
     setInViewMessage(true);
@@ -123,7 +123,7 @@ void SkinBrushContext::setMessage(int value)
 
 void SkinBrushContext::setOversampling(int value)
 {
-    oversamplingVal = value;
+    input.oversamplingVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
@@ -135,7 +135,7 @@ void SkinBrushContext::setRange(double value)
 
 void SkinBrushContext::setSize(double value)
 {
-    sizeVal = value;
+    input.sizeVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
@@ -143,18 +143,18 @@ void SkinBrushContext::setStrength(double value)
 {
     // 0 Add - 1 Remove - 2 AddPercent - 3 Absolute - 4 Smooth - 5 Sharpen - 6 LockVertices - 7
     // unlockVertices
-    if (commandIndex == ModifierCommands::Smooth) {
-        smoothStrengthVal = value;
+    if (input.commandIndex == ModifierCommands::Smooth) {
+        input.smoothStrengthVal = value;
     }
     else { // others
-        strengthVal = value;
+        input.strengthVal = value;
     }
 
     MToolsInfo::setDirtyFlag(*this);
 }
 void SkinBrushContext::setSmoothStrength(double value)
 {
-    smoothStrengthVal = value;
+    input.smoothStrengthVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
@@ -174,25 +174,25 @@ void SkinBrushContext::setInteractiveValue(double value, int ind)
 
 void SkinBrushContext::setUndersampling(int value)
 {
-    undersamplingVal = value;
+    input.undersamplingVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setVolume(bool value)
 {
-    volumeVal = value;
+    input.volumeVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setMirrorTolerance(double value)
 {
-    mirrorMinDist = value;
+    input.mirrorMinDist = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setPaintMirror(int value)
 {
-    paintMirror = value;
+    input.paintMirror = value;
     if (value != 0) {
         getTheOrigMeshForMirror();
     }
@@ -201,71 +201,71 @@ void SkinBrushContext::setPaintMirror(int value)
 
 void SkinBrushContext::setUseColorSetsWhilePainting(bool value)
 {
-    useColorSetsWhilePainting = value;
+    input.useColorSetsWhilePainting = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setDrawTriangles(bool value)
 {
-    drawTriangles = value;
+    input.drawTriangles = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setDrawEdges(bool value)
 {
-    drawEdges = value;
+    input.drawEdges = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setDrawPoints(bool value)
 {
-    drawPoints = value;
+    input.drawPoints = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setDrawTransparency(bool value)
 {
-    drawTransparency = value;
+    input.drawTransparency = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setMinColor(double value)
 {
-    minSoloColor = value;
-    refreshDeformerColor(this->influenceIndex);
+    input.minSoloColor = value;
+    refreshDeformerColor(this->input.influenceIndex);
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setMaxColor(double value)
 {
-    maxSoloColor = value;
-    refreshDeformerColor(this->influenceIndex);
+    input.maxSoloColor = value;
+    refreshDeformerColor(this->input.influenceIndex);
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setCommandIndex(ModifierCommands value)
 {
-    commandIndex = value;
+    input.commandIndex = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setSmoothRepeat(int value)
 {
-    smoothRepeat = value;
+    input.smoothRepeat = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setSoloColor(int value)
 {
-    soloColorVal = value;
-    MString currentColorSet = meshFn.currentColorSetName(); // set multiColor as current Color
+    input.soloColorVal = value;
+    MString currentColorSet = mesh.meshFn.currentColorSetName(); // set multiColor as current Color
 
-    if (soloColorVal == 1) { // solo
-        meshFn.setCurrentColorSetName(this->soloColorSet);
+    if (input.soloColorVal == 1) { // solo
+        mesh.meshFn.setCurrentColorSetName(this->interFrame.soloColorSet);
         editSoloColorSet(true);
     }
     else {
-        meshFn.setCurrentColorSetName(this->fullColorSet);
+        mesh.meshFn.setCurrentColorSetName(this->interFrame.fullColorSet);
     }
     maya2019RefreshColors();
     MToolsInfo::setDirtyFlag(*this);
@@ -274,7 +274,7 @@ void SkinBrushContext::setSoloColor(int value)
 
 void SkinBrushContext::maya2019RefreshColors(bool toggle)
 {
-    meshFn.updateSurface();
+    mesh.meshFn.updateSurface();
     view = M3dView::active3dView();
     // first swap
     if (toggle) {
@@ -282,20 +282,20 @@ void SkinBrushContext::maya2019RefreshColors(bool toggle)
     }
 
     if (!toggle || toggleColorState) {
-        if (soloColorVal == 1) {
-            meshFn.setCurrentColorSetName(this->soloColorSet2);
+        if (input.soloColorVal == 1) {
+            mesh.meshFn.setCurrentColorSetName(this->interFrame.soloColorSet2);
         }
         else {
-            meshFn.setCurrentColorSetName(this->fullColorSet2);
+            mesh.meshFn.setCurrentColorSetName(this->interFrame.fullColorSet2);
         }
         view.refresh(false, true);
     }
     if (!toggle || !toggleColorState) {
-        if (soloColorVal == 1) {
-            meshFn.setCurrentColorSetName(this->soloColorSet);
+        if (input.soloColorVal == 1) {
+            mesh.meshFn.setCurrentColorSetName(this->interFrame.soloColorSet);
         }
         else {
-            meshFn.setCurrentColorSetName(this->fullColorSet);
+            mesh.meshFn.setCurrentColorSetName(this->interFrame.fullColorSet);
         }
         view.refresh(false, true);
     }
@@ -303,10 +303,10 @@ void SkinBrushContext::maya2019RefreshColors(bool toggle)
 
 void SkinBrushContext::setSoloColorType(int value)
 {
-    if (soloColorTypeVal != value) {
-        soloColorTypeVal = value;
+    if (input.soloColorTypeVal != value) {
+        input.soloColorTypeVal = value;
         // here we do the redraw
-        meshFn.updateSurface();
+        mesh.meshFn.updateSurface();
         editSoloColorSet(false);
         maya2019RefreshColors();
 
@@ -322,68 +322,68 @@ void SkinBrushContext::setCoverage(bool value)
 
 void SkinBrushContext::setPickMaxInfluence(bool value)
 {
-    pickMaxInfluenceVal = value;
+    input.pickMaxInfluenceVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setPickInfluence(bool value)
 {
-    pickInfluenceVal = value;
+    input.pickInfluenceVal = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setPostSetting(bool value)
 {
-    postSetting = value;
+    input.postSetting = value;
     MToolsInfo::setDirtyFlag(*this);
 }
 
 void SkinBrushContext::setShiftSmooths(bool value)
 {
     if (value) {
-        smoothModifier = ModifierKeys::Shift;
-        removeModifier = ModifierKeys::Control;
+        input.smoothModifier = ModifierKeys::Shift;
+        input.removeModifier = ModifierKeys::Control;
     }
     else {
-        smoothModifier = ModifierKeys::Control;
-        removeModifier = ModifierKeys::Shift;
+        input.smoothModifier = ModifierKeys::Control;
+        input.removeModifier = ModifierKeys::Shift;
     }
 }
 
 void SkinBrushContext::setInfluenceIndex(int value, bool selectInUI)
 {
-    if (value == this->influenceIndex) {
+    if (value == this->input.influenceIndex) {
         return;
     }
 
-    if (value < this->inflNames.length()) {
-        this->influenceIndex = value;
-        pickedInfluence = this->inflNames[value];
+    if (value < this->influence.inflNames.length()) {
+        this->input.influenceIndex = value;
+        interPersist.pickedInfluence = this->influence.inflNames[value];
         if (selectInUI) {
             MUserEventMessage::postUserEvent("brSkinBrush_pickedInfluence");
         }
     }
     // here we do the redraw
 
-    if (soloColorVal == 1) { // solo IF NOT IT CRASHES on a first pick before paint
-        MString currentColorSet = meshFn.currentColorSetName(); // get current soloColor
-        if (currentColorSet != this->soloColorSet) {
-            meshFn.setCurrentColorSetName(this->soloColorSet);
+    if (input.soloColorVal == 1) { // solo IF NOT IT CRASHES on a first pick before paint
+        MString currentColorSet = mesh.meshFn.currentColorSetName(); // get current soloColor
+        if (currentColorSet != this->interFrame.soloColorSet) {
+            mesh.meshFn.setCurrentColorSetName(this->interFrame.soloColorSet);
         }
         editSoloColorSet(false);
     }
 
-    meshFn.updateSurface(); // for proper redraw hopefully
+    mesh.meshFn.updateSurface(); // for proper redraw hopefully
     maya2019RefreshColors();
 }
 
 void SkinBrushContext::setInfluenceByName(MString &value)
 {
-    if (this->pickMaxInfluenceVal) {
+    if (this->input.pickMaxInfluenceVal) {
         return;
     }
 
-    int indexInfluence = this->inflNames.indexOf(value);
+    int indexInfluence = this->influence.inflNames.indexOf(value);
     if (indexInfluence == -1) {
         return;
     }
@@ -394,27 +394,27 @@ void SkinBrushContext::setInfluenceByName(MString &value)
 // ---------------------------------------------------------------------
 // getting values from the command flags
 // ---------------------------------------------------------------------
-float SkinBrushContext::getColorR() { return colorVal.r; }
-float SkinBrushContext::getColorG() { return colorVal.g; }
-float SkinBrushContext::getColorB() { return colorVal.b; }
+float SkinBrushContext::getColorR() { return input.colorVal.r; }
+float SkinBrushContext::getColorG() { return input.colorVal.g; }
+float SkinBrushContext::getColorB() { return input.colorVal.b; }
 
-int SkinBrushContext::getCurve() { return curveVal; }
-bool SkinBrushContext::getDrawBrush() { return drawBrushVal; }
-bool SkinBrushContext::getDrawRange() { return drawRangeVal; }
-MString SkinBrushContext::getPythonImportPath() { return moduleImportString; }
-MString SkinBrushContext::getEnterToolCommand() { return enterToolCommandVal; }
-MString SkinBrushContext::getExitToolCommand() { return exitToolCommandVal; }
-bool SkinBrushContext::getFractionOversampling() { return fractionOversamplingVal; }
+int SkinBrushContext::getCurve() { return input.curveVal; }
+bool SkinBrushContext::getDrawBrush() { return input.drawBrushVal; }
+bool SkinBrushContext::getDrawRange() { return input.drawRangeVal; }
+MString SkinBrushContext::getPythonImportPath() { return input.moduleImportString; }
+MString SkinBrushContext::getEnterToolCommand() { return input.enterToolCommandVal; }
+MString SkinBrushContext::getExitToolCommand() { return input.exitToolCommandVal; }
+bool SkinBrushContext::getFractionOversampling() { return input.fractionOversamplingVal; }
 
-bool SkinBrushContext::getIgnoreLock() { return ignoreLockVal; }
+bool SkinBrushContext::getIgnoreLock() { return input.ignoreLockVal; }
 
-int SkinBrushContext::getLineWidth() { return lineWidthVal; }
-int SkinBrushContext::getMessage() { return messageVal; }
-int SkinBrushContext::getOversampling() { return oversamplingVal; }
+int SkinBrushContext::getLineWidth() { return input.lineWidthVal; }
+int SkinBrushContext::getMessage() { return input.messageVal; }
+int SkinBrushContext::getOversampling() { return input.oversamplingVal; }
 double SkinBrushContext::getRange() { return rangeVal; }
-double SkinBrushContext::getSize() { return sizeVal; }
-double SkinBrushContext::getStrength() { return strengthVal; }
-double SkinBrushContext::getSmoothStrength() { return smoothStrengthVal; }
+double SkinBrushContext::getSize() { return input.sizeVal; }
+double SkinBrushContext::getStrength() { return input.strengthVal; }
+double SkinBrushContext::getSmoothStrength() { return input.smoothStrengthVal; }
 
 double SkinBrushContext::getInteractiveValue(int ind)
 {
@@ -428,31 +428,31 @@ double SkinBrushContext::getInteractiveValue(int ind)
     return this->interactiveValue2;
 }
 
-int SkinBrushContext::getUndersampling() { return undersamplingVal; }
-bool SkinBrushContext::getVolume() { return volumeVal; }
-ModifierCommands SkinBrushContext::getCommandIndex() { return commandIndex; }
-int SkinBrushContext::getSmoothRepeat() { return smoothRepeat; }
-int SkinBrushContext::getSoloColor() { return soloColorVal; }
+int SkinBrushContext::getUndersampling() { return input.undersamplingVal; }
+bool SkinBrushContext::getVolume() { return input.volumeVal; }
+ModifierCommands SkinBrushContext::getCommandIndex() { return input.commandIndex; }
+int SkinBrushContext::getSmoothRepeat() { return input.smoothRepeat; }
+int SkinBrushContext::getSoloColor() { return input.soloColorVal; }
 
-double SkinBrushContext::getMirrorTolerance() { return mirrorMinDist; }
-int SkinBrushContext::getPaintMirror() { return paintMirror; }
-bool SkinBrushContext::getUseColorSetsWhilePainting() { return useColorSetsWhilePainting; }
-bool SkinBrushContext::getDrawTriangles() { return drawTriangles; }
-bool SkinBrushContext::getDrawEdges() { return drawEdges; }
-bool SkinBrushContext::getDrawPoints() { return drawPoints; }
-bool SkinBrushContext::getDrawTransparency() { return drawTransparency; }
-int SkinBrushContext::getSoloColorType() { return soloColorTypeVal; }
+double SkinBrushContext::getMirrorTolerance() { return input.mirrorMinDist; }
+int SkinBrushContext::getPaintMirror() { return input.paintMirror; }
+bool SkinBrushContext::getUseColorSetsWhilePainting() { return input.useColorSetsWhilePainting; }
+bool SkinBrushContext::getDrawTriangles() { return input.drawTriangles; }
+bool SkinBrushContext::getDrawEdges() { return input.drawEdges; }
+bool SkinBrushContext::getDrawPoints() { return input.drawPoints; }
+bool SkinBrushContext::getDrawTransparency() { return input.drawTransparency; }
+int SkinBrushContext::getSoloColorType() { return input.soloColorTypeVal; }
 bool SkinBrushContext::getCoverage() { return coverageVal; }
-int SkinBrushContext::getInfluenceIndex() { return influenceIndex; }
+int SkinBrushContext::getInfluenceIndex() { return input.influenceIndex; }
 
-double SkinBrushContext::getMinColor() { return minSoloColor; }
-double SkinBrushContext::getMaxColor() { return maxSoloColor; }
+double SkinBrushContext::getMinColor() { return input.minSoloColor; }
+double SkinBrushContext::getMaxColor() { return input.maxSoloColor; }
 
 MString SkinBrushContext::getInfluenceName()
 {
     MString influenceName("FAILED");
-    if (this->influenceIndex < this->inflNames.length()) {
-        influenceName = this->inflNames[this->influenceIndex];
+    if (this->input.influenceIndex < this->influence.inflNames.length()) {
+        influenceName = this->influence.inflNames[this->input.influenceIndex];
     }
 
     return influenceName;
@@ -460,8 +460,8 @@ MString SkinBrushContext::getInfluenceName()
 
 MString SkinBrushContext::getSkinClusterName()
 {
-    if (!skinObj.isNull()) {
-        MFnDependencyNode skinDep(this->skinObj);
+    if (!weights.skinObj.isNull()) {
+        MFnDependencyNode skinDep(this->weights.skinObj);
         return skinDep.name();
     }
     else {
@@ -469,8 +469,11 @@ MString SkinBrushContext::getSkinClusterName()
     }
 }
 
-MString SkinBrushContext::getMeshName() { return this->meshDag.fullPathName(); }
-bool SkinBrushContext::getPostSetting() { return postSetting; }
-MIntArray SkinBrushContext::getWeightOrderedIndices() { return orderedIndicesByWeightsVals; }
-double SkinBrushContext::getAdjustValue() { return adjustValue; }
-MString SkinBrushContext::getPickedInfluence() { return pickedInfluence; }
+MString SkinBrushContext::getMeshName() { return this->mesh.meshDag.fullPathName(); }
+bool SkinBrushContext::getPostSetting() { return input.postSetting; }
+MIntArray SkinBrushContext::getWeightOrderedIndices()
+{
+    return interPersist.orderedIndicesByWeightsVals;
+}
+double SkinBrushContext::getAdjustValue() { return interPersist.adjustValue; }
+MString SkinBrushContext::getPickedInfluence() { return interPersist.pickedInfluence; }
