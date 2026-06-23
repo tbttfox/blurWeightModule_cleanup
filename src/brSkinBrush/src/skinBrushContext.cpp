@@ -4,50 +4,28 @@
 #include <span>
 
 // Forward declarations for free functions defined in skinBrushImperative.cpp
-MColor getASoloColor(
-    double val, double maxSoloColor, double minSoloColor, int soloColorTypeVal, int influenceIndex,
-    MColorArray &jointsColors
-);
-ModifierCommands getCommandIndexModifiers(
-    ModifierCommands commandIndex, ModifierKeys modifierNoneShiftControl,
-    ModifierKeys smoothModifier, ModifierKeys removeModifier
-);
+MColor getASoloColor(double val, const UserInputData &ui, const InfluenceData &infl);
+ModifierCommands
+getCommandIndexModifiers(const UserInputData &ui, const InteractionPerFrameData &frame);
 void getColorWithMirror(
-    int vertexIndex, int influenceIndex, float valueBase, float valueMirror, int nbJoints,
-    double maxSoloColor, double minSoloColor, int soloColorTypeVal, MColorArray &multiEditColors,
-    MColorArray &multiCurrentColors, MColorArray &soloEditColors, MColorArray &soloCurrentColors,
-    MColorArray &jointsColors, MColor &lockVertColor, MColor &lockJntColor, MColor &multColor,
-    MColor &soloColor, MIntArray &lockVertices, MIntArray &lockJoints, MIntArray &mirrorInfluences,
-    MDoubleArray &skinWeightList, ModifierCommands commandIndex,
-    ModifierKeys modifierNoneShiftControl, ModifierKeys smoothModifier, ModifierKeys removeModifier
+    int vertexIndex, float valueBase, float valueMirror, MColor &multColor, MColor &soloColor,
+    const UserInputData &ui, const InfluenceData &infl, const WeightData &weights,
+    const InteractionPerFrameData &frame
 );
 void mergeMirrorArray(
-    std::unordered_map<int, std::pair<float, float>> &mirroredJoinedArray,
-    std::unordered_map<int, float> &valuesBase, std::unordered_map<int, float> &valuesMirrored
+    WeightData &weights, const MirrorableData &base, const MirrorableData &mirror
 );
 MStatus refreshColors(
-    int influenceIndex, int nbJoints, int soloColorTypeVal, MColor &lockVertColor,
-    MColorArray &soloCurrentColors, MColorArray &multiCurrentColors, double maxSoloColor,
-    double minSoloColor, MColorArray &jointsColors, MColor &soloColor, MColor &lockJntColor,
-    MIntArray &lockJoints, MDoubleArray &soloColorsValues, MDoubleArray &skinWeightList,
-    MIntArray &lockVertices, MIntArray &editVertsIndices, MColorArray &multiEditColors,
-    MColorArray &soloEditColors
+    MIntArray &editVertsIndices, MColorArray &multiEditColors, MColorArray &soloEditColors,
+    const UserInputData &ui, const InfluenceData &infl, WeightData &weights
 );
 MStatus doPerformPaint(
-    std::unordered_map<int, std::pair<float, float>> &mirroredJoinedArray, int soloColorVal,
-    bool useColorSetsWhilePainting, bool postSetting, ModifierCommands commandIndex,
-    int influenceIndex, int nbJoints, double maxSoloColor, double minSoloColor,
-    int soloColorTypeVal, MColorArray &multiCurrentColors, MColorArray &soloCurrentColors,
-    MColorArray &jointsColors, MColor &lockVertColor, MColor &lockJntColor, MIntArray &lockVertices,
-    MIntArray &lockJoints, MIntArray &mirrorInfluences, MDoubleArray &skinWeightList,
-    ModifierKeys modifierNoneShiftControl, ModifierKeys smoothModifier, ModifierKeys removeModifier,
-    M3dView &view, bool &toggleColorState, MFnMesh &meshFn
+    bool postSetting, bool &toggleColorState, const UserInputData &ui, const InfluenceData &infl,
+    WeightData &weights, const InteractionPerFrameData &frame, MeshState &mesh
 );
 MStatus editSoloColorSet(
-    int numVertices, int nbJoints, int influenceIndex, MDoubleArray &skinWeightList,
-    MIntArray &lockVertices, MDoubleArray &soloColorsValues, MColorArray &soloCurrentColors,
-    MColor &lockVertColor, MFnMesh &meshFn, double maxSoloColor, double minSoloColor,
-    int soloColorTypeVal, MColorArray &jointsColors, bool doBlack
+    bool doBlack, const UserInputData &ui, const InfluenceData &infl, WeightData &weights,
+    MeshState &mesh
 );
 
 // ---------------------------------------------------------------------
@@ -649,9 +627,7 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
             float weightBase = pt.second.first;
             float weightMirror = pt.second.second;
             MColor multColor, soloColor;
-            this->getColorWithMirror(
-                ptIndex, weightBase, weightMirror, colors, colorsSolo, multColor, soloColor
-            );
+            this->getColorWithMirror(ptIndex, weightBase, weightMirror, multColor, soloColor);
             colors.set(multColor, i);
             colorsSolo.set(soloColor, i);
         }
@@ -1808,17 +1784,17 @@ void SkinBrushContext::doTheAction()
 
 ModifierCommands SkinBrushContext::getCommandIndexModifiers() const
 {
-    return ::getCommandIndexModifiers(
-        input.commandIndex, interFrame.modifierNoneShiftControl, input.smoothModifier,
-        input.removeModifier
-    );
+    return ::getCommandIndexModifiers(this->input, this->interFrame);
 }
 
 void SkinBrushContext::mergeMirrorArray(
     std::unordered_map<int, float> &valuesBase, std::unordered_map<int, float> &valuesMirrored
 )
 {
-    ::mergeMirrorArray(weights.mirroredJoinedArray, valuesBase, valuesMirrored);
+    MirrorableData tmpBase, tmpMirror;
+    tmpBase.skinValuesToSet = valuesBase;
+    tmpMirror.skinValuesToSet = valuesMirrored;
+    ::mergeMirrorArray(this->weights, tmpBase, tmpMirror);
 }
 
 MStatus SkinBrushContext::applyCommandMirror()
@@ -2076,34 +2052,22 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
 
 MStatus SkinBrushContext::editSoloColorSet(bool doBlack)
 {
-    return ::editSoloColorSet(
-        mesh.numVertices, influence.nbJoints, input.influenceIndex, weights.skinWeightList,
-        weights.lockVertices, weights.soloColorsValues, weights.soloCurrentColors,
-        weights.lockVertColor, mesh.meshFn, input.maxSoloColor, input.minSoloColor,
-        input.soloColorTypeVal, influence.jointsColors, doBlack
-    );
+    return ::editSoloColorSet(doBlack, this->input, this->influence, this->weights, this->mesh);
 }
 
 MStatus SkinBrushContext::refreshColors(
     MIntArray &editVertsIndices, MColorArray &multiEditColors, MColorArray &soloEditColors
 )
 {
-    MColor dummySoloColor;
     return ::refreshColors(
-        input.influenceIndex, influence.nbJoints, input.soloColorTypeVal, weights.lockVertColor,
-        weights.soloCurrentColors, weights.multiCurrentColors, input.maxSoloColor,
-        input.minSoloColor, influence.jointsColors, dummySoloColor, influence.lockJntColor,
-        influence.lockJoints, weights.soloColorsValues, weights.skinWeightList,
-        weights.lockVertices, editVertsIndices, multiEditColors, soloEditColors
+        editVertsIndices, multiEditColors, soloEditColors, this->input, this->influence,
+        this->weights
     );
 }
 
 MColor SkinBrushContext::getASoloColor(double val)
 {
-    return ::getASoloColor(
-        val, input.maxSoloColor, input.minSoloColor, input.soloColorTypeVal, input.influenceIndex,
-        influence.jointsColors
-    );
+    return ::getASoloColor(val, this->input, this->influence);
 }
 
 void copyToFloatMatrix(const MMatrix &src, MFloatMatrix &dst)
@@ -3048,18 +3012,12 @@ void SkinBrushContext::addBrushShapeFallof(std::unordered_map<int, float> &dicVe
 }
 
 void SkinBrushContext::getColorWithMirror(
-    int vertexIndex, float valueBase, float valueMirror, MColorArray &multiEditColors,
-    MColorArray &soloEditColors, MColor &multColor, MColor &soloColor
+    int vertexIndex, float valueBase, float valueMirror, MColor &multColor, MColor &soloColor
 )
 {
     ::getColorWithMirror(
-        vertexIndex, input.influenceIndex, valueBase, valueMirror, influence.nbJoints,
-        input.maxSoloColor, input.minSoloColor, input.soloColorTypeVal, multiEditColors,
-        weights.multiCurrentColors, soloEditColors, weights.soloCurrentColors,
-        influence.jointsColors, weights.lockVertColor, influence.lockJntColor, multColor, soloColor,
-        weights.lockVertices, influence.lockJoints, input.mirrorInfluences, weights.skinWeightList,
-        input.commandIndex, interFrame.modifierNoneShiftControl, input.smoothModifier,
-        input.removeModifier
+        vertexIndex, valueBase, valueMirror, multColor, soloColor, this->input, this->influence,
+        this->weights, this->interFrame
     );
 }
 
@@ -3131,13 +3089,8 @@ void SkinBrushContext::preparePaint(
 MStatus SkinBrushContext::doPerformPaint()
 {
     return ::doPerformPaint(
-        weights.mirroredJoinedArray, input.soloColorVal, input.useColorSetsWhilePainting,
-        input.postSetting, input.commandIndex, input.influenceIndex, influence.nbJoints,
-        input.maxSoloColor, input.minSoloColor, input.soloColorTypeVal, weights.multiCurrentColors,
-        weights.soloCurrentColors, influence.jointsColors, weights.lockVertColor,
-        influence.lockJntColor, weights.lockVertices, influence.lockJoints, input.mirrorInfluences,
-        weights.skinWeightList, interFrame.modifierNoneShiftControl, input.smoothModifier,
-        input.removeModifier, view, toggleColorState, mesh.meshFn
+        this->input.postSetting, this->toggleColorState, this->input, this->influence,
+        this->weights, this->interFrame, this->mesh
     );
 }
 

@@ -275,8 +275,7 @@ class SkinBrushContext : public MPxContext {
     MStatus refreshPointsNormals();
 
     void getColorWithMirror(
-        int vertexIndex, float valueBase, float valueMirror, MColorArray &multiEditColors,
-        MColorArray &soloEditColors, MColor &multColor, MColor &soloColor
+        int vertexIndex, float valueBase, float valueMirror, MColor &multColor, MColor &soloColor
     );
 
     MStatus querySkinClusterValues(

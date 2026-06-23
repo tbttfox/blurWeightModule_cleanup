@@ -34,6 +34,7 @@ doTheAction
 */
 
 #include "enums.h"
+#include "skinBrushStructured.h"
 #include <math.h>
 
 #include <maya/M3dView.h>
@@ -98,29 +99,17 @@ doTheAction
 typedef float coord_t;
 typedef std::array<coord_t, 3> point_t;
 
-struct drawingDeformers {
-    MMatrix mat;
-    MPoint center;
-    MPoint minPt;
-    MPoint maxPt;
-    MVector up, right;
-    double width, height, depth;
-};
-
-MColor getASoloColor(
-    double val, double maxSoloColor, double minSoloColor, int soloColorTypeVal, int influenceIndex,
-    MColorArray &jointsColors
-)
+MColor getASoloColor(double val, const UserInputData &ui, const InfluenceData &infl)
 {
     if (val == 0) {
         return MColor(0, 0, 0);
     }
-    val = (maxSoloColor - minSoloColor) * val + minSoloColor;
+    val = (ui.maxSoloColor - ui.minSoloColor) * val + ui.minSoloColor;
     MColor soloColor;
-    if (soloColorTypeVal == 0) { // black and white
+    if (ui.soloColorTypeVal == 0) { // black and white
         soloColor = MColor(val, val, val);
     }
-    else if (soloColorTypeVal == 1) { // lava
+    else if (ui.soloColorTypeVal == 1) { // lava
         val *= 2;
         if (val > 1) {
             soloColor = MColor(val, (val - 1), 0);
@@ -130,35 +119,32 @@ MColor getASoloColor(
         }
     }
     else { // influence
-        soloColor = val * jointsColors[influenceIndex];
+        soloColor = val * infl.jointsColors[ui.influenceIndex];
     }
     return soloColor;
 }
 
-ModifierCommands getCommandIndexModifiers(
-    ModifierCommands commandIndex, ModifierKeys modifierNoneShiftControl,
-    ModifierKeys smoothModifier, // Constant
-    ModifierKeys removeModifier  // Constant
-)
+ModifierCommands
+getCommandIndexModifiers(const UserInputData &ui, const InteractionPerFrameData &frame)
 {
     // 0 Add - 1 Remove - 2 AddPercent - 3 Absolute - 4 Smooth - 5 Sharpen - 6 LockVertices - 7
     // unlockVertices
-    ModifierCommands theCommandIndex = commandIndex;
+    ModifierCommands theCommandIndex = ui.commandIndex;
 
-    if (commandIndex == ModifierCommands::Add) {
-        if (modifierNoneShiftControl == smoothModifier) {
+    if (ui.commandIndex == ModifierCommands::Add) {
+        if (frame.modifierNoneShiftControl == ui.smoothModifier) {
             theCommandIndex = ModifierCommands::Smooth;
         }
-        else if (modifierNoneShiftControl == removeModifier) {
+        else if (frame.modifierNoneShiftControl == ui.removeModifier) {
             theCommandIndex = ModifierCommands::Remove;
         }
     }
-    else if (commandIndex == ModifierCommands::LockVertices) {
-        if (modifierNoneShiftControl == ModifierKeys::Shift) {
+    else if (ui.commandIndex == ModifierCommands::LockVertices) {
+        if (frame.modifierNoneShiftControl == ModifierKeys::Shift) {
             theCommandIndex = ModifierCommands::UnlockVertices;
         }
     }
-    if (modifierNoneShiftControl == ModifierKeys::ControlShift) {
+    if (frame.modifierNoneShiftControl == ModifierKeys::ControlShift) {
         theCommandIndex = ModifierCommands::Sharpen;
     }
 
@@ -166,28 +152,14 @@ ModifierCommands getCommandIndexModifiers(
 }
 
 void getColorWithMirror(
-    int vertexIndex, int influenceIndex, float valueBase, float valueMirror, int nbJoints,
-
-    double maxSoloColor, double minSoloColor, int soloColorTypeVal,
-
-    MColorArray &multiEditColors, MColorArray &multiCurrentColors, MColorArray &soloEditColors,
-    MColorArray &soloCurrentColors, MColorArray &jointsColors, MColor &lockVertColor,
-    MColor &lockJntColor, MColor &multColor, MColor &soloColor,
-
-    MIntArray &lockVertices, MIntArray &lockJoints, MIntArray &mirrorInfluences,
-    MDoubleArray &skinWeightList,
-
-    ModifierCommands commandIndex, ModifierKeys modifierNoneShiftControl,
-    ModifierKeys smoothModifier, // Constant
-    ModifierKeys removeModifier  // Constant
-
+    int vertexIndex, float valueBase, float valueMirror, MColor &multColor, MColor &soloColor,
+    const UserInputData &ui, const InfluenceData &infl, const WeightData &weights,
+    const InteractionPerFrameData &frame
 )
 {
     MColor white(1, 1, 1, 1);
     MColor black(0, 0, 0, 1);
-    ModifierCommands theCommandIndex = getCommandIndexModifiers(
-        commandIndex, modifierNoneShiftControl, smoothModifier, removeModifier
-    );
+    ModifierCommands theCommandIndex = getCommandIndexModifiers(ui, frame);
 
     float sumValue = valueBase + valueMirror;
     sumValue = std::min(float(1.0), sumValue);
@@ -196,45 +168,45 @@ void getColorWithMirror(
     if ((theCommandIndex == ModifierCommands::LockVertices) ||
         (theCommandIndex == ModifierCommands::UnlockVertices)) {
         if (theCommandIndex == ModifierCommands::LockVertices) { // lock verts if not already locked
-            soloColor = lockVertColor;
-            multColor = lockVertColor;
+            soloColor = weights.lockVertColor;
+            multColor = weights.lockVertColor;
         }
         else { // unlock verts
-            multColor = multiCurrentColors[vertexIndex];
-            soloColor = soloCurrentColors[vertexIndex];
+            multColor = weights.multiCurrentColors[vertexIndex];
+            soloColor = weights.soloCurrentColors[vertexIndex];
         }
     }
-    else if (!lockVertices[vertexIndex]) {
-        MColor currentColor = multiCurrentColors[vertexIndex];
-        int influenceMirrorColorIndex = mirrorInfluences[influenceIndex];
-        MColor jntColor = jointsColors[influenceIndex];
-        MColor jntMirrorColor = jointsColors[influenceMirrorColorIndex];
-        if (lockJoints[influenceIndex] == 1) {
-            jntColor = lockJntColor;
+    else if (!weights.lockVertices[vertexIndex]) {
+        MColor currentColor = weights.multiCurrentColors[vertexIndex];
+        int influenceMirrorColorIndex = ui.mirrorInfluences[ui.influenceIndex];
+        MColor jntColor = infl.jointsColors[ui.influenceIndex];
+        MColor jntMirrorColor = infl.jointsColors[influenceMirrorColorIndex];
+        if (infl.lockJoints[ui.influenceIndex] == 1) {
+            jntColor = infl.lockJntColor;
         }
-        if (lockJoints[influenceMirrorColorIndex] == 1) {
-            jntMirrorColor = lockJntColor;
+        if (infl.lockJoints[influenceMirrorColorIndex] == 1) {
+            jntMirrorColor = infl.lockJntColor;
         }
         // 0 Add - 1 Remove - 2 AddPercent - 3 Absolute - 4 Smooth - 5 Sharpen - 6 LockVertices - 7
         // UnLockVertices
 
         if (theCommandIndex == ModifierCommands::Smooth ||
             theCommandIndex == ModifierCommands::Sharpen) {
-            soloColor =
-                biggestValue * white + (1.0 - biggestValue) * soloCurrentColors[vertexIndex];
-            multColor =
-                biggestValue * white + (1.0 - biggestValue) * multiCurrentColors[vertexIndex];
+            soloColor = biggestValue * white +
+                        (1.0 - biggestValue) * weights.soloCurrentColors[vertexIndex];
+            multColor = biggestValue * white +
+                        (1.0 - biggestValue) * weights.multiCurrentColors[vertexIndex];
         }
         else {
             double newW = 0.0;
-            int ind_swl = vertexIndex * nbJoints + influenceIndex;
-            if (ind_swl < skinWeightList.length()) {
-                newW = skinWeightList[ind_swl];
+            int ind_swl = vertexIndex * infl.nbJoints + ui.influenceIndex;
+            if (ind_swl < weights.skinWeightList.length()) {
+                newW = weights.skinWeightList[ind_swl];
             }
             double newWMirror = 0.0;
-            int ind_swlM = vertexIndex * nbJoints + influenceMirrorColorIndex;
-            if (ind_swlM < skinWeightList.length()) {
-                newWMirror = skinWeightList[ind_swlM];
+            int ind_swlM = vertexIndex * infl.nbJoints + influenceMirrorColorIndex;
+            if (ind_swlM < weights.skinWeightList.length()) {
+                newWMirror = weights.skinWeightList[ind_swlM];
             }
             double sumNewWs = newW + newWMirror;
 
@@ -269,58 +241,21 @@ void getColorWithMirror(
                 multColor = currentColor * currentColorVal + jntColor * newW +
                             jntMirrorColor * newWMirror; // white
             }
-            soloColor = getASoloColor(
-                newW, maxSoloColor, minSoloColor, soloColorTypeVal, influenceIndex, jointsColors
-            );
+            soloColor = getASoloColor(newW, ui, infl);
         }
     }
 }
 
 MStatus drawMeshWhileDrag(
-    // Pretty sure These are the only two things that change each frame
-    std::set<int> &verticesPainted, // The full set of vertices that are currently being painted
-    std::unordered_map<int, std::pair<float, float>>
-        &mirroredJoinedArray, // An array of weights and mirror weights: <VertexIndex (weightBase,
-                              // weightMirrored)>
-
-    int numFaces,       // The number of faces on the current mesh
-    int numEdges,       // The number of edges on the current mesh
-    int numVertices,    // The number of vertices in the current mesh
-    int influenceIndex, // The index of the influence currently being painted
-    int paintMirror,    // The mirror behavior index
-    int soloColorVal,   // The solo color index
-
-    bool drawTransparency, // Whether to draw transparency
-    bool drawPoints,       // Whether to draw points
-    bool drawTriangles,    // Whether to draw Triangles
-    bool drawEdges,        // Whether to draw Edges
-
-    MColor &lockVertColor,           // The color to draw verts if they're locked
-    MColorArray &jointsColors,       // An array of joint colors
-    MColorArray &soloCurrentColors,  // Per-vertex array of solo colors
-    MColorArray &multiCurrentColors, // Per-vertex array of multi-colors
-
-    float *mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-
-    ModifierCommands theCommandIndex, // The current command index
-
-    MIntArray &mirrorInfluences,   // A mapping between the current influence, and the mirrored one
-    MFloatMatrix &inclusiveMatrix, // The worldspace matrix of the current mesh
-    MVectorArray &verticesNormals, // The per-vertex local space normals of the mesh
-
-    std::vector<MIntArray> &perVertexFaces, // The face indices for each vertex
-    std::vector<MIntArray> &perVertexEdges, // The edge indices for each vertex
-    std::vector<std::vector<MIntArray>>
-        &perFaceTriangleVertices,                      // Somehow get the triangle indices per face
-    std::vector<std::pair<int, int>> &perEdgeVertices, // The endpoint vertex indices of each edge
-
-    MHWRender::MUIDrawManager &drawManager // Maya's DrawManager
+    ModifierCommands theCommandIndex, const MeshState &mesh, const WeightData &weights,
+    const InfluenceData &infl, const UserInputData &ui, const InteractionPersistentData &persist,
+    MHWRender::MUIDrawManager &drawManager
 )
 {
     // This function is the hottest path when painting
     // So it can and should be optimized more
     // I think the endgame for this is to only update the changed vertices each runthrough
-    int nbVtx = verticesPainted.size();
+    int nbVtx = persist.verticesPainted.size();
 
     MFloatPointArray points(nbVtx);
     MFloatVectorArray normals(nbVtx);
@@ -338,9 +273,9 @@ MStatus drawMeshWhileDrag(
     std::vector<bool> fatEdges_bitset;
     std::vector<bool> vertMap_bitset;
 
-    fatFaces_bitset.resize(numFaces);
-    fatEdges_bitset.resize(numEdges);
-    vertMap_bitset.resize(numVertices);
+    fatFaces_bitset.resize(mesh.numFaces);
+    fatEdges_bitset.resize(mesh.numEdges);
+    vertMap_bitset.resize(mesh.numVertices);
 
     MColor baseColor, baseMirrorColor;
     float h, s, v;
@@ -348,10 +283,10 @@ MStatus drawMeshWhileDrag(
     // 0 Add - 1 Remove - 2 AddPercent - 3 Absolute - 4 Smooth - 5 Sharpen - 6 LockVertices - 7
     // UnLockVertices
 
-    if (drawTransparency || drawPoints) {
+    if (ui.drawTransparency || ui.drawPoints) {
         switch (theCommandIndex) {
         case ModifierCommands::LockVertices:
-            baseColor = lockVertColor;
+            baseColor = weights.lockVertColor;
             break;
         case ModifierCommands::Remove:
             baseColor = black;
@@ -366,9 +301,9 @@ MStatus drawMeshWhileDrag(
             baseColor = white;
             break;
         default:
-            baseColor = jointsColors[influenceIndex];
-            if (paintMirror != 0) {
-                baseMirrorColor = jointsColors[mirrorInfluences[influenceIndex]];
+            baseColor = infl.jointsColors[ui.influenceIndex];
+            if (ui.paintMirror != 0) {
+                baseMirrorColor = infl.jointsColors[ui.mirrorInfluences[ui.influenceIndex]];
                 baseMirrorColor.get(MColor::kHSV, h, s, v);
                 baseMirrorColor.set(MColor::kHSV, h, pow(s, 0.8), pow(v, 0.15));
             }
@@ -385,8 +320,8 @@ MStatus drawMeshWhileDrag(
     // pull data out of the dictionary
     // TODO: There's probably a copy-less way to do this
     std::vector<std::pair<int, std::pair<float, float>>> mja;
-    mja.reserve(mirroredJoinedArray.size());
-    for (const auto &pt : mirroredJoinedArray) {
+    mja.reserve(weights.mirroredJoinedArray.size());
+    for (const auto &pt : weights.mirroredJoinedArray) {
         mja.push_back(pt);
     }
 
@@ -396,16 +331,16 @@ MStatus drawMeshWhileDrag(
 
     MColorArray *usedColors;
     MColorArray *currentColors;
-    if (soloColorVal == 1) {
+    if (ui.soloColorVal == 1) {
         usedColors = &colorsSolo;
-        currentColors = &soloCurrentColors;
+        currentColors = const_cast<MColorArray *>(&weights.soloCurrentColors);
     }
     else {
         usedColors = &colors;
-        currentColors = &multiCurrentColors;
+        currentColors = const_cast<MColorArray *>(&weights.multiCurrentColors);
     }
 
-    bool doTransparency = drawTransparency;
+    bool doTransparency = ui.drawTransparency;
     bool applyGamma = true;
     if (theCommandIndex == ModifierCommands::LockVertices ||
         theCommandIndex == ModifierCommands::UnlockVertices) {
@@ -419,15 +354,15 @@ MStatus drawMeshWhileDrag(
         const auto &pt = mja[i];
         int ptIndex = pt.first;
         MFloatPoint posPoint(
-            mayaRawPoints[ptIndex * 3], mayaRawPoints[ptIndex * 3 + 1],
-            mayaRawPoints[ptIndex * 3 + 2]
+            mesh.mayaRawPoints[ptIndex * 3], mesh.mayaRawPoints[ptIndex * 3 + 1],
+            mesh.mayaRawPoints[ptIndex * 3 + 2]
         );
-        posPoint = posPoint * inclusiveMatrix;
+        posPoint = posPoint * mesh.inclusiveMatrix;
         points.set(posPoint, i);
-        normals.set(verticesNormals[ptIndex], i);
+        normals.set(mesh.verticesNormals[ptIndex], i);
     }
 
-    if (drawTriangles) {
+    if (ui.drawTriangles) {
 #pragma omp parallel for
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
@@ -456,7 +391,7 @@ MStatus drawMeshWhileDrag(
         }
     }
 
-    if (drawPoints) {
+    if (ui.drawPoints) {
 #pragma omp parallel for
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
@@ -465,7 +400,7 @@ MStatus drawMeshWhileDrag(
         }
     }
 
-    if (drawEdges) {
+    if (ui.drawEdges) {
         darkEdges.setLength(mja.size());
 #pragma omp parallel for
         for (unsigned i = 0; i < mja.size(); ++i) {
@@ -475,7 +410,7 @@ MStatus drawMeshWhileDrag(
         }
     }
 
-    if (drawTriangles || drawEdges) {
+    if (ui.drawTriangles || ui.drawEdges) {
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             verticesMap[pt.first] = i;
@@ -483,27 +418,27 @@ MStatus drawMeshWhileDrag(
         }
     }
 
-    if (drawTriangles) {
+    if (ui.drawTriangles) {
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int f : perVertexFaces[ptIndex]) {
+            for (int f : mesh.perVertexFaces[ptIndex]) {
                 fatFaces_bitset[f] = true;
             }
         }
     }
 
-    if (drawEdges) {
+    if (ui.drawEdges) {
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int e : perVertexEdges[ptIndex]) {
+            for (int e : mesh.perVertexEdges[ptIndex]) {
                 fatEdges_bitset[e] = true;
             }
         }
     }
 
-    if (drawTriangles) {
+    if (ui.drawTriangles) {
         // bitset is faster than an unordered_set in this case
         // may be worth keeping the bitsets around on the brush
         // so we don't have to constantly allocate memory
@@ -511,7 +446,7 @@ MStatus drawMeshWhileDrag(
             if (!fatFaces_bitset[f]) {
                 continue;
             }
-            for (auto &tri : perFaceTriangleVertices[f]) {
+            for (auto &tri : mesh.perFaceTriangleVertices[f]) {
                 if (!vertMap_bitset[tri[0]]) {
                     continue;
                 }
@@ -537,7 +472,7 @@ MStatus drawMeshWhileDrag(
         );
     }
 
-    if (drawEdges) {
+    if (ui.drawEdges) {
         // bitset is faster than an unordered_set in this case
         // may be worth keeping the bitsets around on the brush
         // so we don't have to constantly allocate memory
@@ -545,7 +480,7 @@ MStatus drawMeshWhileDrag(
             if (!fatEdges_bitset[e]) {
                 continue;
             }
-            auto &pairEdges = perEdgeVertices[e];
+            auto &pairEdges = mesh.perEdgeVertices[e];
 
             if (!vertMap_bitset[pairEdges.first]) {
                 continue;
@@ -565,20 +500,19 @@ MStatus drawMeshWhileDrag(
         );
     }
 
-    if (drawPoints) {
+    if (ui.drawPoints) {
         drawManager.setPointSize(4);
         drawManager.mesh(MHWRender::MUIDrawManager::kPoints, points, NULL, &pointsColors);
     }
     return MStatus::kSuccess;
 }
 
-std::vector<int> getSurroundingVerticesPerVert(
-    int vertexIndex, const std::vector<int> &perVertexVerticesSetFLAT,
-    const std::vector<int> &perVertexVerticesSetINDEX
-)
+std::vector<int> getSurroundingVerticesPerVert(int vertexIndex, const MeshState &mesh)
 {
-    auto first = perVertexVerticesSetFLAT.begin() + perVertexVerticesSetINDEX[vertexIndex];
-    auto last = perVertexVerticesSetFLAT.begin() + perVertexVerticesSetINDEX[vertexIndex + (int)1];
+    auto first =
+        mesh.perVertexVerticesSetFLAT.begin() + mesh.perVertexVerticesSetINDEX[vertexIndex];
+    auto last = mesh.perVertexVerticesSetFLAT.begin() +
+                mesh.perVertexVerticesSetINDEX[vertexIndex + (int)1];
     std::vector<int> newVec(first, last);
     return newVec;
 };
@@ -592,12 +526,9 @@ coord_t distance_sq(const point_t &a, const point_t &b)
 }
 
 void growArrayOfHitsFromCenters(
-    bool coverageVal, double sizeVal, const std::vector<int> &perVertexVerticesSetFLAT,
-    const std::vector<int> &perVertexVerticesSetINDEX, const float *mayaRawPoints,
-    const MVectorArray &verticesNormals, const MVector &worldVector,
-    const MFloatPointArray &AllHitPoints,
-
-    std::unordered_map<int, float> &dicVertsDist // Return value
+    bool coverageVal, const UserInputData &ui, const MeshState &mesh,
+    const InteractionPerFrameData &frame, const MFloatPointArray &AllHitPoints,
+    std::unordered_map<int, float> &dicVertsDist
 )
 {
     if (AllHitPoints.length() == 0) {
@@ -631,9 +562,7 @@ void growArrayOfHitsFromCenters(
         // std::vector<int> setOfVertsGrow;
         std::unordered_set<int> setOfVertsGrow;
         for (const int &vertexIndex : borderOfGrowth) {
-            std::vector<int> ttt = getSurroundingVerticesPerVert(
-                vertexIndex, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX
-            );
+            std::vector<int> ttt = getSurroundingVerticesPerVert(vertexIndex, mesh);
             setOfVertsGrow.insert(ttt.begin(), ttt.end());
         }
 
@@ -650,8 +579,8 @@ void growArrayOfHitsFromCenters(
         for (int vertexBorder : verticesontheborder) {
             // First check the normal
             if (!coverageVal) {
-                MVector vertexBorderNormal = verticesNormals[vertexBorder];
-                double multVal = worldVector * vertexBorderNormal;
+                MVector vertexBorderNormal = mesh.verticesNormals[vertexBorder];
+                double multVal = frame.worldVector * vertexBorderNormal;
                 if (multVal > 0.0) {
                     continue;
                 }
@@ -659,9 +588,9 @@ void growArrayOfHitsFromCenters(
             float closestDist = -1;
             // find the closestDistance and closest Vertex from visited vertices
             point_t thisPoint;
-            thisPoint[0] = mayaRawPoints[vertexBorder * 3];
-            thisPoint[1] = mayaRawPoints[vertexBorder * 3 + 1];
-            thisPoint[2] = mayaRawPoints[vertexBorder * 3 + 2];
+            thisPoint[0] = mesh.mayaRawPoints[vertexBorder * 3];
+            thisPoint[1] = mesh.mayaRawPoints[vertexBorder * 3 + 1];
+            thisPoint[2] = mesh.mayaRawPoints[vertexBorder * 3 + 2];
 
             auto glambda = [&thisPoint](const point_t &a, const point_t &b) {
                 float aRes = distance_sq(a, thisPoint);
@@ -672,7 +601,7 @@ void growArrayOfHitsFromCenters(
             auto closestPoint = points.front();
             closestDist = std::sqrt(distance_sq(closestPoint, thisPoint));
             // get the new distance between the closest visited vertex and the grow vertex
-            if (closestDist <= sizeVal) { // if in radius of the brush
+            if (closestDist <= ui.sizeVal) { // if in radius of the brush
                 // we found a vertex in the radius
                 // now add to the visited and add the distance to the dictionnary
                 keepGoing = true;
@@ -935,22 +864,21 @@ double getFalloffValue(int curveVal, double value, double strength)
 }
 
 void getVerticesInVolumeRange(
-    int index, int curveVal, double sizeVal, double rangeVal, double strengthVal,
-    double fractionOversamplingVal, double oversamplingVal, const MDagPath meshDag,
+    int index, double rangeVal, const UserInputData &ui, const MeshState &mesh,
     const MIntArray &volumeIndices, MIntArray &rangeIndices, MFloatArray &values
 )
 {
     unsigned int i;
 
-    double radius = sizeVal * rangeVal;
+    double radius = ui.sizeVal * rangeVal;
     radius *= radius;
 
-    double smoothStrength = strengthVal;
-    if (fractionOversamplingVal) {
-        smoothStrength /= oversamplingVal;
+    double smoothStrength = ui.strengthVal;
+    if (ui.fractionOversamplingVal) {
+        smoothStrength /= ui.oversamplingVal;
     }
 
-    MItMeshVertex vtxIter(meshDag);
+    MItMeshVertex vtxIter(mesh.meshDag);
     int prevIndex;
     vtxIter.setIndex(index, prevIndex);
 
@@ -972,7 +900,7 @@ void getVerticesInVolumeRange(
             rangeIndices.append(volumeIndex);
 
             float value = (float)(1 - (delta / radius));
-            value = (float)getFalloffValue(curveVal, value, smoothStrength);
+            value = (float)getFalloffValue(ui.curveVal, value, smoothStrength);
             values.append(value);
         }
 
@@ -981,25 +909,22 @@ void getVerticesInVolumeRange(
 }
 
 bool getMirrorHit(
-    int paintMirror, MFloatPoint &origHitPoint, MMeshIntersector &intersectorOrigShape,
-    MMeshIntersector &intersector, double mirrorMinDist,
-    std::vector<std::vector<MIntArray>> &perFaceTriangleVertices, const float *mayaRawPoints,
-    MFloatMatrix &inclusiveMatrix, MFloatPoint &centerOfBrush,
-
-    int &faceHit, MFloatPoint &hitPoint
+    const UserInputData &ui, const MeshState &mesh, const InteractionStartData &start,
+    const InteractionPerFrameData &frame, const MirrorableData &mdata, int &faceHit,
+    MFloatPoint &hitPoint
 )
 {
     MStatus stat;
 
     MMatrix mirrorMatrix;
     double XVal = 1., YVal = 1.0, ZVal = 1.0;
-    if ((paintMirror == 1) || (paintMirror == 4) || (paintMirror == 7)) {
+    if ((ui.paintMirror == 1) || (ui.paintMirror == 4) || (ui.paintMirror == 7)) {
         XVal = -1.;
     }
-    if ((paintMirror == 2) || (paintMirror == 5) || (paintMirror == 8)) {
+    if ((ui.paintMirror == 2) || (ui.paintMirror == 5) || (ui.paintMirror == 8)) {
         YVal = -1.;
     }
-    if ((paintMirror == 3) || (paintMirror == 6) || (paintMirror == 9)) {
+    if ((ui.paintMirror == 3) || (ui.paintMirror == 6) || (ui.paintMirror == 9)) {
         ZVal = -1.;
     }
     mirrorMatrix.matrix[0][0] = XVal;
@@ -1014,11 +939,11 @@ bool getMirrorHit(
 
     // we're going to mirror by x -1'
     MPointOnMesh pointInfo;
-    if (paintMirror > 0 && paintMirror < 4) { // if we compute the orig mesh
-        MPoint pointToMirror = MPoint(origHitPoint);
+    if (ui.paintMirror > 0 && ui.paintMirror < 4) { // if we compute the orig mesh
+        MPoint pointToMirror = MPoint(frame.origHitPoint);
         MPoint mirrorPoint = pointToMirror * mirrorMatrix;
 
-        stat = intersectorOrigShape.getClosestPoint(mirrorPoint, pointInfo, mirrorMinDist);
+        stat = start.intersectorOrigShape.getClosestPoint(mirrorPoint, pointInfo, ui.mirrorMinDist);
         if (MS::kSuccess != stat) {
             return false;
         }
@@ -1028,23 +953,23 @@ bool getMirrorHit(
         float hitBary1, hitBary2;
         pointInfo.getBarycentricCoords(hitBary1, hitBary2);
 
-        MIntArray triangle = perFaceTriangleVertices[faceHit][hitTriangle];
+        MIntArray triangle = mesh.perFaceTriangleVertices[faceHit][hitTriangle];
 
         float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = mayaRawPoints[triangle[0] * 3] * hitBary1 +
-                  mayaRawPoints[triangle[1] * 3] * hitBary2 +
-                  mayaRawPoints[triangle[2] * 3] * hitBary3;
-        float y = mayaRawPoints[triangle[0] * 3 + 1] * hitBary1 +
-                  mayaRawPoints[triangle[1] * 3 + 1] * hitBary2 +
-                  mayaRawPoints[triangle[2] * 3 + 1] * hitBary3;
-        float z = mayaRawPoints[triangle[0] * 3 + 2] * hitBary1 +
-                  mayaRawPoints[triangle[1] * 3 + 2] * hitBary2 +
-                  mayaRawPoints[triangle[2] * 3 + 2] * hitBary3;
-        hitPoint = MFloatPoint(x, y, z) * inclusiveMatrix;
+        float x = mesh.mayaRawPoints[triangle[0] * 3] * hitBary1 +
+                  mesh.mayaRawPoints[triangle[1] * 3] * hitBary2 +
+                  mesh.mayaRawPoints[triangle[2] * 3] * hitBary3;
+        float y = mesh.mayaRawPoints[triangle[0] * 3 + 1] * hitBary1 +
+                  mesh.mayaRawPoints[triangle[1] * 3 + 1] * hitBary2 +
+                  mesh.mayaRawPoints[triangle[2] * 3 + 1] * hitBary3;
+        float z = mesh.mayaRawPoints[triangle[0] * 3 + 2] * hitBary1 +
+                  mesh.mayaRawPoints[triangle[1] * 3 + 2] * hitBary2 +
+                  mesh.mayaRawPoints[triangle[2] * 3 + 2] * hitBary3;
+        hitPoint = MFloatPoint(x, y, z) * mesh.inclusiveMatrix;
     }
     else {
-        MPoint mirrorPoint = MPoint(centerOfBrush) * mirrorMatrix;
-        stat = intersector.getClosestPoint(mirrorPoint, pointInfo, mirrorMinDist);
+        MPoint mirrorPoint = MPoint(mdata.centerOfBrush) * mirrorMatrix;
+        stat = start.intersector.getClosestPoint(mirrorPoint, pointInfo, ui.mirrorMinDist);
         if (MS::kSuccess != stat) {
             return false;
         }
@@ -1056,17 +981,13 @@ bool getMirrorHit(
 }
 
 bool computeHit(
-    short screenPixelX, short screenPixelY, bool getNormal, M3dView &view, MPoint &worldPoint,
-    MVector &worldVector, MFnMesh &meshFn, MMeshIsectAccelParams &accelParams, float &pressDistance,
-    int paintMirror, std::vector<std::vector<MIntArray>> &perFaceTriangleVertices,
-    const float *mayaOrigRawPoints, MFloatPoint &origHitPoint, MVector &normalVector,
-
-    int &faceHit, MFloatPoint &hitPoint
+    short screenPixelX, short screenPixelY, bool getNormal, M3dView &view, const UserInputData &ui,
+    MeshState &mesh, InteractionPerFrameData &frame, int &faceHit, MFloatPoint &hitPoint
 )
 {
     MStatus stat;
 
-    view.viewToWorld(screenPixelX, screenPixelY, worldPoint, worldVector);
+    view.viewToWorld(screenPixelX, screenPixelY, frame.worldPoint, frame.worldVector);
 
     // float hitRayParam;
     float hitBary1;
@@ -1077,66 +998,62 @@ bool computeHit(
     // hitPoint = (*hitBary1)*v1 + (*hitBary2)*v2 + (1 - *hitBary1 - *hitBary2)*v3;
     // If no hit was found, the referenced value will not be modified,
 
-    bool foundIntersect = meshFn.closestIntersection(
-        worldPoint, worldVector, nullptr, nullptr, false, MSpace::kWorld, 9999, false, &accelParams,
-        hitPoint, &pressDistance, &faceHit, &hitTriangle, &hitBary1, &hitBary2, 0.0001f, &stat
+    bool foundIntersect = mesh.meshFn.closestIntersection(
+        frame.worldPoint, frame.worldVector, nullptr, nullptr, false, MSpace::kWorld, 9999, false,
+        &mesh.accelParams, hitPoint, &frame.pressDistance, &faceHit, &hitTriangle, &hitBary1,
+        &hitBary2, 0.0001f, &stat
     );
 
     if (!foundIntersect) {
         return false;
     }
 
-    if (paintMirror > 0 && paintMirror < 4) { // if we compute the orig
-        MIntArray triangle = perFaceTriangleVertices[faceHit][hitTriangle];
+    if (ui.paintMirror > 0 && ui.paintMirror < 4) { // if we compute the orig
+        MIntArray triangle = mesh.perFaceTriangleVertices[faceHit][hitTriangle];
         float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = mayaOrigRawPoints[triangle[0] * 3] * hitBary1 +
-                  mayaOrigRawPoints[triangle[1] * 3] * hitBary2 +
-                  mayaOrigRawPoints[triangle[2] * 3] * hitBary3;
-        float y = mayaOrigRawPoints[triangle[0] * 3 + 1] * hitBary1 +
-                  mayaOrigRawPoints[triangle[1] * 3 + 1] * hitBary2 +
-                  mayaOrigRawPoints[triangle[2] * 3 + 1] * hitBary3;
-        float z = mayaOrigRawPoints[triangle[0] * 3 + 2] * hitBary1 +
-                  mayaOrigRawPoints[triangle[1] * 3 + 2] * hitBary2 +
-                  mayaOrigRawPoints[triangle[2] * 3 + 2] * hitBary3;
-        origHitPoint = MFloatPoint(x, y, z);
+        float x = mesh.mayaOrigRawPoints[triangle[0] * 3] * hitBary1 +
+                  mesh.mayaOrigRawPoints[triangle[1] * 3] * hitBary2 +
+                  mesh.mayaOrigRawPoints[triangle[2] * 3] * hitBary3;
+        float y = mesh.mayaOrigRawPoints[triangle[0] * 3 + 1] * hitBary1 +
+                  mesh.mayaOrigRawPoints[triangle[1] * 3 + 1] * hitBary2 +
+                  mesh.mayaOrigRawPoints[triangle[2] * 3 + 1] * hitBary3;
+        float z = mesh.mayaOrigRawPoints[triangle[0] * 3 + 2] * hitBary1 +
+                  mesh.mayaOrigRawPoints[triangle[1] * 3 + 2] * hitBary2 +
+                  mesh.mayaOrigRawPoints[triangle[2] * 3 + 2] * hitBary3;
+        frame.origHitPoint = MFloatPoint(x, y, z);
     }
 
     // ----------- get normal for display ---------------------
     if (getNormal) {
-        meshFn.getPolygonNormal(faceHit, normalVector, MSpace::kWorld);
+        mesh.meshFn.getPolygonNormal(faceHit, frame.normalVector, MSpace::kWorld);
     }
     return true;
 }
 
-std::vector<int> getSurroundingVerticesPerFace(
-    int vertexIndex, std::vector<int> &perFaceVerticesSetFLAT,
-    std::vector<int> &perFaceVerticesSetINDEX
-)
+std::vector<int> getSurroundingVerticesPerFace(int vertexIndex, const MeshState &mesh)
 {
-    auto first = perFaceVerticesSetFLAT.begin() + perFaceVerticesSetINDEX[vertexIndex];
-    auto last = perFaceVerticesSetFLAT.begin() + perFaceVerticesSetINDEX[vertexIndex + (int)1];
+    auto first = mesh.perFaceVerticesSetFLAT.begin() + mesh.perFaceVerticesSetINDEX[vertexIndex];
+    auto last =
+        mesh.perFaceVerticesSetFLAT.begin() + mesh.perFaceVerticesSetINDEX[vertexIndex + (int)1];
     std::vector<int> newVec(first, last);
     return newVec;
 }
 
 bool expandHit(
-    int faceHit, const float *mayaRawPoints, double sizeVal,
-    std::vector<int> &perFaceVerticesSetFLAT, std::vector<int> &perFaceVerticesSetINDEX,
-
-    MFloatPoint &hitPoint, std::unordered_map<int, float> &dicVertsDist
+    int faceHit, const MFloatPoint &hitPoint, const UserInputData &ui, const MeshState &mesh,
+    std::unordered_map<int, float> &dicVertsDist
 )
 {
     // ----------- compute the vertices around ---------------------
-    std::vector<int> verticesSet =
-        getSurroundingVerticesPerFace(faceHit, perFaceVerticesSetFLAT, perFaceVerticesSetINDEX);
+    std::vector<int> verticesSet = getSurroundingVerticesPerFace(faceHit, mesh);
     bool foundHit = false;
     for (int ptIndex : verticesSet) {
         MFloatPoint posPoint(
-            mayaRawPoints[ptIndex * 3], mayaRawPoints[ptIndex * 3 + 1],
-            mayaRawPoints[ptIndex * 3 + 2]
+            mesh.mayaRawPoints[ptIndex * 3], mesh.mayaRawPoints[ptIndex * 3 + 1],
+            mesh.mayaRawPoints[ptIndex * 3 + 2]
         );
         float dist = posPoint.distanceTo(hitPoint);
-        if (dist <= sizeVal) {
+        if (dist <= ui.sizeVal) {
             foundHit = true;
             auto ret = dicVertsDist.insert(std::make_pair(ptIndex, dist));
             if (!ret.second) {
@@ -1148,52 +1065,46 @@ bool expandHit(
 }
 
 void addBrushShapeFallof(
-    double strengthVal, double smoothStrengthVal, ModifierKeys modifierNoneShiftControl,
-    ModifierCommands commandIndex, bool fractionOversamplingVal, int oversamplingVal,
-    double sizeVal, int curveVal,
-
+    const UserInputData &ui, const InteractionPerFrameData &frame,
     std::unordered_map<int, float> &dicVertsDist
 )
 {
-    double valueStrength = strengthVal;
-    if (modifierNoneShiftControl == ModifierKeys::ControlShift ||
-        commandIndex == ModifierCommands::Smooth) {
-        valueStrength = smoothStrengthVal; // smooth always we use the smooth value different of
-                                           // the regular value
+    double valueStrength = ui.strengthVal;
+    if (frame.modifierNoneShiftControl == ModifierKeys::ControlShift ||
+        ui.commandIndex == ModifierCommands::Smooth) {
+        valueStrength = ui.smoothStrengthVal; // smooth always we use the smooth value different of
+                                              // the regular value
     }
 
-    if (fractionOversamplingVal) {
-        valueStrength /= oversamplingVal;
+    if (ui.fractionOversamplingVal) {
+        valueStrength /= ui.oversamplingVal;
     }
 
     for (auto &element : dicVertsDist) {
-        float value = 1.0 - (element.second / sizeVal);
-        value = (float)getFalloffValue(curveVal, value, valueStrength);
+        float value = 1.0 - (element.second / ui.sizeVal);
+        value = (float)getFalloffValue(ui.curveVal, value, valueStrength);
 
         element.second = value;
     }
 }
 
-void mergeMirrorArray(
-    std::unordered_map<int, std::pair<float, float>> &mirroredJoinedArray,
-    std::unordered_map<int, float> &valuesBase, std::unordered_map<int, float> &valuesMirrored
-)
+void mergeMirrorArray(WeightData &weights, const MirrorableData &base, const MirrorableData &mirror)
 {
-    mirroredJoinedArray.clear();
-    for (const auto &elem : valuesBase) {
+    weights.mirroredJoinedArray.clear();
+    for (const auto &elem : base.skinValuesToSet) {
         int theVert = elem.first;
         float theWeight = elem.second;
         std::pair<float, float> secondElem(theWeight, 0.0);
         std::pair<int, std::pair<float, float>> toAdd(theVert, secondElem);
-        mirroredJoinedArray.insert(toAdd);
+        weights.mirroredJoinedArray.insert(toAdd);
     }
 
-    for (const auto &elem : valuesMirrored) {
+    for (const auto &elem : mirror.skinValuesToSet) {
         int theVert = elem.first;
         float theWeight = elem.second;
         std::pair<float, float> secondElem(0.0, theWeight);
         std::pair<int, std::pair<float, float>> toAdd(theVert, secondElem);
-        auto ret = mirroredJoinedArray.insert(toAdd);
+        auto ret = weights.mirroredJoinedArray.insert(toAdd);
         if (!ret.second) {
             std::pair<float, float> origSecondElem = ret.first->second;
             origSecondElem.second = theWeight;
@@ -1681,32 +1592,26 @@ static MStatus transferPointNurbsToMesh(MFnMesh &msh, MFnNurbsSurface &nurbsFn)
     return stat;
 }
 
-MStatus refreshPointsNormals(
-    const float *mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-    const float *rawNormals,    // A C-style array pointing to the mesh vertex positions
-    MIntArray &verticesNormalsIndices,
-    MVectorArray &verticesNormals, // The per-vertex local space normals of the mesh
-    int numVertices, MFnMesh &meshFn, MDagPath &meshDag, MObject &skinObj
-)
+MStatus refreshPointsNormals(MeshState &mesh, const WeightData &weights)
 {
     MStatus status = MStatus::kSuccess;
 
-    if (!skinObj.isNull() && meshDag.isValid(&status)) {
-        meshFn.freeCachedIntersectionAccelerator(); // yes ?
-        mayaRawPoints = meshFn.getRawPoints(&status);
-        rawNormals = meshFn.getRawNormals(&status);
-        int rawNormalsLength = sizeof(rawNormals);
+    if (!weights.skinObj.isNull() && mesh.meshDag.isValid(&status)) {
+        mesh.meshFn.freeCachedIntersectionAccelerator(); // yes ?
+        mesh.mayaRawPoints = const_cast<float *>(mesh.meshFn.getRawPoints(&status));
+        mesh.rawNormals = const_cast<float *>(mesh.meshFn.getRawNormals(&status));
+        int rawNormalsLength = sizeof(mesh.rawNormals);
 
 #pragma omp parallel for
-        for (int vertexInd = 0; vertexInd < numVertices; vertexInd++) {
-            int indNormal = verticesNormalsIndices[vertexInd];
+        for (int vertexInd = 0; vertexInd < mesh.numVertices; vertexInd++) {
+            int indNormal = mesh.verticesNormalsIndices[vertexInd];
             int rawIndNormal = indNormal * 3 + 2;
             if (rawIndNormal < rawNormalsLength) {
                 MVector theNormal(
-                    rawNormals[indNormal * 3], rawNormals[indNormal * 3 + 1],
-                    rawNormals[indNormal * 3 + 2]
+                    mesh.rawNormals[indNormal * 3], mesh.rawNormals[indNormal * 3 + 1],
+                    mesh.rawNormals[indNormal * 3 + 2]
                 );
-                verticesNormals.set(theNormal, vertexInd);
+                mesh.verticesNormals.set(theNormal, vertexInd);
             }
         }
     }
@@ -1714,39 +1619,26 @@ MStatus refreshPointsNormals(
 }
 
 MStatus applyCommand(
-    int influence, int nbJoints, int smoothRepeat, std::unordered_map<int, float> &valuesToSet,
-    bool ignoreLockVal, MDoubleArray &skinWeightList, MIntArray &lockJoints,
-    double smoothStrengthVal, MIntArray &ignoreLockJoints, bool doNormalize, MObject &skinObj,
-    MDoubleArray &skinWeightsForUndo, bool isNurbs, MDagPath &meshDag, MIntArray &influenceIndices,
-    int numCVsInV_, MDagPath &nurbsDag, bool normalize, MFnMesh &meshFn, MFnNurbsSurface &nurbsFn,
-    const std::vector<int> &perVertexVerticesSetFLAT,
-    const std::vector<int> &perVertexVerticesSetINDEX,
-    const float *mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-    const float *rawNormals,    // A C-style array pointing to the mesh vertex positions
-    MIntArray &verticesNormalsIndices,
-    MVectorArray &verticesNormals, // The per-vertex local space normals of the mesh
-    int numVertices, ModifierCommands commandIndex, ModifierKeys modifierNoneShiftControl,
-    ModifierKeys smoothModifier, // Constant
-    ModifierKeys removeModifier  // Constant
+    int influence, std::unordered_map<int, float> &valuesToSet, bool doNormalize,
+    const UserInputData &ui, InfluenceData &infl, WeightData &weights, MeshState &mesh,
+    NurbsData &nurbs, InteractionPersistentData &persist, const InteractionPerFrameData &frame
 )
 {
     MStatus status;
     // we need to sort all of that one way or another ---------------- here it is ------
     std::map<int, double> valuesToSetOrdered(valuesToSet.begin(), valuesToSet.end());
 
-    ModifierCommands theCommandIndex = getCommandIndexModifiers(
-        commandIndex, modifierNoneShiftControl, smoothModifier, removeModifier
-    );
+    ModifierCommands theCommandIndex = getCommandIndexModifiers(ui, frame);
 
     double multiplier = 1.0;
 
     if ((theCommandIndex != ModifierCommands::LockVertices) &&
         (theCommandIndex != ModifierCommands::UnlockVertices)) {
-        MDoubleArray theWeights((int)nbJoints * valuesToSetOrdered.size(), 0.0);
+        MDoubleArray theWeights((int)infl.nbJoints * valuesToSetOrdered.size(), 0.0);
         int repeatLimit = 1;
         if (theCommandIndex == ModifierCommands::Smooth ||
             theCommandIndex == ModifierCommands::Sharpen) {
-            repeatLimit = smoothRepeat;
+            repeatLimit = ui.smoothRepeat;
         }
 
         for (int repeat = 0; repeat < repeatLimit; ++repeat) {
@@ -1755,32 +1647,32 @@ MStatus applyCommand(
                 for (const auto &elem : valuesToSetOrdered) {
                     int theVert = elem.first;
                     double theWeight = elem.second;
-                    std::vector<int> vertsAround = getSurroundingVerticesPerVert(
-                        theVert, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX
-                    );
+                    std::vector<int> vertsAround = getSurroundingVerticesPerVert(theVert, mesh);
 
                     status = setAverageWeight(
-                        vertsAround, theVert, i, nbJoints, lockJoints, skinWeightList, theWeights,
-                        smoothStrengthVal * theWeight
+                        vertsAround, theVert, i, infl.nbJoints, infl.lockJoints,
+                        weights.skinWeightList, theWeights, ui.smoothStrengthVal * theWeight
                     );
                     i++;
                 }
             }
             else {
-                if (ignoreLockVal) {
+                if (ui.ignoreLockVal) {
                     status = editArray(
-                        theCommandIndex, influence, nbJoints, ignoreLockJoints, skinWeightList,
-                        valuesToSetOrdered, theWeights, doNormalize, multiplier
+                        theCommandIndex, influence, infl.nbJoints, infl.ignoreLockJoints,
+                        weights.skinWeightList, valuesToSetOrdered, theWeights, doNormalize,
+                        multiplier
                     );
                 }
                 else {
-                    if (lockJoints[influence] == 1 &&
+                    if (infl.lockJoints[influence] == 1 &&
                         theCommandIndex != ModifierCommands::Sharpen) {
                         return status; //  if locked and it's not sharpen --> do nothing
                     }
                     status = editArray(
-                        theCommandIndex, influence, nbJoints, lockJoints, skinWeightList,
-                        valuesToSetOrdered, theWeights, doNormalize, multiplier
+                        theCommandIndex, influence, infl.nbJoints, infl.lockJoints,
+                        weights.skinWeightList, valuesToSetOrdered, theWeights, doNormalize,
+                        multiplier
                     );
                 }
                 if (status == MStatus::kFailure) {
@@ -1793,17 +1685,17 @@ MStatus applyCommand(
             // int prevVert = -1;
             for (const auto &elem : valuesToSetOrdered) {
                 int theVert = elem.first;
-                for (int j = 0; j < nbJoints; ++j) {
-                    int ind_swl = theVert * nbJoints + j;
-                    if (ind_swl >= skinWeightList.length()) {
-                        skinWeightList.setLength(ind_swl + 1);
+                for (int j = 0; j < infl.nbJoints; ++j) {
+                    int ind_swl = theVert * infl.nbJoints + j;
+                    if (ind_swl >= weights.skinWeightList.length()) {
+                        weights.skinWeightList.setLength(ind_swl + 1);
                     }
                     double val = 0.0;
-                    int ind_tw = i * nbJoints + j;
+                    int ind_tw = i * infl.nbJoints + j;
                     if (ind_tw < theWeights.length()) {
                         val = theWeights[ind_tw];
                     }
-                    skinWeightList[ind_swl] = val;
+                    weights.skinWeightList[ind_swl] = val;
                 }
                 i++;
             }
@@ -1820,12 +1712,13 @@ MStatus applyCommand(
 
         // Set the new weights.
         // Initialize the skin cluster.
-        MFnSkinCluster skinFn(skinObj, &status);
+        MFnSkinCluster skinFn(weights.skinObj, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
-        skinWeightsForUndo.clear();
-        if (!isNurbs) {
+        persist.skinWeightsForUndo.clear();
+        if (!frame.isNurbs) {
             skinFn.setWeights(
-                meshDag, weightsObj, influenceIndices, theWeights, normalize, &skinWeightsForUndo
+                mesh.meshDag, weightsObj, infl.influenceIndices, theWeights, doNormalize,
+                &persist.skinWeightsForUndo
             );
         }
         else {
@@ -1834,121 +1727,97 @@ MStatus applyCommand(
             int uVal, vVal;
             for (int vert : objVertices) {
 
-                vVal = (int)vert % (int)numCVsInV_;
-                uVal = (int)vert / (int)numCVsInV_;
+                vVal = (int)vert % (int)nurbs.numCVsInV_;
+                uVal = (int)vert / (int)nurbs.numCVsInV_;
                 doubleFn.addElement(uVal, vVal);
             }
             skinFn.setWeights(
-                nurbsDag, weightsObjNurbs, influenceIndices, theWeights, normalize,
-                &skinWeightsForUndo
+                nurbs.nurbsDag, weightsObjNurbs, infl.influenceIndices, theWeights, doNormalize,
+                &persist.skinWeightsForUndo
             );
-            transferPointNurbsToMesh(meshFn, nurbsFn); // we transfer the points postions
+            transferPointNurbsToMesh(mesh.meshFn, nurbs.nurbsFn); // we transfer the points postions
         }
         // in do press common
         // update values ---------------
-        refreshPointsNormals(
-            mayaRawPoints, rawNormals, verticesNormalsIndices, verticesNormals, numVertices, meshFn,
-            meshDag, skinObj
-        );
+        refreshPointsNormals(mesh, weights);
     }
     return status;
 }
 
 void preparePaint(
-    bool postSetting, ModifierCommands commandIndex, ModifierKeys modifierNoneShiftControl,
-    MIntArray &lockVertices, MIntArray &mirrorInfluences, int influenceIndex, int numVertices,
-
-    int nbJoints, int smoothRepeat, bool ignoreLockVal, MDoubleArray &skinWeightList,
-    MIntArray &lockJoints, double smoothStrengthVal, MIntArray &ignoreLockJoints, bool doNormalize,
-    MObject &skinObj, MDoubleArray &skinWeightsForUndo, bool isNurbs, MDagPath &meshDag,
-    MIntArray &influenceIndices, int numCVsInV_, MDagPath &nurbsDag, bool normalize,
-    MFnMesh &meshFn, MFnNurbsSurface &nurbsFn, const std::vector<int> &perVertexVerticesSetFLAT,
-    const std::vector<int> &perVertexVerticesSetINDEX,
-    const float *mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-    const float *rawNormals,    // A C-style array pointing to the mesh vertex positions
-    MIntArray &verticesNormalsIndices,
-    MVectorArray &verticesNormals, // The per-vertex local space normals of the mesh
-    ModifierKeys smoothModifier,   // Constant
-    ModifierKeys removeModifier,   // Constant
-
-    std::unordered_map<int, float> &dicVertsDist,
-    std::unordered_map<int, float> &dicVertsDistPrevPaint, std::vector<float> &intensityValues,
-    std::unordered_map<int, float> &skinValToSet, std::set<int> &theVerticesPainted, bool mirror
+    bool postSetting, bool mirror, std::unordered_map<int, float> &dicVertsDist,
+    const UserInputData &ui, InfluenceData &infl, WeightData &weights, MeshState &mesh,
+    NurbsData &nurbs, InteractionPersistentData &persist, const InteractionPerFrameData &frame,
+    MirrorableData &mdata
 )
 {
-
     // MGlobal::displayInfo("perform Paint");
     double multiplier = 1.0;
+    ModifierCommands commandIndex = getCommandIndexModifiers(ui, frame);
     if (!postSetting && commandIndex != ModifierCommands::Smooth) {
         multiplier = .1; // less applying if dragging paint
     }
 
     bool isCommandLock = ((commandIndex == ModifierCommands::LockVertices) ||
                           (commandIndex == ModifierCommands::UnlockVertices)) &&
-                         (modifierNoneShiftControl != ModifierKeys::Control);
+                         (frame.modifierNoneShiftControl != ModifierKeys::Control);
 
-    auto endOfFind = dicVertsDistPrevPaint.end();
+    auto endOfFind = mdata.previousPaint.end();
     for (const auto &element : dicVertsDist) {
         int index = element.first;
         float value = element.second * multiplier;
         // check if need to set this color, we store in intensityValues to check if it's already at
         // 1 -------
-        if ((lockVertices[index] == 1 && !isCommandLock) || intensityValues[index] == 1) {
+        if ((weights.lockVertices[index] == 1 && !isCommandLock) ||
+            mdata.intensityValuesOrig[index] == 1) {
             continue;
         }
         // get the correct value of paint by adding this value -----
-        value += intensityValues[index];
-        auto res = dicVertsDistPrevPaint.find(index);
+        value += mdata.intensityValuesOrig[index];
+        auto res = mdata.previousPaint.find(index);
         if (res != endOfFind) { // we substract the smallest
             value -= std::min(res->second, element.second);
         }
         value = std::min(value, (float)1.0);
-        intensityValues[index] = value;
+        mdata.intensityValuesOrig[index] = value;
 
         // add to array of values to set at the end---------------
         // we need to check if it is in the regular array and make adjustements
-        auto ret = skinValToSet.insert(std::make_pair(index, value));
+        auto ret = mdata.skinValuesToSet.insert(std::make_pair(index, value));
         if (!ret.second) {
             ret.first->second = std::max(value, ret.first->second);
         }
         else {
-            theVerticesPainted.insert(index);
+            persist.verticesPainted.insert(index);
         }
         // end add to array of values to set at the end--------------------
     }
-    dicVertsDistPrevPaint = dicVertsDist;
+    mdata.previousPaint = dicVertsDist;
 
     if (!postSetting) {
         // MGlobal::displayInfo("apply the skin stuff");
         // still have to deal with the colors damn it
-        if (skinValToSet.size() > 0) {
-            int theInfluence = influenceIndex;
+        if (mdata.skinValuesToSet.size() > 0) {
+            int theInfluence = ui.influenceIndex;
             if (mirror) {
-                theInfluence = mirrorInfluences[influenceIndex];
+                theInfluence = ui.mirrorInfluences[ui.influenceIndex];
             }
             applyCommand(
-                theInfluence, nbJoints, smoothRepeat, skinValToSet, ignoreLockVal, skinWeightList,
-                lockJoints, smoothStrengthVal, ignoreLockJoints, doNormalize, skinObj,
-                skinWeightsForUndo, isNurbs, meshDag, influenceIndices, numCVsInV_, nurbsDag,
-                normalize, meshFn, nurbsFn, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX,
-                mayaRawPoints, rawNormals, verticesNormalsIndices, verticesNormals, numVertices,
-                commandIndex, modifierNoneShiftControl, smoothModifier, removeModifier
+                theInfluence, mdata.skinValuesToSet,
+                true, // doNormalize: hard-coded per UserInputData comment
+                ui, infl, weights, mesh, nurbs, persist, frame
             );
 
-            intensityValues = std::vector<float>(numVertices, 0);
-            dicVertsDistPrevPaint.clear();
-            skinValToSet.clear();
+            mdata.intensityValuesOrig = std::vector<float>(mesh.numVertices, 0);
+            mdata.previousPaint.clear();
+            mdata.skinValuesToSet.clear();
         }
     }
 }
 
 MStatus refreshColors(
-    int influenceIndex, int nbJoints, int soloColorTypeVal, MColor &lockVertColor,
-    MColorArray &soloCurrentColors, MColorArray &multiCurrentColors, double maxSoloColor,
-    double minSoloColor, MColorArray &jointsColors, MColor &soloColor, MColor &lockJntColor,
-    MIntArray &lockJoints, MDoubleArray &soloColorsValues, MDoubleArray &skinWeightList,
-    MIntArray &lockVertices, MIntArray &editVertsIndices, MColorArray &multiEditColors,
-    MColorArray &soloEditColors
+    MIntArray &editVertsIndices, MColorArray &multiEditColors, MColorArray &soloEditColors,
+    const UserInputData &ui, const InfluenceData &infl, WeightData &weights
 )
 {
     MStatus status = MS::kSuccess;
@@ -1962,32 +1831,29 @@ MStatus refreshColors(
     for (unsigned int i = 0; i < editVertsIndices.length(); ++i) {
         int theVert = editVertsIndices[i];
         MColor multiColor, soloColor;
-        bool isVtxLocked = lockVertices[theVert] == 1;
+        bool isVtxLocked = weights.lockVertices[theVert] == 1;
 
-        for (int j = 0; j < nbJoints; ++j) { // for each joint
-            int ind_swl = theVert * nbJoints + j;
-            if (ind_swl < skinWeightList.length()) {
-                double val = skinWeightList[ind_swl];
-                if (lockJoints[j] == 1) {
-                    multiColor += lockJntColor * val;
+        for (int j = 0; j < infl.nbJoints; ++j) { // for each joint
+            int ind_swl = theVert * infl.nbJoints + j;
+            if (ind_swl < weights.skinWeightList.length()) {
+                double val = weights.skinWeightList[ind_swl];
+                if (infl.lockJoints[j] == 1) {
+                    multiColor += infl.lockJntColor * val;
                 }
                 else {
-                    multiColor += jointsColors[j] * val;
+                    multiColor += infl.jointsColors[j] * val;
                 }
-                if (j == influenceIndex) {
-                    soloColorsValues[theVert] = val;
-                    soloColor = getASoloColor(
-                        val, maxSoloColor, minSoloColor, soloColorTypeVal, influenceIndex,
-                        jointsColors
-                    );
+                if (j == ui.influenceIndex) {
+                    weights.soloColorsValues[theVert] = val;
+                    soloColor = getASoloColor(val, ui, infl);
                 }
             }
         }
-        multiCurrentColors[theVert] = multiColor;
-        soloCurrentColors[theVert] = soloColor;
+        weights.multiCurrentColors[theVert] = multiColor;
+        weights.soloCurrentColors[theVert] = soloColor;
         if (isVtxLocked) {
-            multiEditColors[i] = lockVertColor;
-            soloEditColors[i] = lockVertColor;
+            multiEditColors[i] = weights.lockVertColor;
+            soloEditColors[i] = weights.lockVertColor;
         }
         else {
             multiEditColors[i] = multiColor;
@@ -1998,51 +1864,33 @@ MStatus refreshColors(
 }
 
 MStatus applyCommandMirror(
-    std::unordered_map<int, std::pair<float, float>> &mirroredJoinedArray,
-    MIntArray &mirrorInfluences, int nbJoints, int influenceIndex, int smoothRepeat,
-    MIntArray &lockJoints, MDoubleArray &skinWeightList, double smoothStrengthVal,
-    bool ignoreLockVal, MIntArray &ignoreLockJoints, bool doNormalize, MObject &skinObj,
-    const float *mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-    const float *rawNormals,    // A C-style array pointing to the mesh vertex positions
-    MIntArray &verticesNormalsIndices,
-    MVectorArray &verticesNormals, // The per-vertex local space normals of the mesh
-    int numVertices, MFnNurbsSurface &nurbsFn, MDagPath &nurbsDag, int numCVsInV_, bool normalize,
-    MIntArray &influenceIndices,
-    MDagPath &meshDag, // So I can get the "maya canonical" edges
-    bool isNurbs, MDoubleArray &skinWeightsForUndo, MFnMesh &meshFn,
-
-    const std::vector<int> &perVertexVerticesSetFLAT,
-    const std::vector<int> &perVertexVerticesSetINDEX,
-
-    ModifierCommands commandIndex, ModifierKeys modifierNoneShiftControl,
-    ModifierKeys smoothModifier, // Constant
-    ModifierKeys removeModifier  // Constant
+    bool doNormalize, const UserInputData &ui, InfluenceData &infl, WeightData &weights,
+    MeshState &mesh, NurbsData &nurbs, InteractionPersistentData &persist,
+    const InteractionPerFrameData &frame
 )
 {
     MStatus status;
     MGlobal::displayInfo(MString("applyCommandMirror "));
     std::map<int, std::pair<float, float>> mirroredJoinedArrayOrdered(
-        mirroredJoinedArray.begin(), mirroredJoinedArray.end()
+        weights.mirroredJoinedArray.begin(), weights.mirroredJoinedArray.end()
     );
-    ModifierCommands theCommandIndex = getCommandIndexModifiers(
-        commandIndex, modifierNoneShiftControl, smoothModifier, removeModifier
-    );
+    ModifierCommands theCommandIndex = getCommandIndexModifiers(ui, frame);
 
     double multiplier = 1.0;
 
-    int influence = influenceIndex;
-    int influenceMirror = mirrorInfluences[influenceIndex];
+    int influence = ui.influenceIndex;
+    int influenceMirror = ui.mirrorInfluences[ui.influenceIndex];
 
     if ((theCommandIndex == ModifierCommands::LockVertices) ||
         (theCommandIndex == ModifierCommands::UnlockVertices)) {
         return MStatus::kSuccess;
     }
 
-    MDoubleArray theWeights((int)nbJoints * mirroredJoinedArrayOrdered.size(), 0.0);
+    MDoubleArray theWeights((int)infl.nbJoints * mirroredJoinedArrayOrdered.size(), 0.0);
     int repeatLimit = 1;
     if (theCommandIndex == ModifierCommands::Smooth ||
         theCommandIndex == ModifierCommands::Sharpen) {
-        repeatLimit = smoothRepeat;
+        repeatLimit = ui.smoothRepeat;
     }
 
     MIntArray objVertices;
@@ -2059,31 +1907,32 @@ MStatus applyCommandMirror(
                 float biggestValue = std::max(valueBase, valueMirror);
 
                 double theWeight = (double)biggestValue;
-                std::vector<int> vertsAround = getSurroundingVerticesPerVert(
-                    theVert, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX
-                );
+                std::vector<int> vertsAround = getSurroundingVerticesPerVert(theVert, mesh);
 
                 status = setAverageWeight(
-                    vertsAround, theVert, indexCurrVert, nbJoints, lockJoints, skinWeightList,
-                    theWeights, smoothStrengthVal * theWeight
+                    vertsAround, theVert, indexCurrVert, infl.nbJoints, infl.lockJoints,
+                    weights.skinWeightList, theWeights, ui.smoothStrengthVal * theWeight
                 );
                 indexCurrVert++;
             }
         }
         else {
-            if (ignoreLockVal) {
+            if (ui.ignoreLockVal) {
                 status = editArrayMirror(
-                    theCommandIndex, influence, influenceMirror, nbJoints, ignoreLockJoints,
-                    skinWeightList, mirroredJoinedArrayOrdered, theWeights, doNormalize, multiplier
+                    theCommandIndex, influence, influenceMirror, infl.nbJoints,
+                    infl.ignoreLockJoints, weights.skinWeightList, mirroredJoinedArrayOrdered,
+                    theWeights, doNormalize, multiplier
                 );
             }
             else {
-                if (lockJoints[influence] == 1 && theCommandIndex != ModifierCommands::Sharpen) {
+                if (infl.lockJoints[influence] == 1 &&
+                    theCommandIndex != ModifierCommands::Sharpen) {
                     return status; //  if locked and it's not sharpen --> do nothing
                 }
                 status = editArrayMirror(
-                    theCommandIndex, influence, influenceMirror, nbJoints, lockJoints,
-                    skinWeightList, mirroredJoinedArrayOrdered, theWeights, doNormalize, multiplier
+                    theCommandIndex, influence, influenceMirror, infl.nbJoints, infl.lockJoints,
+                    weights.skinWeightList, mirroredJoinedArrayOrdered, theWeights, doNormalize,
+                    multiplier
                 );
             }
         }
@@ -2098,17 +1947,17 @@ MStatus applyCommandMirror(
                 objVertices.append(theVert);
             }
 
-            for (int j = 0; j < nbJoints; ++j) {
-                int ind_swl = theVert * nbJoints + j;
-                if (ind_swl >= skinWeightList.length()) {
-                    skinWeightList.setLength(ind_swl + 1);
+            for (int j = 0; j < infl.nbJoints; ++j) {
+                int ind_swl = theVert * infl.nbJoints + j;
+                if (ind_swl >= weights.skinWeightList.length()) {
+                    weights.skinWeightList.setLength(ind_swl + 1);
                 }
                 double val = 0.0;
-                int ind_tw = i * nbJoints + j;
+                int ind_tw = i * infl.nbJoints + j;
                 if (ind_tw < theWeights.length()) {
                     val = theWeights[ind_tw];
                 }
-                skinWeightList[ind_swl] = val;
+                weights.skinWeightList[ind_swl] = val;
             }
             i++;
         }
@@ -2117,12 +1966,13 @@ MStatus applyCommandMirror(
     MFnSingleIndexedComponent compFn;
     MObject weightsObj = compFn.create(MFn::kMeshVertComponent);
     compFn.addElements(objVertices);
-    MFnSkinCluster skinFn(skinObj, &status);
+    MFnSkinCluster skinFn(weights.skinObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
-    skinWeightsForUndo.clear();
-    if (!isNurbs) {
+    persist.skinWeightsForUndo.clear();
+    if (!frame.isNurbs) {
         skinFn.setWeights(
-            meshDag, weightsObj, influenceIndices, theWeights, normalize, &skinWeightsForUndo
+            mesh.meshDag, weightsObj, infl.influenceIndices, theWeights, doNormalize,
+            &persist.skinWeightsForUndo
         );
     }
     else {
@@ -2130,23 +1980,18 @@ MStatus applyCommandMirror(
         MObject weightsObjNurbs = doubleFn.create(MFn::kSurfaceCVComponent);
         int uVal, vVal;
         for (int vert : objVertices) {
-            vVal = (int)vert % (int)numCVsInV_;
-            uVal = (int)vert / (int)numCVsInV_;
+            vVal = (int)vert % (int)nurbs.numCVsInV_;
+            uVal = (int)vert / (int)nurbs.numCVsInV_;
             doubleFn.addElement(uVal, vVal);
         }
         skinFn.setWeights(
-            nurbsDag, weightsObjNurbs, influenceIndices, theWeights, normalize, &skinWeightsForUndo
+            nurbs.nurbsDag, weightsObjNurbs, infl.influenceIndices, theWeights, doNormalize,
+            &persist.skinWeightsForUndo
         );
-        transferPointNurbsToMesh(meshFn, nurbsFn); // we transfer the points postions
-        meshFn.updateSurface();
+        transferPointNurbsToMesh(mesh.meshFn, nurbs.nurbsFn); // we transfer the points postions
+        mesh.meshFn.updateSurface();
     }
-    refreshPointsNormals(
-        mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-        rawNormals,    // A C-style array pointing to the mesh vertex positions
-        verticesNormalsIndices,
-        verticesNormals, // The per-vertex local space normals of the mesh
-        numVertices, meshFn, meshDag, skinObj
-    );
+    refreshPointsNormals(mesh, weights);
     return status;
 }
 
@@ -2182,54 +2027,38 @@ MString fullColorSet2 = MString("multiColorsSet2");
 MString soloColorSet2 = MString("soloColorsSet2");
 
 void maya2019RefreshColors(
-    bool toggle, M3dView &view, bool &toggleColorState, int soloColorVal, MFnMesh &meshFn
+    bool toggle, bool &toggleColorState, const UserInputData &ui, MeshState &mesh
 )
 {
-    meshFn.updateSurface();
-    view = M3dView::active3dView();
+    mesh.meshFn.updateSurface();
     // first swap
     if (toggle) {
         toggleColorState = !toggleColorState;
     }
 
     if (!toggle || toggleColorState) {
-        if (soloColorVal == 1) {
-            meshFn.setCurrentColorSetName(soloColorSet2);
+        if (ui.soloColorVal == 1) {
+            mesh.meshFn.setCurrentColorSetName(soloColorSet2);
         }
         else {
-            meshFn.setCurrentColorSetName(fullColorSet2);
+            mesh.meshFn.setCurrentColorSetName(fullColorSet2);
         }
-        view.refresh(false, true);
+        M3dView::active3dView().refresh(false, true);
     }
     if (!toggle || !toggleColorState) {
-        if (soloColorVal == 1) {
-            meshFn.setCurrentColorSetName(soloColorSet);
+        if (ui.soloColorVal == 1) {
+            mesh.meshFn.setCurrentColorSetName(soloColorSet);
         }
         else {
-            meshFn.setCurrentColorSetName(fullColorSet);
+            mesh.meshFn.setCurrentColorSetName(fullColorSet);
         }
-        view.refresh(false, true);
+        M3dView::active3dView().refresh(false, true);
     }
 }
 
 MStatus doPerformPaint(
-    std::unordered_map<int, std::pair<float, float>> &mirroredJoinedArray, int soloColorVal,
-    bool useColorSetsWhilePainting, bool postSetting, ModifierCommands commandIndex,
-    int influenceIndex, int nbJoints,
-
-    double maxSoloColor, double minSoloColor, int soloColorTypeVal,
-
-    MColorArray &multiCurrentColors, MColorArray &soloCurrentColors, MColorArray &jointsColors,
-    MColor &lockVertColor, MColor &lockJntColor,
-
-    MIntArray &lockVertices, MIntArray &lockJoints, MIntArray &mirrorInfluences,
-    MDoubleArray &skinWeightList,
-
-    ModifierKeys modifierNoneShiftControl, ModifierKeys smoothModifier, ModifierKeys removeModifier,
-
-    M3dView &view, bool &toggleColorState,
-
-    MFnMesh &meshFn
+    bool postSetting, bool &toggleColorState, const UserInputData &ui, const InfluenceData &infl,
+    WeightData &weights, const InteractionPerFrameData &frame, MeshState &mesh
 )
 {
     MStatus status = MStatus::kSuccess;
@@ -2237,22 +2066,15 @@ MStatus doPerformPaint(
     MColorArray multiEditColors, soloEditColors;
     MIntArray editVertsIndices;
 
-    for (const auto &pt : mirroredJoinedArray) {
+    ModifierCommands commandIndex = getCommandIndexModifiers(ui, frame);
+
+    for (const auto &pt : weights.mirroredJoinedArray) {
         int ptIndex = pt.first;
         float weightBase = pt.second.first;
         float weightMirror = pt.second.second;
         MColor multColor, soloColor;
         getColorWithMirror(
-            ptIndex, influenceIndex, weightBase, weightMirror, nbJoints,
-
-            maxSoloColor, minSoloColor, soloColorTypeVal,
-
-            multiEditColors, multiCurrentColors, soloEditColors, soloCurrentColors, jointsColors,
-            lockVertColor, lockJntColor, multColor, soloColor,
-
-            lockVertices, lockJoints, mirrorInfluences, skinWeightList,
-
-            commandIndex, modifierNoneShiftControl, smoothModifier, removeModifier
+            ptIndex, weightBase, weightMirror, multColor, soloColor, ui, infl, weights, frame
         );
 
         editVertsIndices.append(ptIndex);
@@ -2261,76 +2083,32 @@ MStatus doPerformPaint(
     }
 
     // do actually set colors -----------------------------------
-    if (soloColorVal == 0) {
-        meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet);
-        meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet2);
+    if (ui.soloColorVal == 0) {
+        mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet);
+        mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet2);
     }
     else {
-        meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet);
-        meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet2);
+        mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet);
+        mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet2);
     }
 
-    if (useColorSetsWhilePainting || !postSetting) {
+    if (ui.useColorSetsWhilePainting || !postSetting) {
         if ((commandIndex == ModifierCommands::LockVertices) ||
             (commandIndex == ModifierCommands::UnlockVertices)) {
             // without that it doesn't refresh because mesh is not invalidated, meaning the
             // skinCluster hasn't changed
-            meshFn.updateSurface();
+            mesh.meshFn.updateSurface();
         }
-        maya2019RefreshColors(true, view, toggleColorState, soloColorVal, meshFn);
+        maya2019RefreshColors(true, toggleColorState, ui, mesh);
     }
     return status;
 }
 
 MStatus doDragCommon(
-    short screenX, short screenY, std::unordered_map<int, float> &dicVertsDistSTART,
-    std::unordered_map<int, float> &previousPaint,
-    std::unordered_map<int, float> &previousMirrorPaint,
-    std::unordered_map<int, float> &dicVertsMirrorDistSTART,
-    std::unordered_map<int, float> &skinValuesToSet,
-    std::unordered_map<int, float> &skinValuesMirrorToSet, std::set<int> &verticesPainted,
-    MFloatPoint &inMatrixHit, MFloatPoint &inMatrixHitMirror, int paintMirror,
-    bool successFullMirrorHit, bool drawBrushVal,
-
-    M3dView &view, MPoint &worldPoint, MVector &worldVector, MFnMesh &meshFn,
-    MMeshIsectAccelParams &accelParams, float pressDistance,
-    std::vector<std::vector<MIntArray>> &perFaceTriangleVertices, const float *mayaOrigRawPoints,
-    MFloatPoint &origHitPoint, MVector &normalVector, int previousfaceHit,
-    MFloatMatrix &inclusiveMatrixInverse, bool successFullDragHit, bool successFullDragMirrorHit,
-    MFloatPoint &centerOfBrush, MFloatPoint &centerOfMirrorBrush,
-    ModifierKeys modifierNoneShiftControl, MFloatPointArray &AllHitPoints,
-    MFloatPointArray &AllHitPointsMirror, std::vector<float> &intensityValuesOrig,
-    std::vector<float> &intensityValuesMirror, bool useColorSetsWhilePainting, bool postSetting,
-    bool performBrush, int &undersamplingSteps, int &undersamplingVal, short startScreenX,
-    short startScreenY, bool initAdjust, bool sizeAdjust, double sizeVal, double smoothStrengthVal,
-    double strengthVal, bool shiftMiddleDrag, double storedDistance, double adjustValue,
-    short viewCenterX, short viewCenterY, MFloatMatrix &inclusiveMatrix,
-
-    const float *mayaRawPoints, std::vector<int> &perFaceVerticesSetFLAT,
-    std::vector<int> &perFaceVerticesSetINDEX,
-
-    MMeshIntersector &intersectorOrigShape, MMeshIntersector &intersector, double mirrorMinDist,
-
-    bool coverageVal, const std::vector<int> &perVertexVerticesSetFLAT,
-    const std::vector<int> &perVertexVerticesSetINDEX, MVectorArray &verticesNormals,
-    ModifierCommands commandIndex, bool fractionOversamplingVal, int oversamplingVal, int curveVal,
-
-    MIntArray &lockVertices, MIntArray &mirrorInfluences, int influenceIndex, int numVertices,
-    int nbJoints, int smoothRepeat, bool ignoreLockVal, MDoubleArray &skinWeightList,
-    MIntArray &lockJoints, MIntArray &ignoreLockJoints, bool doNormalize, MObject &skinObj,
-    MDoubleArray &skinWeightsForUndo, bool isNurbs, MDagPath &meshDag, MIntArray &influenceIndices,
-    int numCVsInV_, MDagPath &nurbsDag, bool normalize, MFnNurbsSurface &nurbsFn,
-    const float *rawNormals, // A C-style array pointing to the mesh vertex positions
-    MIntArray &verticesNormalsIndices,
-    ModifierKeys smoothModifier, // Constant
-    ModifierKeys removeModifier, // Constant
-    std::unordered_map<int, std::pair<float, float>> &mirroredJoinedArray,
-
-    int soloColorVal, double maxSoloColor, double minSoloColor, int soloColorTypeVal,
-    MColorArray &multiCurrentColors, MColorArray &soloCurrentColors, MColorArray &jointsColors,
-    MColor &lockVertColor, MColor &lockJntColor, bool toggleColorState,
-
-    MEvent &event
+    bool &toggleColorState, const UserInputData &ui, InfluenceData &infl, WeightData &weights,
+    MeshState &mesh, NurbsData &nurbs, InteractionPersistentData &persist,
+    InteractionPerFrameData &frame, const InteractionStartData &start, MirrorableData &base,
+    MirrorableData &mirror, const MEvent &event
 )
 {
     MStatus status = MStatus::kSuccess;
@@ -2340,79 +2118,67 @@ MStatus doDragCommon(
     // -----------------------------------------------------------------
     if (event.mouseButton() == MEvent::kLeftMouse) {
         // from previous hit get a line----------
-        short previousX = screenX;
-        short previousY = screenY;
-        event.getPosition(screenX, screenY);
+        short previousX = frame.screenX;
+        short previousY = frame.screenY;
+        event.getPosition(frame.screenX, frame.screenY);
 
         // dictionnary of visited vertices and distances --- prefill it with the previous hit ---
-        std::unordered_map<int, float> dicVertsDistToGrow = dicVertsDistSTART;
-        std::unordered_map<int, float> dicVertsDistToGrowMirror = dicVertsMirrorDistSTART;
+        std::unordered_map<int, float> dicVertsDistToGrow = base.dicVertsDistSTART;
+        std::unordered_map<int, float> dicVertsDistToGrowMirror = mirror.dicVertsDistSTART;
 
         // for linear growth ----------------------------------
         MFloatPointArray lineHitPoints, lineHitPointsMirror;
-        lineHitPoints.append(inMatrixHit);
-        if (paintMirror != 0 && successFullMirrorHit) { // if mirror is not OFf
-            lineHitPointsMirror.append(inMatrixHitMirror);
+        lineHitPoints.append(base.inMatrixHit);
+        if (ui.paintMirror != 0 && mirror.successfullHit) { // if mirror is not OFf
+            lineHitPointsMirror.append(mirror.inMatrixHit);
         }
         // --------- LINE OF PIXELS --------------------
         std::vector<std::pair<short, short>> line2dOfPixels;
         // get pixels of the line of pixels
-        lineC(previousX, previousY, screenX, screenY, line2dOfPixels);
+        lineC(previousX, previousY, frame.screenX, frame.screenY, line2dOfPixels);
         int nbPixelsOfLine = (int)line2dOfPixels.size();
 
         MFloatPoint hitPoint, hitMirrorPoint;
         MFloatPoint hitPointIM, hitMirrorPointIM;
         int faceHit, faceMirrorHit;
 
+        M3dView view = M3dView::active3dView();
         bool successFullHit2 = computeHit(
-            screenX, screenY, drawBrushVal, view, worldPoint, worldVector, meshFn, accelParams,
-            pressDistance, paintMirror, perFaceTriangleVertices, mayaOrigRawPoints, origHitPoint,
-            normalVector, faceHit, hitPoint
+            frame.screenX, frame.screenY, ui.drawBrushVal, view, ui, mesh, frame, faceHit, hitPoint
         );
 
         bool successFullMirrorHit2 = false;
         if (successFullHit2) {
             // stored in start dic for next call of drag function
-            previousfaceHit = faceHit;
-            dicVertsDistSTART.clear();
-            hitPointIM = hitPoint * inclusiveMatrixInverse;
-            expandHit(
-                faceHit, mayaRawPoints, sizeVal, perFaceVerticesSetFLAT, perFaceVerticesSetINDEX,
-                hitPointIM, dicVertsDistSTART
-            );
+            persist.previousfaceHit = faceHit;
+            base.dicVertsDistSTART.clear();
+            hitPointIM = hitPoint * mesh.inclusiveMatrixInverse;
+            expandHit(faceHit, hitPointIM, ui, mesh, base.dicVertsDistSTART);
 
             // If the mirror happens -------------------------
-            if (paintMirror != 0) {     // if mirror is not OFf
-                successFullMirrorHit2 = // getMirrorHit(faceMirrorHit, hitMirrorPoint);
-
-                    getMirrorHit(
-                        paintMirror, origHitPoint, intersectorOrigShape, intersector, mirrorMinDist,
-                        perFaceTriangleVertices, mayaRawPoints, inclusiveMatrix, centerOfBrush,
-                        faceMirrorHit, hitMirrorPoint
-                    );
+            if (ui.paintMirror != 0) { // if mirror is not OFf
+                successFullMirrorHit2 =
+                    getMirrorHit(ui, mesh, start, frame, base, faceMirrorHit, hitMirrorPoint);
 
                 if (successFullMirrorHit2) {
-                    hitMirrorPointIM = hitMirrorPoint * inclusiveMatrixInverse;
-                    expandHit(
-                        faceMirrorHit, mayaRawPoints, sizeVal, perFaceVerticesSetFLAT,
-                        perFaceVerticesSetINDEX, hitMirrorPointIM, dicVertsMirrorDistSTART
-                    );
+                    hitMirrorPointIM = hitMirrorPoint * mesh.inclusiveMatrixInverse;
+                    expandHit(faceMirrorHit, hitMirrorPointIM, ui, mesh, mirror.dicVertsDistSTART);
                 }
             }
         }
-        if (!successFullDragHit && !successFullHit2) { // moving in empty zone
+        if (!base.successFullDragHit && !successFullHit2) { // moving in empty zone
             return MStatus::kNotFound;
         }
         //////////////////////////////////////////////////////////////////////////////
-        successFullDragHit = successFullHit2;
-        successFullDragMirrorHit = successFullMirrorHit2;
+        base.successFullDragHit = successFullHit2;
+        mirror.successFullDragHit = successFullMirrorHit2;
 
-        if (successFullDragHit) {
-            centerOfBrush = hitPoint;
-            inMatrixHit = hitPointIM;
-            if (paintMirror != 0 && successFullDragMirrorHit) {
-                centerOfMirrorBrush = hitMirrorPoint;
-                inMatrixHitMirror = hitMirrorPointIM;
+        if (base.successFullDragHit) {
+            base.centerOfBrush = hitPoint;
+            base.inMatrixHit = hitPointIM;
+            if (ui.paintMirror != 0 && mirror.successFullDragHit) {
+                mirror.centerOfBrush = hitMirrorPoint;
+                mirror.inMatrixHit = hitMirrorPointIM;
             }
         }
         int incrementValue = 1;
@@ -2422,32 +2188,23 @@ MStatus doDragCommon(
                 short x = myPair.first;
                 short y = myPair.second;
 
-                bool successFullHit2 = computeHit(
-                    x, y, false, view, worldPoint, worldVector, meshFn, accelParams, pressDistance,
-                    paintMirror, perFaceTriangleVertices, mayaOrigRawPoints, origHitPoint,
-                    normalVector, faceHit, hitPoint
-                );
+                bool successFullHit2 =
+                    computeHit(x, y, false, view, ui, mesh, frame, faceHit, hitPoint);
                 if (successFullHit2) {
-                    hitPointIM = hitPoint * inclusiveMatrixInverse;
+                    hitPointIM = hitPoint * mesh.inclusiveMatrixInverse;
                     lineHitPoints.append(hitPointIM);
-                    successFullHit2 = expandHit(
-                        faceHit, mayaRawPoints, sizeVal, perFaceVerticesSetFLAT,
-                        perFaceVerticesSetINDEX, hitPointIM, dicVertsDistToGrow
-                    );
+                    successFullHit2 = expandHit(faceHit, hitPointIM, ui, mesh, dicVertsDistToGrow);
                     // mirror part -------------------
-                    if (paintMirror != 0) { // if mirror is not OFf
+                    if (ui.paintMirror != 0) { // if mirror is not OFf
                         successFullMirrorHit2 = getMirrorHit(
-                            paintMirror, origHitPoint, intersectorOrigShape, intersector,
-                            mirrorMinDist, perFaceTriangleVertices, mayaRawPoints, inclusiveMatrix,
-                            centerOfBrush, faceMirrorHit, hitMirrorPoint
+                            ui, mesh, start, frame, base, faceMirrorHit, hitMirrorPoint
                         );
 
                         if (successFullMirrorHit2) {
-                            hitMirrorPointIM = hitMirrorPoint * inclusiveMatrixInverse;
+                            hitMirrorPointIM = hitMirrorPoint * mesh.inclusiveMatrixInverse;
                             lineHitPointsMirror.append(hitMirrorPointIM);
                             expandHit(
-                                faceMirrorHit, mayaRawPoints, sizeVal, perFaceVerticesSetFLAT,
-                                perFaceVerticesSetINDEX, hitMirrorPointIM, dicVertsDistToGrowMirror
+                                faceMirrorHit, hitMirrorPointIM, ui, mesh, dicVertsDistToGrowMirror
                             );
                         }
                     }
@@ -2455,105 +2212,61 @@ MStatus doDragCommon(
             }
         }
         // only now add last hit -------------------------
-        if (successFullDragHit) {
-            lineHitPoints.append(inMatrixHit);
+        if (base.successFullDragHit) {
+            lineHitPoints.append(base.inMatrixHit);
             expandHit(
-                faceHit, mayaRawPoints, sizeVal, perFaceVerticesSetFLAT, perFaceVerticesSetINDEX,
-                inMatrixHit,
-                dicVertsDistToGrow
-            );                                                  // to get closest hit
-            if (paintMirror != 0 && successFullDragMirrorHit) { // if mirror is not OFf
-                lineHitPointsMirror.append(inMatrixHitMirror);
-                expandHit(
-                    faceMirrorHit, mayaRawPoints, sizeVal, perFaceVerticesSetFLAT,
-                    perFaceVerticesSetINDEX, inMatrixHitMirror, dicVertsDistToGrowMirror
-                );
+                faceHit, base.inMatrixHit, ui, mesh, dicVertsDistToGrow
+            );                                                      // to get closest hit
+            if (ui.paintMirror != 0 && mirror.successFullDragHit) { // if mirror is not OFf
+                lineHitPointsMirror.append(mirror.inMatrixHit);
+                expandHit(faceMirrorHit, mirror.inMatrixHit, ui, mesh, dicVertsDistToGrowMirror);
             }
         }
 
-        modifierNoneShiftControl = ModifierKeys::NoModifier;
+        frame.modifierNoneShiftControl = ModifierKeys::NoModifier;
         if (event.isModifierShift()) {
             if (event.isModifierControl()) {
-                modifierNoneShiftControl = ModifierKeys::ControlShift;
+                frame.modifierNoneShiftControl = ModifierKeys::ControlShift;
             }
             else {
-                modifierNoneShiftControl = ModifierKeys::Shift;
+                frame.modifierNoneShiftControl = ModifierKeys::Shift;
             }
         }
         else if (event.isModifierControl()) {
-            modifierNoneShiftControl = ModifierKeys::Control;
+            frame.modifierNoneShiftControl = ModifierKeys::Control;
         }
 
         // let's expand these arrays to the outer part of the brush----------------
-        for (auto hitPoint : lineHitPoints) {
-            AllHitPoints.append(hitPoint);
+        for (auto hp : lineHitPoints) {
+            base.AllHitPoints.append(hp);
         }
-        for (auto hitPoint : lineHitPointsMirror) {
-            AllHitPointsMirror.append(hitPoint);
+        for (auto hp : lineHitPointsMirror) {
+            mirror.AllHitPoints.append(hp);
         }
 
-        growArrayOfHitsFromCenters(
-            coverageVal, sizeVal, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX,
-            mayaRawPoints, verticesNormals, worldVector, lineHitPoints, dicVertsDistToGrow
-        );
-
-        addBrushShapeFallof(
-            strengthVal, smoothStrengthVal, modifierNoneShiftControl, commandIndex,
-            fractionOversamplingVal, oversamplingVal, sizeVal, curveVal, dicVertsDistToGrow
-        );
-
+        growArrayOfHitsFromCenters(true, ui, mesh, frame, lineHitPoints, dicVertsDistToGrow);
+        addBrushShapeFallof(ui, frame, dicVertsDistToGrow);
         preparePaint(
-            postSetting, commandIndex, modifierNoneShiftControl, lockVertices, mirrorInfluences,
-            influenceIndex, numVertices, nbJoints, smoothRepeat, ignoreLockVal, skinWeightList,
-            lockJoints, smoothStrengthVal, ignoreLockJoints, doNormalize, skinObj,
-            skinWeightsForUndo, isNurbs, meshDag, influenceIndices, numCVsInV_, nurbsDag, normalize,
-            meshFn, nurbsFn, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX,
-            mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-            rawNormals,    // A C-style array pointing to the mesh vertex positions
-            verticesNormalsIndices,
-            verticesNormals, // The per-vertex local space normals of the mesh
-            smoothModifier,  // Constant
-            removeModifier,  // Constant
-
-            dicVertsDistToGrow, previousPaint, intensityValuesOrig, skinValuesToSet,
-            verticesPainted, false
+            ui.postSetting, false, dicVertsDistToGrow, ui, infl, weights, mesh, nurbs, persist,
+            frame, base
         );
 
-        if (paintMirror != 0) { // mirror
+        if (ui.paintMirror != 0) { // mirror
             growArrayOfHitsFromCenters(
-                coverageVal, sizeVal, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX,
-                mayaRawPoints, verticesNormals, worldVector, lineHitPointsMirror,
-                dicVertsDistToGrowMirror
+                true, ui, mesh, frame, lineHitPointsMirror, dicVertsDistToGrowMirror
             );
-            addBrushShapeFallof(
-                strengthVal, smoothStrengthVal, modifierNoneShiftControl, commandIndex,
-                fractionOversamplingVal, oversamplingVal, sizeVal, curveVal,
-                dicVertsDistToGrowMirror
-            );
+            addBrushShapeFallof(ui, frame, dicVertsDistToGrowMirror);
             preparePaint(
-                postSetting, commandIndex, modifierNoneShiftControl, lockVertices, mirrorInfluences,
-                influenceIndex, numVertices, nbJoints, smoothRepeat, ignoreLockVal, skinWeightList,
-                lockJoints, smoothStrengthVal, ignoreLockJoints, doNormalize, skinObj,
-                skinWeightsForUndo, isNurbs, meshDag, influenceIndices, numCVsInV_, nurbsDag,
-                normalize, meshFn, nurbsFn, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX,
-                mayaRawPoints, rawNormals, verticesNormalsIndices, verticesNormals, smoothModifier,
-                removeModifier, dicVertsDistToGrowMirror, previousMirrorPaint,
-                intensityValuesMirror, skinValuesMirrorToSet, verticesPainted, true
+                ui.postSetting, true, dicVertsDistToGrowMirror, ui, infl, weights, mesh, nurbs,
+                persist, frame, mirror
             );
         }
-        mergeMirrorArray(mirroredJoinedArray, skinValuesToSet, skinValuesMirrorToSet);
+        mergeMirrorArray(weights, base, mirror);
 
-        if (useColorSetsWhilePainting || !postSetting) {
-            doPerformPaint(
-                mirroredJoinedArray, soloColorVal, useColorSetsWhilePainting, postSetting,
-                commandIndex, influenceIndex, nbJoints, maxSoloColor, minSoloColor,
-                soloColorTypeVal, multiCurrentColors, soloCurrentColors, jointsColors,
-                lockVertColor, lockJntColor, lockVertices, lockJoints, mirrorInfluences,
-                skinWeightList, modifierNoneShiftControl, smoothModifier, removeModifier, view,
-                toggleColorState, meshFn
-            );
+        if (ui.useColorSetsWhilePainting || !ui.postSetting) {
+            doPerformPaint(ui.postSetting, toggleColorState, ui, infl, weights, frame, mesh);
         }
-        performBrush = true;
+        persist.performBrush = true;
     }
     // -----------------------------------------------------------------
     // Dragging with the middle mouse button adjusts the settings.
@@ -2566,18 +2279,18 @@ MStatus doDragCommon(
         //   show less flicker.
         // - It also improves the differentiation between horizontal and
         //   vertical dragging when adjusting.
-        undersamplingSteps++;
-        if (undersamplingSteps < undersamplingVal) {
+        persist.undersamplingSteps++;
+        if (persist.undersamplingSteps < ui.undersamplingVal) {
             return status;
         }
-        undersamplingSteps = 0;
+        persist.undersamplingSteps = 0;
 
         // get screen position
-        event.getPosition(screenX, screenY);
+        event.getPosition(frame.screenX, frame.screenY);
         // Get the current and initial cursor position and calculate the
         // delta movement from them.
-        MPoint currentPos(screenX, screenY);
-        MPoint startPos(startScreenX, startScreenY);
+        MPoint currentPos(frame.screenX, frame.screenY);
+        MPoint startPos(start.startScreenX, start.startScreenY);
         MVector deltaPos(currentPos - startPos);
 
         // Switch if the size should get adjusted or the strength based
@@ -2586,13 +2299,13 @@ MStatus doDragCommon(
         // InitAdjust makes sure that direction gets set on the first
         // drag event and gets reset the next time a mouse button is
         // pressed.
-        if (!initAdjust) {
+        if (!persist.initAdjust) {
             if (deltaPos.length() < 6) {
                 return status; // only if we move at least 6 pixels do we know the direction to
                                // pick !
             }
-            sizeAdjust = (abs(deltaPos.x) > abs(deltaPos.y));
-            initAdjust = true;
+            persist.sizeAdjust = (abs(deltaPos.x) > abs(deltaPos.y));
+            persist.initAdjust = true;
         }
         // Define the settings for either setting the brush size or the
         // brush strength.
@@ -2601,21 +2314,21 @@ MStatus doDragCommon(
         double dragDistance = deltaPos.x;
         double min = 0.001;
         unsigned int max = 1000;
-        double baseValue = sizeVal;
+        double baseValue = ui.sizeVal;
         // The adjustment speed depends on the distance to the mesh.
         // Closer distances allows for a feiner control whereas larger
         // distances need a coarser control.
-        double speed = pow(0.001 * pressDistance, 0.9);
+        double speed = pow(0.001 * frame.pressDistance, 0.9);
 
         // Vary the settings if the strength gets adjusted.
-        if (!sizeAdjust) {
+        if (!persist.sizeAdjust) {
             if (event.isModifierControl()) {
                 message = "Smooth Strength";
-                baseValue = smoothStrengthVal;
+                baseValue = ui.smoothStrengthVal;
             }
             else {
                 message = "Brush Strength";
-                baseValue = strengthVal;
+                baseValue = ui.strengthVal;
             }
             slider = "Strength";
             dragDistance = deltaPos.y;
@@ -2625,21 +2338,21 @@ MStatus doDragCommon(
         double prevDist = 0.0;
         // The shift modifier scales the speed for a fine adjustment.
         if (event.isModifierShift()) {
-            if (!shiftMiddleDrag) {            // if we weren't in shift we reset
-                storedDistance = dragDistance; // store the pixels to remove
-                shiftMiddleDrag = true;
+            if (!frame.shiftMiddleDrag) {              // if we weren't in shift we reset
+                persist.storedDistance = dragDistance; // store the pixels to remove
+                frame.shiftMiddleDrag = true;
             }
-            prevDist = storedDistance * speed; // store the previsou drag done
+            prevDist = persist.storedDistance * speed; // store the previsou drag done
             speed *= 0.1;
         }
         else {
-            if (shiftMiddleDrag) {
-                storedDistance = dragDistance;
-                shiftMiddleDrag = false;
+            if (frame.shiftMiddleDrag) {
+                persist.storedDistance = dragDistance;
+                frame.shiftMiddleDrag = false;
             }
-            prevDist = storedDistance * speed; // store the previous drag done
+            prevDist = persist.storedDistance * speed; // store the previous drag done
         }
-        dragDistance -= storedDistance;
+        dragDistance -= persist.storedDistance;
 
         // Calculate the new value by adding the drag distance to the
         // start value.
@@ -2655,13 +2368,13 @@ MStatus doDragCommon(
 
         // Store the modified value for drawing and for setting the
         // values when releasing the mouse button.
-        adjustValue = value;
+        persist.adjustValue = value;
 
         // -------------------------------------------------------------
         // value display in the viewport
         // -------------------------------------------------------------
-        short offsetX = startScreenX - viewCenterX;
-        short offsetY = startScreenY - viewCenterY - 50;
+        short offsetX = start.startScreenX - start.viewCenterX;
+        short offsetY = start.startScreenY - start.viewCenterY - 50;
 
         int precision = 2;
         if (event.isModifierShift()) {
@@ -2671,7 +2384,7 @@ MStatus doDragCommon(
         std::string stdMessage = std::string(message.asChar());
 
         std::stringstream stream;
-        stream << std::fixed << std::setprecision(precision) << adjustValue;
+        stream << std::fixed << std::setprecision(precision) << persist.adjustValue;
 
         std::string theMessage = stdMessage + ": " + stream.str();
         std::string headsUpFmt = "headsUpMessage -horizontalOffset " + std::to_string(offsetX) +
@@ -2681,7 +2394,7 @@ MStatus doDragCommon(
 
         // Also, adjust the slider in the tool settings window if it's
         // currently open.
-        if (sizeAdjust) {
+        if (persist.sizeAdjust) {
             MUserEventMessage::postUserEvent("brSkinBrush_updateDisplaySize");
         }
         else {
@@ -2692,33 +2405,28 @@ MStatus doDragCommon(
 }
 
 MStatus editSoloColorSet(
-    int numVertices, // The number of vertices in the current mesh
-    int nbJoints, int influenceIndex, MDoubleArray &skinWeightList, MIntArray &lockVertices,
-    MDoubleArray &soloColorsValues, MColorArray &soloCurrentColors, MColor &lockVertColor,
-    MFnMesh &meshFn, double maxSoloColor, double minSoloColor, int soloColorTypeVal,
-    MColorArray &jointsColors, bool doBlack
+    bool doBlack, const UserInputData &ui, const InfluenceData &infl, WeightData &weights,
+    MeshState &mesh
 )
 {
     MStatus status;
 
     MColorArray colToSet;
     MIntArray vtxToSet;
-    for (unsigned int theVert = 0; theVert < numVertices; ++theVert) {
+    for (unsigned int theVert = 0; theVert < (unsigned int)mesh.numVertices; ++theVert) {
         double val = 0.0;
-        int ind_swl = theVert * nbJoints + influenceIndex;
-        if (ind_swl < skinWeightList.length()) {
-            val = skinWeightList[ind_swl];
+        int ind_swl = theVert * infl.nbJoints + ui.influenceIndex;
+        if (ind_swl < weights.skinWeightList.length()) {
+            val = weights.skinWeightList[ind_swl];
         }
-        bool isVtxLocked = lockVertices[theVert] == 1;
-        bool update = doBlack || !(soloColorsValues[theVert] == 0 && val == 0);
+        bool isVtxLocked = weights.lockVertices[theVert] == 1;
+        bool update = doBlack || !(weights.soloColorsValues[theVert] == 0 && val == 0);
         if (update) { // dont update the black
-            MColor soloColor = getASoloColor(
-                val, maxSoloColor, minSoloColor, soloColorTypeVal, influenceIndex, jointsColors
-            );
-            soloCurrentColors[theVert] = soloColor;
-            soloColorsValues[theVert] = val;
+            MColor soloColor = getASoloColor(val, ui, infl);
+            weights.soloCurrentColors[theVert] = soloColor;
+            weights.soloColorsValues[theVert] = val;
             if (isVtxLocked) {
-                colToSet.append(lockVertColor);
+                colToSet.append(weights.lockVertColor);
             }
             else {
                 colToSet.append(soloColor);
@@ -2726,108 +2434,59 @@ MStatus editSoloColorSet(
             vtxToSet.append(theVert);
         }
     }
-    meshFn.setSomeColors(vtxToSet, colToSet, &soloColorSet);
-    meshFn.setSomeColors(vtxToSet, colToSet, &soloColorSet2);
+    mesh.meshFn.setSomeColors(vtxToSet, colToSet, &soloColorSet);
+    mesh.meshFn.setSomeColors(vtxToSet, colToSet, &soloColorSet2);
 
     return status;
 }
 
 void setInfluenceIndex(
-    int influenceIndex, MStringArray &inflNames, MString &pickedInfluence,
-    int soloColorVal, // The solo color index
-    MFnMesh &meshFn,  // For getting the mesh data
-    int value, int numVertices, int nbJoints, MDoubleArray &skinWeightList, MIntArray &lockVertices,
-    MDoubleArray &soloColorsValues, MColorArray &soloCurrentColors, MColor &lockVertColor,
-    double maxSoloColor, double minSoloColor, int soloColorTypeVal, MColorArray &jointsColors,
-    bool selectInUI
+    int value, bool selectInUI, UserInputData &ui, const InfluenceData &infl, WeightData &weights,
+    MeshState &mesh, InteractionPersistentData &persist
 )
 {
-    if (value != influenceIndex) {
-        if (value < inflNames.length()) {
-            influenceIndex = value;
-            pickedInfluence = inflNames[value];
+    if (value != ui.influenceIndex) {
+        if (value < infl.inflNames.length()) {
+            ui.influenceIndex = value;
+            persist.pickedInfluence = infl.inflNames[value];
             if (selectInUI) {
                 MUserEventMessage::postUserEvent("brSkinBrush_pickedInfluence");
             }
         }
 
-        if (soloColorVal == 1) { // solo IF NOT IT CRASHES on a first pick before paint
-            MString currentColorSet = meshFn.currentColorSetName(); // get current soloColor
+        if (ui.soloColorVal == 1) { // solo IF NOT IT CRASHES on a first pick before paint
+            MString currentColorSet = mesh.meshFn.currentColorSetName(); // get current soloColor
             if (currentColorSet != soloColorSet) {
-                meshFn.setCurrentColorSetName(soloColorSet);
+                mesh.meshFn.setCurrentColorSetName(soloColorSet);
             }
-            editSoloColorSet(
-                numVertices, nbJoints, influenceIndex, skinWeightList, lockVertices,
-                soloColorsValues, soloCurrentColors, lockVertColor, meshFn, maxSoloColor,
-                minSoloColor, soloColorTypeVal, jointsColors, false
-            );
+            editSoloColorSet(false, ui, infl, weights, mesh);
         }
-        meshFn.updateSurface(); // for proper redraw hopefully
+        mesh.meshFn.updateSurface(); // for proper redraw hopefully
     }
 }
 
 MStatus doPressCommon(
-    M3dView &view, MDagPath &meshDag, bool pickMaxInfluenceVal, bool pickInfluenceVal,
-    std::vector<drawingDeformers> BBoxOfDeformers, int biggestInfluence, int influenceIndex,
-    bool postSetting, int paintMirror, MDoubleArray &fullUndoSkinWeightList,
-    MDoubleArray &skinWeightList, MDoubleArray &paintArrayValues, int numVertices,
-    std::unordered_map<int, float> &skinValuesToSet,
-    std::unordered_map<int, float> &skinValuesMirrorToSet, std::set<int> &verticesPainted,
-    std::vector<float> &intensityValuesOrig, std::vector<float> &intensityValuesMirror,
-    int &undersamplingSteps, bool performBrush, short screenX, short screenY, unsigned int width,
-    unsigned int height, short viewCenterX, short viewCenterY, short startScreenX,
-    short startScreenY, double storedDistance, bool initAdjust, bool sizeAdjust, double adjustValue,
-    bool successFullDragHit, bool successFullDragMirrorHit,
-    std::unordered_map<int, float> &dicVertsDistSTART,
-    std::unordered_map<int, std::pair<float, float>> &mirroredJoinedArray, bool successFullHit,
-    int previousfaceHit, MFloatPoint &centerOfBrush, MFloatPointArray &AllHitPoints,
-    MFloatPointArray &AllHitPointsMirror, MFloatPoint &inMatrixHit,
-    MFloatMatrix &inclusiveMatrixInverse, std::unordered_map<int, float> &dicVertsMirrorDistSTART,
-    bool successFullMirrorHit, MFnMesh &meshFn, MFloatPoint &centerOfMirrorBrush,
-    MVector &normalMirroredVector, MFloatPoint &inMatrixHitMirror, MFloatPoint surfacePointAdjust,
-    MVector worldVectorAdjust, const MVector &worldVector, MStringArray &inflNames,
-    MString &pickedInfluence,
-    int soloColorVal, // The solo color index
-
-    const float *mayaRawPoints, // A C-style array pointing to the mesh vertex positions
-    const float *rawNormals,    // A C-style array pointing to the mesh vertex positions
-    MIntArray &verticesNormalsIndices,
-    MVectorArray &verticesNormals, // The per-vertex local space normals of the mesh
-    MObject &skinObj,
-
-    int nbJoints, MIntArray &lockVertices, MDoubleArray &soloColorsValues,
-    MColorArray &soloCurrentColors, MColor &lockVertColor, double maxSoloColor, double minSoloColor,
-    int soloColorTypeVal, MColorArray &jointsColors, bool toggleColorState,
-
-    MEvent &event
+    bool &toggleColorState, UserInputData &ui, const InfluenceData &infl, WeightData &weights,
+    MeshState &mesh, InteractionPersistentData &persist, InteractionPerFrameData &frame,
+    InteractionStartData &start, MirrorableData &base, MirrorableData &mirror, const MEvent &event
 )
 {
     MStatus status = MStatus::kSuccess;
 
-    if (meshDag.node().isNull()) {
+    if (mesh.meshDag.node().isNull()) {
         return MStatus::kNotFound;
     }
 
-    view = M3dView::active3dView();
+    if (ui.pickMaxInfluenceVal || ui.pickInfluenceVal) {
+        start.BBoxOfDeformers.clear();
 
-    if (pickMaxInfluenceVal || pickInfluenceVal) {
-        BBoxOfDeformers.clear();
-
-        if (pickMaxInfluenceVal && biggestInfluence != -1) {
+        if (ui.pickMaxInfluenceVal && persist.biggestInfluence != -1) {
             MUserEventMessage::postUserEvent("brSkinBrush_influencesReordered");
         }
 
-        if (biggestInfluence != influenceIndex && biggestInfluence != -1) {
-            setInfluenceIndex(
-                influenceIndex, inflNames, pickedInfluence,
-                soloColorVal, // The solo color index
-                meshFn,       // For getting the mesh data
-                biggestInfluence, numVertices, nbJoints, skinWeightList, lockVertices,
-                soloColorsValues, soloCurrentColors, lockVertColor, maxSoloColor, minSoloColor,
-                soloColorTypeVal, jointsColors,
-                true // true for select in UI
-            );
-            maya2019RefreshColors(true, view, toggleColorState, soloColorVal, meshFn);
+        if (persist.biggestInfluence != ui.influenceIndex && persist.biggestInfluence != -1) {
+            setInfluenceIndex(persist.biggestInfluence, true, ui, infl, weights, mesh, persist);
+            maya2019RefreshColors(true, toggleColorState, ui, mesh);
         }
 
         return MStatus::kNotFound;
@@ -2835,48 +2494,43 @@ MStatus doPressCommon(
 
     // store for undo purposes --------------------------------------------------------------
     // only if painting not after
-    if (!postSetting || paintMirror != 0) {
-        fullUndoSkinWeightList = MDoubleArray(skinWeightList);
+    if (!ui.postSetting || ui.paintMirror != 0) {
+        persist.fullUndoSkinWeightList = MDoubleArray(weights.skinWeightList);
     }
     // update values ------------------------------------------------------------------------
-    refreshPointsNormals(
-        mayaRawPoints, rawNormals, verticesNormalsIndices, verticesNormals, numVertices, meshFn,
-        meshDag, skinObj
-    );
+    refreshPointsNormals(mesh, weights);
 
     // first reset attribute to paint values off if we're doing that ------------------------
-    paintArrayValues.copy(MDoubleArray(numVertices, 0.0));
-    skinValuesToSet.clear();
-    skinValuesMirrorToSet.clear();
-    verticesPainted.clear();
+    base.skinValuesToSet.clear();
+    mirror.skinValuesToSet.clear();
+    persist.verticesPainted.clear();
 
     // reset values ---------------------------------
-    intensityValuesOrig = std::vector<float>(numVertices, 0);
-    intensityValuesMirror = std::vector<float>(numVertices, 0);
+    base.intensityValuesOrig = std::vector<float>(mesh.numVertices, 0);
+    mirror.intensityValuesOrig = std::vector<float>(mesh.numVertices, 0);
     // initialize --
-    undersamplingSteps = 0;
-    performBrush = false;
+    persist.undersamplingSteps = 0;
+    persist.performBrush = false;
 
-    event.getPosition(screenX, screenY);
+    event.getPosition(frame.screenX, frame.screenY);
 
     // Get the size of the viewport and calculate the center for placing
     // the value messages when adjusting the brush settings.
-    unsigned int x;
-    unsigned int y;
-    view.viewport(x, y, width, height);
-    viewCenterX = (short)width / 2;
-    viewCenterY = (short)height / 2;
+    unsigned int x, y, width, height;
+    M3dView::active3dView().viewport(x, y, width, height);
+    start.viewCenterX = (short)width / 2;
+    start.viewCenterY = (short)height / 2;
 
     // Store the initial mouse position. These get used when adjusting
     // the brush size and strength values.
-    startScreenX = screenX;
-    startScreenY = screenY;
-    storedDistance = 0.0; // for the drag screen middle click
+    start.startScreenX = frame.screenX;
+    start.startScreenY = frame.screenY;
+    persist.storedDistance = 0.0; // for the drag screen middle click
 
     // Reset the adjustment from the previous drag.
-    initAdjust = false;
-    sizeAdjust = true;
-    adjustValue = 0.0;
+    persist.initAdjust = false;
+    persist.sizeAdjust = true;
+    persist.adjustValue = 0.0;
 
     // -----------------------------------------------------------------
     // closest point on surface
@@ -2886,92 +2540,83 @@ MStatus doPressCommon(
     MStatus mbStat;
     if (event.mouseButton(&mbStat)) {
         // init at false
-        successFullDragHit = false;
-        successFullDragMirrorHit = false;
-        dicVertsDistSTART.clear();
-        mirroredJoinedArray.clear();
+        base.successFullDragHit = false;
+        mirror.successFullDragHit = false;
+        base.dicVertsDistSTART.clear();
+        weights.mirroredJoinedArray.clear();
         // TODO: these need full arg lists — view, accelParams, pressDistance,
         // perFaceTriangleVertices, mayaOrigRawPoints, origHitPoint, normalVector, sizeVal,
         // perFaceVerticesSetFLAT, perFaceVerticesSetINDEX, inclusiveMatrix, mirrorMinDist, etc.
-        successFullHit = false;
-        // successFullHit = computeHit(screenX, screenY, false, view, worldPoint, worldVector,
-        //     meshFn, accelParams, pressDistance, paintMirror, perFaceTriangleVertices,
-        //     mayaOrigRawPoints, origHitPoint, normalVector, previousfaceHit, centerOfBrush);
-        if (!successFullHit) {
+        base.successfullHit = false;
+        // base.successfullHit = computeHit(frame.screenX, frame.screenY, false,
+        //     M3dView::active3dView(), ui, mesh, frame, persist.previousfaceHit,
+        //     base.centerOfBrush);
+        if (!base.successfullHit) {
             return MStatus::kNotFound;
         }
-        AllHitPoints.clear();
-        AllHitPointsMirror.clear();
+        base.AllHitPoints.clear();
+        mirror.AllHitPoints.clear();
 
         // we put it inside our world matrix
-        inMatrixHit = centerOfBrush * inclusiveMatrixInverse;
-        successFullHit = false;
-        // successFullHit = expandHit(previousfaceHit, mayaRawPoints, sizeVal,
-        //     perFaceVerticesSetFLAT, perFaceVerticesSetINDEX, inMatrixHit, dicVertsDistSTART);
+        base.inMatrixHit = base.centerOfBrush * mesh.inclusiveMatrixInverse;
+        base.successfullHit = false;
+        // base.successfullHit = expandHit(persist.previousfaceHit, base.inMatrixHit, ui, mesh,
+        // base.dicVertsDistSTART);
 
         // mirror part -------------------
-        if (paintMirror != 0) { // if mirror is not OFf
-            dicVertsMirrorDistSTART.clear();
+        if (ui.paintMirror != 0) { // if mirror is not OFf
+            mirror.dicVertsDistSTART.clear();
             int faceMirrorHit = 0;
-            successFullMirrorHit = false;
-            // successFullMirrorHit = getMirrorHit(paintMirror, origHitPoint, intersectorOrigShape,
-            //     intersector, mirrorMinDist, perFaceTriangleVertices, mayaRawPoints,
-            //     inclusiveMatrix, centerOfBrush, faceMirrorHit, centerOfMirrorBrush);
-            meshFn.getPolygonNormal(faceMirrorHit, normalMirroredVector, MSpace::kWorld);
+            mirror.successfullHit = false;
+            // mirror.successfullHit = getMirrorHit(ui, mesh, start, frame, base, faceMirrorHit,
+            // mirror.centerOfBrush);
+            MVector normalMirroredVector;
+            mesh.meshFn.getPolygonNormal(faceMirrorHit, normalMirroredVector, MSpace::kWorld);
 
-            inMatrixHitMirror = centerOfMirrorBrush * inclusiveMatrixInverse;
-            if (successFullMirrorHit) {
-                // TODO: expandHit(faceMirrorHit, mayaRawPoints, sizeVal,
-                //     perFaceVerticesSetFLAT, perFaceVerticesSetINDEX, inMatrixHitMirror,
-                //     dicVertsMirrorDistSTART);
+            mirror.inMatrixHit = mirror.centerOfBrush * mesh.inclusiveMatrixInverse;
+            if (mirror.successfullHit) {
+                // TODO: expandHit(faceMirrorHit, mirror.inMatrixHit, ui, mesh,
+                // mirror.dicVertsDistSTART);
             }
         }
         // Store the initial surface point and view vector to use when
         // the brush settings are adjusted because the brush circle
         // needs to be static during the adjustment.
-        surfacePointAdjust = centerOfBrush;
-        worldVectorAdjust = worldVector;
+        start.surfacePointAdjust = base.centerOfBrush;
+        start.worldVectorAdjust = frame.worldVector;
     }
     return status;
 }
 
 MStatus doReleaseCommon(
-    MFnMesh &meshFn, // For getting the mesh data
-    bool pickMaxInfluenceVal, bool pickInfluenceVal, bool refreshDone, bool initAdjust,
-    MStatus &pressStatus, bool sizeAdjust, double sizeVal, double adjustValue,
-    double smoothStrengthVal, double strengthVal, bool performBrush,
-
-    MEvent &event
+    bool &refreshDone, UserInputData &ui, const MeshState &mesh, InteractionPersistentData &persist,
+    const MEvent &event
 )
 {
     // Don't continue if no mesh has been set.
-    if (meshFn.object().isNull()) {
+    if (mesh.meshFn.object().isNull()) {
         return MS::kFailure;
-    }
-    if (pickMaxInfluenceVal || pickInfluenceVal) {
-        pickMaxInfluenceVal = false;
-        pickInfluenceVal = false;
     }
     refreshDone = false;
     // Define, which brush setting has been adjusted and needs to get
     // stored.
-    if (event.mouseButton() == MEvent::kMiddleMouse && initAdjust) {
-        CHECK_MSTATUS_AND_RETURN_SILENT(pressStatus);
-        if (sizeAdjust) {
-            sizeVal = adjustValue;
+    if (event.mouseButton() == MEvent::kMiddleMouse && persist.initAdjust) {
+        CHECK_MSTATUS_AND_RETURN_SILENT(persist.pressStatus);
+        if (persist.sizeAdjust) {
+            ui.sizeVal = persist.adjustValue;
         }
         else {
             if (event.isModifierControl()) {
-                smoothStrengthVal = adjustValue;
+                ui.smoothStrengthVal = persist.adjustValue;
             }
             else {
-                strengthVal = adjustValue;
+                ui.strengthVal = persist.adjustValue;
             }
         }
     }
-    if (performBrush) {
+    if (persist.performBrush) {
         // TODO: doTheAction() needs all its params threaded through here
-        // doTheAction(verticesPainted, lockJoints, nbJoints, ...);
+        // doTheAction(ui, infl, weights, mesh, nurbs, persist, frame, base, mirror);
     }
     return MS::kSuccess;
 }
@@ -3021,84 +2666,75 @@ static MStatus getListLockJoints(
 }
 
 void doTheAction(
-    std::set<int> &verticesPainted, MIntArray &lockJoints, int nbJoints, MObject &skinObj,
-    MIntArray indicesForInfluenceObjects, MIntArray &lockVertices, int paintMirror,
-    MIntArray &mirrorInfluences, int influenceIndex,
-    std::unordered_map<int, float> &skinValuesToSet,
-    std::unordered_map<int, float> &skinValuesMirrorToSet, bool postSetting,
-    MDoubleArray &fullUndoSkinWeightList,
-    MFnMesh &meshFn, // For getting the mesh data
-    std::unordered_map<int, float> &previousPaint,
-    std::unordered_map<int, float> &previousMirrorPaint, bool firstPaintDone
+    const UserInputData &ui, InfluenceData &infl, WeightData &weights, MeshState &mesh,
+    NurbsData &nurbs, InteractionPersistentData &persist, const InteractionPerFrameData &frame,
+    MirrorableData &base, MirrorableData &mirror
 )
 {
     // If the smoothing has been performed send the current values to
     // the tool command along with the necessary data for undo and redo.
     // The same goes for the select mode.
     MColorArray multiEditColors, soloEditColors;
-    int nbVerticesPainted = (int)verticesPainted.size();
+    int nbVerticesPainted = (int)persist.verticesPainted.size();
     MIntArray editVertsIndices(nbVerticesPainted, 0);
     MIntArray undoLocks, redoLocks;
 
     MStatus status;
-    if (lockJoints.length() < nbJoints) {
-        getListLockJoints(skinObj, nbJoints, indicesForInfluenceObjects, lockJoints);
-        if (lockJoints.length() < nbJoints) {
-            lockJoints = MIntArray(nbJoints, 0);
-        }
+    if (infl.lockJoints.length() < infl.nbJoints) {
+        MIntArray lockJointsCopy = infl.lockJoints;
+        getListLockJoints(
+            weights.skinObj, infl.nbJoints, infl.indicesForInfluenceObjects, lockJointsCopy
+        );
     }
-    MDoubleArray prevWeights((int)verticesPainted.size() * nbJoints, 0);
+    MDoubleArray prevWeights((int)persist.verticesPainted.size() * infl.nbJoints, 0);
 
     std::vector<int> intArray;
-    intArray.resize(verticesPainted.size());
+    intArray.resize(persist.verticesPainted.size());
 
     int i = 0;
-    for (const auto &theVert : verticesPainted) {
+    for (const auto &theVert : persist.verticesPainted) {
         editVertsIndices[i] = theVert;
         i++;
     }
 
-    // TODO: getCommandIndexModifiers needs commandIndex, modifierNoneShiftControl, smoothModifier,
-    // removeModifier as params of this function
-    // ModifierCommands theCommandIndex = getCommandIndexModifiers();
-    ModifierCommands theCommandIndex = ModifierCommands::Add;
+    ModifierCommands theCommandIndex = getCommandIndexModifiers(ui, frame);
     if ((theCommandIndex == ModifierCommands::LockVertices) ||
         (theCommandIndex == ModifierCommands::UnlockVertices)) {
-        undoLocks.copy(lockVertices);
+        undoLocks.copy(weights.lockVertices);
         bool addLocks = theCommandIndex == ModifierCommands::LockVertices;
         // TODO: editLocks needs forward declaration (defined in functions.cpp)
-        // editLocks(skinObj, editVertsIndices, addLocks, lockVertices);
-        redoLocks.copy(lockVertices);
+        // editLocks(weights.skinObj, editVertsIndices, addLocks, weights.lockVertices);
+        redoLocks.copy(weights.lockVertices);
     }
     else {
-        if (paintMirror != 0) {
-            int mirrorInfluenceIndex = mirrorInfluences[influenceIndex];
-            // TODO: mergeMirrorArray needs mirroredJoinedArray as 1st param (not in current params)
-            // mergeMirrorArray(mirroredJoinedArray, skinValuesToSet, skinValuesMirrorToSet);
+        if (ui.paintMirror != 0) {
+            int mirrorInfluenceIndex = ui.mirrorInfluences[ui.influenceIndex];
+            mergeMirrorArray(weights, base, mirror);
 
-            if (mirrorInfluenceIndex != influenceIndex) {
-                // TODO: applyCommandMirror needs ~32 params threaded through here
-                // status = applyCommandMirror(mirroredJoinedArray, mirrorInfluences, nbJoints,
-                // ...);
+            if (mirrorInfluenceIndex != ui.influenceIndex) {
+                status = applyCommandMirror(true, ui, infl, weights, mesh, nurbs, persist, frame);
             }
             else { // we merge in one array, it's easier
-                for (const auto &element : skinValuesMirrorToSet) {
+                for (const auto &element : mirror.skinValuesToSet) {
                     int index = element.first;
                     float value = element.second;
 
-                    auto ret = skinValuesToSet.insert(std::make_pair(index, value));
+                    auto ret = base.skinValuesToSet.insert(std::make_pair(index, value));
                     if (!ret.second) {
                         ret.first->second = std::max(value, ret.first->second);
                     }
                 }
-                // TODO: applyCommand needs ~31 params threaded through here
-                // status = applyCommand(influenceIndex, nbJoints, smoothRepeat, skinValuesToSet,
-                // ...);
+                status = applyCommand(
+                    ui.influenceIndex, base.skinValuesToSet, true, ui, infl, weights, mesh, nurbs,
+                    persist, frame
+                );
             }
         }
-        else if (skinValuesToSet.size() > 0) {
-            // TODO: applyCommand needs ~31 params threaded through here
-            // status = applyCommand(influenceIndex, nbJoints, smoothRepeat, skinValuesToSet, ...);
+        else if (base.skinValuesToSet.size() > 0) {
+            status = applyCommand(
+                ui.influenceIndex, base.skinValuesToSet, true, ui, infl, weights, mesh, nurbs,
+                persist, frame
+            );
             if (status == MStatus::kFailure) {
                 MGlobal::displayError(
                     MString("Something went wrong. EXIT the brush and RESTART it")
@@ -3106,43 +2742,41 @@ void doTheAction(
                 return;
             }
         }
-        if (!postSetting) { // only store if not constant setting
+        if (!ui.postSetting) { // only store if not constant setting
             int i = 0;
-            for (const auto &theVert : verticesPainted) {
-                for (int j = 0; j < nbJoints; ++j) {
-                    prevWeights[i * nbJoints + j] = fullUndoSkinWeightList[theVert * nbJoints + j];
+            for (const auto &theVert : persist.verticesPainted) {
+                for (int j = 0; j < infl.nbJoints; ++j) {
+                    prevWeights[i * infl.nbJoints + j] =
+                        persist.fullUndoSkinWeightList[theVert * infl.nbJoints + j];
                 }
                 i++;
             }
         }
     }
-    // TODO: refreshColors needs influenceIndex, nbJoints, soloColorTypeVal, lockVertColor, etc.
-    // refreshColors(influenceIndex, nbJoints, soloColorTypeVal, lockVertColor, soloCurrentColors,
-    //     multiCurrentColors, maxSoloColor, minSoloColor, jointsColors, soloColor, lockJntColor,
-    //     lockJoints, soloColorsValues, skinWeightList, lockVertices, editVertsIndices,
-    //     multiEditColors, soloEditColors);
-    meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet);
-    meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet);
+    // TODO: refreshColors — needs editVertsIndices, multiEditColors, soloEditColors populated first
+    // refreshColors(editVertsIndices, multiEditColors, soloEditColors, ui, infl, weights);
+    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet);
+    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet);
 
-    meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet2);
-    meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet2);
+    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet2);
+    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet2);
     if ((theCommandIndex == ModifierCommands::LockVertices) ||
         (theCommandIndex == ModifierCommands::UnlockVertices)) {
         // without that it doesn't refresh because mesh is not invalidated, meaning the skinCluster
         // hasn't changed
-        meshFn.updateSurface();
+        mesh.meshFn.updateSurface();
     }
-    skinValuesToSet.clear();
-    skinValuesMirrorToSet.clear();
-    previousPaint.clear();
-    previousMirrorPaint.clear();
+    base.skinValuesToSet.clear();
+    mirror.skinValuesToSet.clear();
+    base.previousPaint.clear();
+    mirror.previousPaint.clear();
 
-    if (!firstPaintDone) {
-        firstPaintDone = true;
+    if (!persist.firstPaintDone) {
+        persist.firstPaintDone = true;
         MUserEventMessage::postUserEvent("brSkinBrush_cleanCloseUndo");
     }
 
-    // TODO: maya2019RefreshColors needs toggle, view, toggleColorState, soloColorVal, meshFn
-    // maya2019RefreshColors(false, view, toggleColorState, soloColorVal, meshFn);
+    // TODO: maya2019RefreshColors needs toggleColorState threaded through here
+    // maya2019RefreshColors(false, toggleColorState, ui, mesh);
     MUserEventMessage::postUserEvent("brSkinBrush_afterPaint");
 }
