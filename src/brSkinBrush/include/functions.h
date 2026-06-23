@@ -46,16 +46,15 @@ void CVsAround(
     int storedU, int storedV, int numCVsInU, int numCVsInV, bool UIsPeriodic, bool VIsPeriodic,
     MIntArray &vertices
 );
-MStatus
-findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster, bool verbose);
-MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj, bool verbose);
-MStatus findNurbsTesselateOrig(MDagPath meshPath, MObject &origMeshObj, bool verbose);
+MStatus findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster);
+MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj);
+MStatus findNurbsTesselateOrig(MDagPath meshPath, MObject &origMeshObj);
 
-MStatus findMesh(MObject &theSkinCluster, MDagPath &theMeshPath, bool verbose);
-MStatus findOrigMesh(MObject &theSkinCluster, MObject &origMesh, bool verbose);
+MStatus findMesh(MObject &theSkinCluster, MDagPath &theMeshPath);
+MStatus findOrigMesh(MObject &theSkinCluster, MObject &origMesh);
 MStatus getListColorsJoints(
     MObject &skinCluster, int nbJoints, MIntArray indicesForInfluenceObjects,
-    MColorArray &jointsColors, bool verbose
+    MColorArray &jointsColors
 );
 MStatus getListLockJoints(
     MObject &skinCluster, int nbJoints, MIntArray indicesForInfluenceObjects, MIntArray &jointsLocks
@@ -72,13 +71,13 @@ editLocks(MObject &skinCluster, MIntArray &vertsToLock, bool addToLock, MIntArra
 MStatus editArray(
     ModifierCommands command, int influence, int nbJoints, MIntArray &lockJoints,
     MDoubleArray &fullWeightArray, std::map<int, double> &valuesToSet, MDoubleArray &theWeights,
-    bool normalize = true, double mutliplier = 1.0, bool verbose = false
+    bool normalize = true, double mutliplier = 1.0
 );
 MStatus editArrayMirror(
     ModifierCommands command, int influence, int influenceMirror, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray,
     std::map<int, std::pair<float, float>> &valuesToSetMirror, MDoubleArray &theWeights,
-    bool normalize = true, double mutliplier = 1.0, bool verbose = false
+    bool normalize = true, double mutliplier = 1.0
 );
 
 MStatus setAverageWeight(

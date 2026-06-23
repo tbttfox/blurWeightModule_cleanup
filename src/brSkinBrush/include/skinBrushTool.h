@@ -21,6 +21,7 @@
 #include <maya/MCursor.h>
 #include <maya/MDagPath.h>
 #include <maya/MDagPathArray.h>
+#include <maya/MDoubleArray.h>
 #include <maya/MEulerRotation.h>
 #include <maya/MEvent.h>
 #include <maya/MFloatMatrix.h>
@@ -35,6 +36,7 @@
 #include <maya/MFnSkinCluster.h>
 #include <maya/MFrameContext.h>
 #include <maya/MGlobal.h>
+#include <maya/MIntArray.h>
 #include <maya/MItDependencyGraph.h>
 #include <maya/MItMeshEdge.h>
 #include <maya/MItMeshPolygon.h>
@@ -286,9 +288,13 @@ class SkinBrushContext : public MPxContext {
     void getConnectedVerticesSecond();
     void getConnectedVerticesThird();
     void getConnectedVerticesTyler();
-    void getConnectedVerticesFlatten();
-    std::vector<int> getSurroundingVerticesPerVert(int vertexIndex);
-    std::vector<int> getSurroundingVerticesPerFace(int vertexIndex);
+    void getConnectedVerticesFlatten(
+        std::vector<int> &perVertexVerticesSetFLAT, std::vector<int> &perVertexVerticesSetINDEX,
+        std::vector<int> &perFaceVerticesSetFLAT, std::vector<int> &perFaceVerticesSetINDEX
+    ) const;
+
+    std::vector<int> getSurroundingVerticesPerVert(int vertexIndex) const;
+    std::vector<int> getSurroundingVerticesPerFace(int vertexIndex) const;
 
     void getFromMeshNormals();
     MStatus getSelection(MDagPath &dagPath);
@@ -316,47 +322,50 @@ class SkinBrushContext : public MPxContext {
         MColorArray &soloEditColors, MColor &multColor, MColor &soloColor
     ) const;
 
-    MStatus querySkinClusterValues(MObject &skinCluster, MIntArray &verticesIndices, bool doColors);
+    MStatus querySkinClusterValues(
+        MObject &skinCluster, MIntArray &verticesIndices, MDoubleArray &theSkinWeightList,
+        bool doColors
+    ) const;
     MStatus fillArrayValues(MObject &skinCluster, bool doColors);
-    MStatus displayWeightValue(int vertexIndex, bool displayZero = false);
+    MStatus displayWeightValue(int vertexIndex, bool displayZero = false) const;
     MStatus fillArrayValuesDEP(MObject &skinCluster, bool doColors);
     void getSkinClusterAttributes(
         MObject &skinCluster, unsigned int &maxInfluences, bool &maintainMaxInfluences,
         unsigned int &normalize
-    );
+    ) const;
     MIntArray getInfluenceIndices();
-    bool getMirrorHit(bool getNormal, int &faceHit, MFloatPoint &hitPoint);
+    bool getMirrorHit(int &faceHit, MFloatPoint &hitPoint) const;
     bool computeHit(
         short screenPixelX, short screenPixelY, bool getNormal, int &faceHit, MFloatPoint &hitPoint
     );
-    bool
-    expandHit(int faceHit, MFloatPoint &hitPoint, std::unordered_map<int, float> &dicVertsDist);
+    bool expandHit(
+        int faceHit, MFloatPoint &hitPoint, std::unordered_map<int, float> &dicVertsDist
+    ) const;
 
     void growArrayOfHitsFromCenters(
         std::unordered_map<int, float> &dicVertsDist, MFloatPointArray &AllHitPoints
     );
 
     // smooth computation
-    MStatus preparePaint(
+    void preparePaint(
         std::unordered_map<int, float> &dicVertsDist,
         std::unordered_map<int, float> &dicVertsDistPrevPaint, std::vector<float> &intensityValues,
-        std::unordered_map<int, float> &skinValToSet, bool mirror
+        std::unordered_map<int, float> &skinValToSet, std::set<int> &theVerticesPainted, bool mirror
     );
 
     MStatus doPerformPaint();
 
-    void addBrushShapeFallof(std::unordered_map<int, float> &dicVertsDist);
+    void addBrushShapeFallof(std::unordered_map<int, float> &dicVertsDist) const;
 
     MObject allVertexComponents();
-    MIntArray getVerticesInVolume();
     void getVerticesInVolumeRange(
         int index, MIntArray &volumeIndices, MIntArray &rangeIndices, MFloatArray &values
-    );
+    ) const;
 
-    double getFalloffValue(double value, double strength);
+    double getFalloffValue(double value, double strength) const;
     bool eventIsValid(MEvent &event);
 
-    void setInViewMessage(bool display);
+    void setInViewMessage(bool display) const;
 
     // setting the attributes
     void setColorR(float value);

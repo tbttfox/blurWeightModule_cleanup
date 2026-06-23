@@ -1,12 +1,11 @@
 
 #include "skinBrushFlags.h"
 #include "skinBrushTool.h"
+#include <span>
 
 // ---------------------------------------------------------------------
 // the context
 // ---------------------------------------------------------------------
-
-const char helpString[] = "it's a custom brush weights.";
 
 // ---------------------------------------------------------------------
 // general methods when calling the context
@@ -58,22 +57,13 @@ SkinBrushContext::SkinBrushContext()
 
 void SkinBrushContext::toolOnSetup(MEvent &)
 {
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString("---------------- [SkinBrushContext::toolOnSetup ()]------------------")
-        );
-    }
-
     MStatus status = MStatus::kSuccess;
 
-    setHelpString(helpString);
+    setHelpString("it's a custom brush weights.");
     setInViewMessage(true);
 
     if (enterToolCommandVal.length() > 5) {
         MGlobal::executeCommand(enterToolCommandVal);
-    }
-    if (verbose) {
-        MGlobal::displayInfo(MString(" --------->  moduleImportString : ") + moduleImportString);
     }
     MGlobal::executePythonCommand(
         moduleImportString + MString(
@@ -96,10 +86,8 @@ void SkinBrushContext::toolOnSetup(MEvent &)
     status = getMesh();
     MIntArray editVertsIndices;
     if (!skinObj.isNull()) {
-        getListColorsJoints(
-            skinObj, this->nbJoints, indicesForInfluenceObjects, jointsColors,
-            verbose
-        ); // get the joints colors
+        // get the joints colors
+        getListColorsJoints(skinObj, this->nbJoints, indicesForInfluenceObjects, jointsColors);
 
         this->skinWeightList.clear();
         this->ignoreLockJoints = MIntArray(this->nbJoints, 0);
@@ -114,9 +102,6 @@ void SkinBrushContext::toolOnSetup(MEvent &)
         getListLockVertices(skinObj, this->lockVertices, editVertsIndices);
 
         status = fillArrayValues(skinObj, true); // WAY TOO SLOW ... but accurate ?
-        if (verbose) {
-            MGlobal::displayInfo(MString("nb found joints colors ") + jointsColors.length());
-        }
     }
     else {
         MGlobal::displayInfo(MString("FAILED : skinObj.isNull"));
@@ -210,9 +195,6 @@ void SkinBrushContext::getClassName(MString &name) const { name.set("brSkinBrush
 
 void SkinBrushContext::refreshJointsLocks()
 {
-    if (verbose) {
-        MGlobal::displayInfo(" - refreshJointsLocks-");
-    }
     if (!skinObj.isNull()) {
         // Get the skin cluster node from the history of the mesh.
         getListLockJoints(skinObj, this->nbJoints, indicesForInfluenceObjects, this->lockJoints);
@@ -223,38 +205,12 @@ void SkinBrushContext::refreshMirrorInfluences(MIntArray &inputMirrorInfluences)
 {
     this->mirrorInfluences.clear();
     this->mirrorInfluences.copy(inputMirrorInfluences);
-
-    if (verbose) {
-        MGlobal::displayInfo(" - refreshMirrorInfluences-");
-        MString toDisplay("influences names : \n");
-        int nbInfluences = inputMirrorInfluences.length();
-        for (int i = 0; i < nbInfluences; ++i) {
-            int oppInfluenceIndex = inputMirrorInfluences[i];
-            toDisplay += this->inflNames[i];
-            toDisplay += MString(" - ");
-            toDisplay += this->inflNames[oppInfluenceIndex];
-            toDisplay += MString("\n");
-        }
-        MGlobal::displayInfo(toDisplay);
-    }
 }
 
 void SkinBrushContext::refreshTheseVertices(MIntArray &verticesIndices)
 {
     // this command is used when undo is called
-    if (verbose) {
-        MGlobal::displayInfo(" - refreshThisVertices-");
-        MString toDisplay("List Vertices : ");
-        int nbVerts = verticesIndices.length();
-        for (int i = 0; i < nbVerts; ++i) {
-            int vtxIndex = verticesIndices[i];
-            toDisplay += vtxIndex;
-            toDisplay += MString(" - ");
-        }
-        MGlobal::displayInfo(toDisplay);
-    }
-
-    querySkinClusterValues(this->skinObj, verticesIndices, true);
+    querySkinClusterValues(this->skinObj, verticesIndices, this->skinWeightList, true);
     // query the Locks
     getListLockJoints(skinObj, this->nbJoints, indicesForInfluenceObjects, this->lockJoints);
     MIntArray editVertsIndices;
@@ -292,9 +248,8 @@ void SkinBrushContext::refreshDeformerColor(int deformerInd)
     if (!skinObj.isNull()) {
         getListLockJoints(skinObj, this->nbJoints, indicesForInfluenceObjects, this->lockJoints);
         getListColorsJoints(
-            skinObj, this->nbJoints, indicesForInfluenceObjects, this->jointsColors,
-            this->verbose
-        ); // get the joints colors
+            skinObj, this->nbJoints, indicesForInfluenceObjects, this->jointsColors
+        );
     }
     else {
         MGlobal::displayInfo(MString("FAILED : skinObj.isNull"));
@@ -334,11 +289,6 @@ void SkinBrushContext::refreshDeformerColor(int deformerInd)
 void SkinBrushContext::refresh()
 {
     MStatus status;
-    if (verbose) {
-        MGlobal::displayInfo(" - REFRESH In CPP -");
-    }
-    // refresh skinCluster
-    //
     refreshPointsNormals();
     MIntArray editVertsIndices;
 
@@ -346,9 +296,8 @@ void SkinBrushContext::refresh()
         // Get the skin cluster node from the history of the mesh.
         getListLockJoints(skinObj, this->nbJoints, indicesForInfluenceObjects, this->lockJoints);
         getListColorsJoints(
-            skinObj, this->nbJoints, indicesForInfluenceObjects, this->jointsColors,
-            this->verbose
-        ); // get the joints colors
+            skinObj, this->nbJoints, indicesForInfluenceObjects, this->jointsColors
+        );
         status = getListLockVertices(skinObj, this->lockVertices, editVertsIndices); // problem ?
         status = fillArrayValuesDEP(skinObj, true); // get the skin data and all the colors
     }
@@ -511,9 +460,6 @@ MStatus SkinBrushContext::doPtrMoved(
     event.getPosition(screenX, screenY);
     bool displayPickInfluence = this->pickMaxInfluenceVal || this->pickInfluenceVal;
     if (this->pickInfluenceVal) {
-        if (verbose) {
-            MGlobal::displayInfo("HERE pickInfluenceVal IS CALLED");
-        }
         // -------------------------------------------------------------------------------------------------
         // start fill jnts boundingBox
         // --------------------------------------------------------------------
@@ -523,9 +469,6 @@ MStatus SkinBrushContext::doPtrMoved(
             MGlobal::displayInfo(MString("jointDisplayScale :  ") + jointDisplayVal);
 
             int lent = this->inflDagPaths.length();
-            if (verbose) {
-                MGlobal::displayInfo("\nfilling BBoxOfDeformers \n");
-            }
             MPoint zero(0, 0, 0);
             MVector up(0, 1, 0);
             MVector right(1, 0, 0);
@@ -685,7 +628,9 @@ MStatus SkinBrushContext::doPtrMoved(
         if (paintMirror != 0) { // if mirror is not OFf
             // here paint the mirror Brush
             int faceMirrorHit;
-            bool mirroredFound = getMirrorHit(true, faceMirrorHit, this->centerOfMirrorBrush);
+            bool mirroredFound = getMirrorHit(faceMirrorHit, this->centerOfMirrorBrush);
+            meshFn.getPolygonNormal(faceHit, this->normalMirroredVector, MSpace::kWorld);
+
             if (mirroredFound) {
                 drawManager.setColor(MColor(0.0, 1.0, 1.0));
                 drawManager.circle(this->centerOfMirrorBrush, this->normalMirroredVector, sizeVal);
@@ -1445,7 +1390,9 @@ MStatus SkinBrushContext::doPressCommon(MEvent &event)
     // closest point on surface
     // -----------------------------------------------------------------
     // Getting the closest index cannot be performed when in flood mode.
-    if (eventIsValid(event)) {
+
+    MStatus mbStat;
+    if (event.mouseButton(&mbStat)) {
         // init at false
         successFullDragHit = false;
         successFullDragMirrorHit = false;
@@ -1468,7 +1415,8 @@ MStatus SkinBrushContext::doPressCommon(MEvent &event)
         if (paintMirror != 0) { // if mirror is not OFf
             this->dicVertsMirrorDistSTART.clear();
             int faceMirrorHit;
-            successFullMirrorHit = getMirrorHit(true, faceMirrorHit, this->centerOfMirrorBrush);
+            successFullMirrorHit = getMirrorHit(faceMirrorHit, this->centerOfMirrorBrush);
+            meshFn.getPolygonNormal(faceMirrorHit, this->normalMirroredVector, MSpace::kWorld);
 
             this->inMatrixHitMirror = this->centerOfMirrorBrush * this->inclusiveMatrixInverse;
             if (successFullMirrorHit) {
@@ -1482,6 +1430,111 @@ MStatus SkinBrushContext::doPressCommon(MEvent &event)
         worldVectorAdjust = this->worldVector;
     }
     return status;
+}
+
+std::vector<int> getSurroundingVerticesPerVert(
+    int vertexIndex, const std::vector<int> &perVertexVerticesSetFLAT,
+    const std::vector<int> &perVertexVerticesSetINDEX
+)
+{
+    auto first = perVertexVerticesSetFLAT.begin() + perVertexVerticesSetINDEX[vertexIndex];
+    auto last = perVertexVerticesSetFLAT.begin() + perVertexVerticesSetINDEX[vertexIndex + (int)1];
+    std::vector<int> newVec(first, last);
+    return newVec;
+};
+
+void growArrayOfHitsFromCenters(
+    bool coverageVal, double sizeVal, const std::vector<int> &perVertexVerticesSetFLAT,
+    const std::vector<int> &perVertexVerticesSetINDEX, const float *mayaRawPoints,
+    const MVectorArray &verticesNormals, const MVector &worldVector,
+    const MFloatPointArray &AllHitPoints,
+
+    std::unordered_map<int, float> &dicVertsDist // Return value
+)
+{
+    if (AllHitPoints.length() == 0) {
+        return;
+    }
+
+    // set of visited vertices
+    std::vector<int> vertsVisited, vertsWithinDistance;
+
+    for (const auto &element : dicVertsDist) {
+        vertsVisited.push_back(element.first);
+    }
+    std::sort(vertsVisited.begin(), vertsVisited.end());
+    vertsWithinDistance = vertsVisited;
+
+    // start of growth
+    std::vector<int> borderOfGrowth;
+    borderOfGrowth = vertsVisited;
+
+    // make the std vector points for faster sorting
+    std::vector<point_t> points;
+    for (auto hitPt : AllHitPoints) {
+        points.push_back(std::make_tuple(hitPt.x, hitPt.y, hitPt.z));
+    }
+
+    bool keepGoing = true;
+    while (keepGoing) {
+        keepGoing = false;
+
+        // grow the vertices
+        std::vector<int> setOfVertsGrow;
+        for (const int &vertexIndex : borderOfGrowth) {
+            setOfVertsGrow = setOfVertsGrow +
+                             getSurroundingVerticesPerVert(
+                                 vertexIndex, perVertexVerticesSetFLAT, perVertexVerticesSetINDEX
+                             );
+        }
+
+        // get the vertices that are grown
+        std::vector<int> verticesontheborder = setOfVertsGrow - vertsVisited;
+        std::vector<int> foundGrowVertsWithinDistance;
+
+        // for all vertices grown
+        for (int vertexBorder : verticesontheborder) {
+            // First check the normal
+            if (!coverageVal) {
+                MVector vertexBorderNormal = verticesNormals[vertexBorder];
+                double multVal = worldVector * vertexBorderNormal;
+                if (multVal > 0.0) {
+                    continue;
+                }
+            }
+            float closestDist = -1;
+            // find the closestDistance and closest Vertex from visited vertices
+            point_t thisPoint = std::make_tuple(
+                mayaRawPoints[vertexBorder * 3], mayaRawPoints[vertexBorder * 3 + 1],
+                mayaRawPoints[vertexBorder * 3 + 2]
+            );
+            auto glambda = [&thisPoint](const point_t &a, const point_t &b) {
+                float aRes = distance_sq(a, thisPoint);
+                float bRes = distance_sq(b, thisPoint);
+                return aRes < bRes;
+            };
+            std::partial_sort(points.begin(), points.begin() + 1, points.end(), glambda);
+            auto closestPoint = points.front();
+            closestDist = distance(closestPoint, thisPoint);
+            // get the new distance between the closest visited vertex and the grow vertex
+            if (closestDist <= sizeVal) { // if in radius of the brush
+                // we found a vertex in the radius
+                // now add to the visited and add the distance to the dictionnary
+                keepGoing = true;
+                foundGrowVertsWithinDistance.push_back(vertexBorder);
+                auto ret = dicVertsDist.insert(std::make_pair(vertexBorder, closestDist));
+                if (!ret.second) {
+                    ret.first->second = std::min(closestDist, ret.first->second);
+                }
+            }
+        }
+        // this vertices has been visited, let's not consider them anymore
+        std::sort(foundGrowVertsWithinDistance.begin(), foundGrowVertsWithinDistance.end());
+        vertsVisited = vertsVisited + verticesontheborder;
+        vertsWithinDistance = vertsWithinDistance + foundGrowVertsWithinDistance;
+
+        borderOfGrowth = foundGrowVertsWithinDistance;
+    }
 }
 
 void SkinBrushContext::growArrayOfHitsFromCenters(
@@ -1613,7 +1666,7 @@ MStatus SkinBrushContext::doDragCommon(MEvent &event)
 
             // If the mirror happens -------------------------
             if (paintMirror != 0) { // if mirror is not OFf
-                successFullMirrorHit2 = getMirrorHit(false, faceMirrorHit, hitMirrorPoint);
+                successFullMirrorHit2 = getMirrorHit(faceMirrorHit, hitMirrorPoint);
                 if (successFullMirrorHit2) {
                     hitMirrorPointIM = hitMirrorPoint * this->inclusiveMatrixInverse;
                     expandHit(faceMirrorHit, hitMirrorPointIM, this->dicVertsMirrorDistSTART);
@@ -1649,7 +1702,7 @@ MStatus SkinBrushContext::doDragCommon(MEvent &event)
                     successFullHit2 = expandHit(faceHit, hitPointIM, dicVertsDistToGrow);
                     // mirror part -------------------
                     if (paintMirror != 0) { // if mirror is not OFf
-                        successFullMirrorHit2 = getMirrorHit(false, faceMirrorHit, hitMirrorPoint);
+                        successFullMirrorHit2 = getMirrorHit(faceMirrorHit, hitMirrorPoint);
                         if (successFullMirrorHit2) {
                             hitMirrorPointIM = hitMirrorPoint * this->inclusiveMatrixInverse;
                             lineHitPointsMirror.append(hitMirrorPointIM);
@@ -1694,7 +1747,7 @@ MStatus SkinBrushContext::doDragCommon(MEvent &event)
         addBrushShapeFallof(dicVertsDistToGrow);
         preparePaint(
             dicVertsDistToGrow, this->previousPaint, this->intensityValuesOrig,
-            this->skinValuesToSet, false
+            this->skinValuesToSet, this->verticesPainted, false
         );
 
         if (paintMirror != 0) { // mirror
@@ -1702,7 +1755,7 @@ MStatus SkinBrushContext::doDragCommon(MEvent &event)
             addBrushShapeFallof(dicVertsDistToGrowMirror);
             preparePaint(
                 dicVertsDistToGrowMirror, this->previousMirrorPaint, this->intensityValuesMirror,
-                this->skinValuesMirrorToSet, true
+                this->skinValuesMirrorToSet, this->verticesPainted, true
             );
         }
         mergeMirrorArray(this->skinValuesToSet, this->skinValuesMirrorToSet);
@@ -1892,18 +1945,9 @@ void SkinBrushContext::doTheAction()
 
     MStatus status;
     if (this->lockJoints.length() < this->nbJoints) {
-        if (verbose) {
-            MGlobal::displayInfo(
-                MString("-> doTheAction | before getListLockJoints | nbJoints ") + nbJoints +
-                MString(" | lockJoints ") + lockJoints.length()
-            );
-        }
         getListLockJoints(skinObj, this->nbJoints, indicesForInfluenceObjects, this->lockJoints);
         if (this->lockJoints.length() < this->nbJoints) {
             this->lockJoints = MIntArray(this->nbJoints, 0);
-            if (verbose) {
-                MGlobal::displayInfo(MString("-> doTheAction | fix the size of lock array"));
-            }
         }
     }
     MDoubleArray prevWeights((int)this->verticesPainted.size() * this->nbJoints, 0);
@@ -1947,12 +1991,6 @@ void SkinBrushContext::doTheAction()
             }
         }
         else if (this->skinValuesToSet.size() > 0) {
-            if (verbose) {
-                MGlobal::displayInfo(
-                    MString("before applyCommand this->skinValuesToSet.size is ") +
-                    this->skinValuesToSet.size()
-                );
-            }
             status = applyCommand(this->influenceIndex, this->skinValuesToSet); //
             if (status == MStatus::kFailure) {
                 MGlobal::displayError(
@@ -1972,18 +2010,12 @@ void SkinBrushContext::doTheAction()
             }
         }
     }
-    if (verbose) {
-        MGlobal::displayInfo(MString("before refreshColors"));
-    }
     refreshColors(editVertsIndices, multiEditColors, soloEditColors);
     meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->fullColorSet);
     meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->soloColorSet);
 
     meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->fullColorSet2);
     meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->soloColorSet2);
-    if (verbose) {
-        MGlobal::displayInfo(MString("after refreshColors"));
-    }
     if ((theCommandIndex == ModifierCommands::LockVertices) ||
         (theCommandIndex == ModifierCommands::UnlockVertices)) {
         // without that it doesn't refresh because mesh is not invalidated, meaning the skinCluster
@@ -2069,13 +2101,7 @@ void SkinBrushContext::doTheAction()
     // (MPxToolCommand)::redoIt at this point but in this case it
     // is not necessary since the the smoothing already has been
     // performed. There is no need to apply the values twice.
-    if (verbose) {
-        MGlobal::displayInfo(MString("cmd->finalize"));
-    }
     cmd->finalize();
-    if (verbose) {
-        MGlobal::displayInfo(MString("maya2019RefreshColors"));
-    }
     maya2019RefreshColors();
     MUserEventMessage::postUserEvent("brSkinBrush_afterPaint");
 }
@@ -2130,21 +2156,6 @@ void SkinBrushContext::mergeMirrorArray(
             ret.first->second = origSecondElem;
         }
     }
-    if (verbose) {
-        // sort this array
-        std::map<int, std::pair<float, float>> mirroredJoinedArrayOrdered(
-            mirroredJoinedArray.begin(), mirroredJoinedArray.end()
-        );
-        // now the print
-        for (auto &elem : mirroredJoinedArrayOrdered) {
-            int theVert = elem.first;
-            std::pair<float, float> secondElem = elem.second;
-            MGlobal::displayInfo(
-                MString("Vert ") + theVert + MString(" : [") + secondElem.first + MString("]  [") +
-                secondElem.second + MString("] ")
-            );
-        }
-    }
 }
 MStatus SkinBrushContext::applyCommandMirror()
 {
@@ -2170,9 +2181,6 @@ MStatus SkinBrushContext::applyCommandMirror()
     if (theCommandIndex == ModifierCommands::Smooth ||
         theCommandIndex == ModifierCommands::Sharpen) {
         repeatLimit = this->smoothRepeat;
-    }
-    if (verbose) {
-        MGlobal::displayInfo(MString("-> applyCommand | repeatLimit is ") + repeatLimit);
     }
 
     MIntArray objVertices;
@@ -2202,7 +2210,7 @@ MStatus SkinBrushContext::applyCommandMirror()
                 status = editArrayMirror(
                     theCommandIndex, influence, influenceMirror, this->nbJoints,
                     this->ignoreLockJoints, this->skinWeightList, mirroredJoinedArrayOrdered,
-                    theWeights, this->doNormalize, multiplier, verbose
+                    theWeights, this->doNormalize, multiplier
                 );
             }
             else {
@@ -2213,7 +2221,7 @@ MStatus SkinBrushContext::applyCommandMirror()
                 status = editArrayMirror(
                     theCommandIndex, influence, influenceMirror, this->nbJoints, this->lockJoints,
                     this->skinWeightList, mirroredJoinedArrayOrdered, theWeights, this->doNormalize,
-                    multiplier, verbose
+                    multiplier
                 );
             }
         }
@@ -2260,18 +2268,8 @@ MStatus SkinBrushContext::applyCommandMirror()
         MObject weightsObjNurbs = doubleFn.create(MFn::kSurfaceCVComponent);
         int uVal, vVal;
         for (int vert : objVertices) {
-            if (verbose) {
-                MGlobal::displayInfo(
-                    MString(" vert  : ") + vert + MString("  |  numCVsInV_ : ") + numCVsInV_
-                );
-            }
             vVal = (int)vert % (int)numCVsInV_;
             uVal = (int)vert / (int)numCVsInV_;
-            if (verbose) {
-                MGlobal::displayInfo(
-                    MString(" vert  : ") + vert + MString(" : ") + uVal + MString("  |  ") + vVal
-                );
-            }
             doubleFn.addElement(uVal, vVal);
         }
         skinFn.setWeights(
@@ -2294,11 +2292,6 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
     ModifierCommands theCommandIndex = getCommandIndexModifiers();
     double multiplier = 1.0;
 
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString("-> applyCommand | theCommandIndex is ") + static_cast<int>(theCommandIndex)
-        );
-    }
     if ((theCommandIndex != ModifierCommands::LockVertices) &&
         (theCommandIndex != ModifierCommands::UnlockVertices)) {
         MDoubleArray theWeights((int)this->nbJoints * valuesToSetOrdered.size(), 0.0);
@@ -2306,9 +2299,6 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
         if (theCommandIndex == ModifierCommands::Smooth ||
             theCommandIndex == ModifierCommands::Sharpen) {
             repeatLimit = this->smoothRepeat;
-        }
-        if (verbose) {
-            MGlobal::displayInfo(MString("-> applyCommand | repeatLimit is ") + repeatLimit);
         }
 
         for (int repeat = 0; repeat < repeatLimit; ++repeat) {
@@ -2327,17 +2317,11 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
                 }
             }
             else {
-                if (verbose) {
-                    MGlobal::displayInfo(
-                        MString("-> applyCommand | before editArray this->ignoreLockVal is ") +
-                        this->ignoreLockVal
-                    );
-                }
                 if (this->ignoreLockVal) {
                     status = editArray(
                         theCommandIndex, influence, this->nbJoints, this->ignoreLockJoints,
                         this->skinWeightList, valuesToSetOrdered, theWeights, this->doNormalize,
-                        multiplier, verbose
+                        multiplier
                     );
                 }
                 else {
@@ -2348,26 +2332,17 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
                     status = editArray(
                         theCommandIndex, influence, this->nbJoints, this->lockJoints,
                         this->skinWeightList, valuesToSetOrdered, theWeights, this->doNormalize,
-                        multiplier, verbose
+                        multiplier
                     );
                 }
                 if (status == MStatus::kFailure) {
                     return status;
-                }
-                if (verbose) {
-                    MGlobal::displayInfo(MString("-> applyCommand | after editArray "));
                 }
             }
             // now set the weights -----------------------------------------------------
             // here we should normalize -----------------------------------------------------
             int i = 0;
             // int prevVert = -1;
-            if (verbose) {
-                MGlobal::displayInfo(
-                    MString("-> applyCommand | valuesToSetOrdered size is  ") +
-                    valuesToSetOrdered.size()
-                );
-            }
             for (const auto &elem : valuesToSetOrdered) {
                 int theVert = elem.first;
                 for (int j = 0; j < this->nbJoints; ++j) {
@@ -2385,9 +2360,6 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
                 i++;
             }
         }
-        if (verbose) {
-            MGlobal::displayInfo(MString("-> applyCommand | out of repeat loop  "));
-        }
         MIntArray objVertices;
         for (const auto &elem : valuesToSetOrdered) {
             int theVert = elem.first;
@@ -2403,9 +2375,6 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
         MFnSkinCluster skinFn(skinObj, &status);
         CHECK_MSTATUS_AND_RETURN_IT(status);
         this->skinWeightsForUndo.clear();
-        if (verbose) {
-            MGlobal::displayInfo(MString(" applyCommand | before skinFn.setWeights"));
-        }
         if (!isNurbs) {
             skinFn.setWeights(
                 meshDag, weightsObj, influenceIndices, theWeights, normalize,
@@ -2417,20 +2386,9 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
             MObject weightsObjNurbs = doubleFn.create(MFn::kSurfaceCVComponent);
             int uVal, vVal;
             for (int vert : objVertices) {
-                if (verbose) {
-                    MGlobal::displayInfo(
-                        MString(" vert  : ") + vert + MString("  |  numCVsInV_ : ") + numCVsInV_
-                    );
-                }
 
                 vVal = (int)vert % (int)numCVsInV_;
                 uVal = (int)vert / (int)numCVsInV_;
-                if (verbose) {
-                    MGlobal::displayInfo(
-                        MString(" vert  : ") + vert + MString(" : ") + uVal + MString("  |  ") +
-                        vVal
-                    );
-                }
                 doubleFn.addElement(uVal, vVal);
             }
             skinFn.setWeights(
@@ -2439,15 +2397,9 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
             );
             transferPointNurbsToMesh(meshFn, nurbsFn); // we transfer the points postions
         }
-        if (verbose) {
-            MGlobal::displayInfo(MString(" applyCommand | before refreshPointsAndNormals"));
-        }
         // in do press common
         // update values ---------------
         refreshPointsNormals();
-        if (verbose) {
-            MGlobal::displayInfo(MString(" applyCommand | FINISH"));
-        }
     }
     return status;
 }
@@ -2458,9 +2410,6 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
 MStatus SkinBrushContext::editSoloColorSet(bool doBlack)
 {
     MStatus status;
-    if (verbose) {
-        MGlobal::displayInfo(" editSoloColorSet CALL NEW 3 ");
-    }
 
     MColorArray colToSet;
     MIntArray vtxToSet;
@@ -2496,11 +2445,6 @@ MStatus SkinBrushContext::refreshColors(
 )
 {
     MStatus status = MS::kSuccess;
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString(" refreshColors CALL ") + editVertsIndices.length()
-        ); // beginning opening of node
-    }
     if (multiEditColors.length() != editVertsIndices.length()) {
         multiEditColors.setLength(editVertsIndices.length());
     }
@@ -2539,22 +2483,12 @@ MStatus SkinBrushContext::refreshColors(
             multiEditColors[i] = multiColor;
             soloEditColors[i] = soloColor;
         }
-
-        if (verbose && theVert == 4) {
-            MGlobal::displayInfo(MString("refreshColors| Vtx 4 | isLocked ") + isVtxLocked);
-            MGlobal::displayInfo(
-                MString("r ") + multiEditColors[i].r + MString(" g ") + multiEditColors[i].g +
-                MString("b ") + multiEditColors[i].b
-            );
-        }
     }
     return status;
 }
 
 MColor SkinBrushContext::getASoloColor(double val) const
 {
-    // if (verbose) MGlobal::displayInfo(" getASoloColor CALL \n");
-
     if (val == 0) {
         return MColor(0, 0, 0);
     }
@@ -2578,6 +2512,26 @@ MColor SkinBrushContext::getASoloColor(double val) const
     return soloColor;
 }
 
+void copyToFloatMatrix(const MMatrix &src, MFloatMatrix &dst)
+{
+    dst[0][0] = (float)src[0][0];
+    dst[0][1] = (float)src[0][1];
+    dst[0][2] = (float)src[0][2];
+    dst[0][3] = (float)src[0][3];
+    dst[1][0] = (float)src[1][0];
+    dst[1][1] = (float)src[1][1];
+    dst[1][2] = (float)src[1][2];
+    dst[1][3] = (float)src[1][3];
+    dst[2][0] = (float)src[2][0];
+    dst[2][1] = (float)src[2][1];
+    dst[2][2] = (float)src[2][2];
+    dst[2][3] = (float)src[2][3];
+    dst[3][0] = (float)src[3][0];
+    dst[3][1] = (float)src[3][1];
+    dst[3][2] = (float)src[3][2];
+    dst[3][3] = (float)src[3][3];
+}
+
 // ---------------------------------------------------------------------
 // brush methods
 // ---------------------------------------------------------------------
@@ -2597,7 +2551,7 @@ MStatus SkinBrushContext::getMesh()
     if (meshDag.apiType() == MFn::kNurbsSurface) { // if is nurbs
         isNurbs = true;
         MObject foundMesh;
-        findNurbsTesselate(meshDag, foundMesh, this->verbose);
+        findNurbsTesselate(meshDag, foundMesh);
         // nurbsDag = meshDag;
         status = MDagPath::getAPathTo(foundMesh, meshDag);
         // MFnNurbsSurface MfnSurface(dagPath);
@@ -2621,46 +2575,12 @@ MStatus SkinBrushContext::getMesh()
     else {
         isNurbs = false;
     }
-    if (verbose) {
-        MGlobal::displayInfo(MString(" is nurbs : ") + isNurbs);
-        MGlobal::displayInfo(MString(" painting : ") + meshDag.fullPathName());
-    }
     // get the matrix
     MMatrix MIM = meshDag.inclusiveMatrix();
     MMatrix MIMI = meshDag.inclusiveMatrixInverse();
-    this->inclusiveMatrix[0][0] = (float)MIM[0][0];
-    this->inclusiveMatrix[0][1] = (float)MIM[0][1];
-    this->inclusiveMatrix[0][2] = (float)MIM[0][2];
-    this->inclusiveMatrix[0][3] = (float)MIM[0][3];
-    this->inclusiveMatrix[1][0] = (float)MIM[1][0];
-    this->inclusiveMatrix[1][1] = (float)MIM[1][1];
-    this->inclusiveMatrix[1][2] = (float)MIM[1][2];
-    this->inclusiveMatrix[1][3] = (float)MIM[1][3];
-    this->inclusiveMatrix[2][0] = (float)MIM[2][0];
-    this->inclusiveMatrix[2][1] = (float)MIM[2][1];
-    this->inclusiveMatrix[2][2] = (float)MIM[2][2];
-    this->inclusiveMatrix[2][3] = (float)MIM[2][3];
-    this->inclusiveMatrix[3][0] = (float)MIM[3][0];
-    this->inclusiveMatrix[3][1] = (float)MIM[3][1];
-    this->inclusiveMatrix[3][2] = (float)MIM[3][2];
-    this->inclusiveMatrix[3][3] = (float)MIM[3][3];
 
-    this->inclusiveMatrixInverse[0][0] = (float)MIMI[0][0];
-    this->inclusiveMatrixInverse[0][1] = (float)MIMI[0][1];
-    this->inclusiveMatrixInverse[0][2] = (float)MIMI[0][2];
-    this->inclusiveMatrixInverse[0][3] = (float)MIMI[0][3];
-    this->inclusiveMatrixInverse[1][0] = (float)MIMI[1][0];
-    this->inclusiveMatrixInverse[1][1] = (float)MIMI[1][1];
-    this->inclusiveMatrixInverse[1][2] = (float)MIMI[1][2];
-    this->inclusiveMatrixInverse[1][3] = (float)MIMI[1][3];
-    this->inclusiveMatrixInverse[2][0] = (float)MIMI[2][0];
-    this->inclusiveMatrixInverse[2][1] = (float)MIMI[2][1];
-    this->inclusiveMatrixInverse[2][2] = (float)MIMI[2][2];
-    this->inclusiveMatrixInverse[2][3] = (float)MIMI[2][3];
-    this->inclusiveMatrixInverse[3][0] = (float)MIMI[3][0];
-    this->inclusiveMatrixInverse[3][1] = (float)MIMI[3][1];
-    this->inclusiveMatrixInverse[3][2] = (float)MIMI[3][2];
-    this->inclusiveMatrixInverse[3][3] = (float)MIMI[3][3];
+    copyToFloatMatrix(MIM, this->inclusiveMatrix);
+    copyToFloatMatrix(MIMI, this->inclusiveMatrixInverse);
 
     // Set the mesh.
     meshFn.setObject(this->meshDag);
@@ -2668,16 +2588,19 @@ MStatus SkinBrushContext::getMesh()
     numFaces = (unsigned)meshFn.numPolygons();
     numEdges = (unsigned)meshFn.numEdges();
     meshFn.freeCachedIntersectionAccelerator();
-    this->accelParams =
-        meshFn.uniformGridParams(33, 33, 33); // I dont know why, but '33' seems to work well
+
+    // I dont know why, but '33' seems to work well
+    this->accelParams = meshFn.uniformGridParams(33, 33, 33);
 
     // getConnected vertices Guillaume function
     getConnectedVertices();
     getConnectedVerticesSecond();
     getConnectedVerticesThird();
     getFromMeshNormals();
-    getConnectedVerticesFlatten();
-
+    getConnectedVerticesFlatten(
+        this->perVertexVerticesSetFLAT, this->perVertexVerticesSetINDEX,
+        this->perFaceVerticesSetFLAT, this->perFaceVerticesSetINDEX
+    );
     this->mayaRawPoints = meshFn.getRawPoints(&status);
     this->lockVertices = MIntArray(this->numVertices, 0);
 
@@ -2705,11 +2628,7 @@ MStatus SkinBrushContext::getMesh()
     // Get the skin cluster settings.
     unsigned int normalizeValue;
     getSkinClusterAttributes(skinClusterObj, maxInfluences, maintainMaxInfluences, normalizeValue);
-    normalize = false;
-    if (normalizeValue > 0) {
-        normalize = true;
-    }
-
+    normalize = (normalizeValue > 0);
     getTheOrigMeshForMirror();
     return status;
 }
@@ -2718,26 +2637,22 @@ MStatus SkinBrushContext::getTheOrigMeshForMirror()
 {
     MStatus status;
 
-    if (verbose) {
-        MGlobal::displayInfo("getting orig mesh also for nurbs");
-    }
     // get the origMesh ----------------------------------------
     MObject origObj;
     if (this->isNurbs) {
-        findNurbsTesselateOrig(this->meshDag, origObj, verbose);
+        findNurbsTesselateOrig(this->meshDag, origObj);
     }
     else {
-        findOrigMesh(skinObj, origObj, verbose);
+        findOrigMesh(skinObj, origObj);
     }
     status = MDagPath::getAPathTo(origObj, origMeshDag);
     // get the orgi vertices -----------------------------------
     meshOrigFn.setObject(origMeshDag);
     mayaOrigRawPoints = meshOrigFn.getRawPoints(&status);
-    this->accelParamsOrigMesh =
-        meshOrigFn.uniformGridParams(33, 33, 33); // I dont know why, but '33' seems to work well
+    // I dont know why, but '33' seems to work well
+    this->accelParamsOrigMesh = meshOrigFn.uniformGridParams(33, 33, 33);
 
     MObject origMeshNode = origMeshDag.node();
-
     status = intersectorOrigShape.create(origMeshNode); // , matrix);
 
     // Create the intersector for the closest point operation for
@@ -2750,6 +2665,177 @@ MStatus SkinBrushContext::getTheOrigMeshForMirror()
 /*
 store vertices connections
 */
+
+/* Build a class that gives fast read access to arbitrarily sized
+faces by dense index.
+
+
+
+
+
+
+*/
+class FlatCounts {
+  private:
+    std::vector<size_t> offsets; // actually offsets
+    std::vector<int> values;
+
+  public:
+    // Constructor from counts/vals pair of vectors
+    FlatCounts(const std::vector<int> &inCounts, const std::vector<int> &inVals)
+    {
+        values = inVals;
+
+        offsets.resize(inCounts.size() + 1);
+        offsets[0] = 0;
+        size_t i = 1, v = 0;
+        for (const auto &c : inCounts) {
+            v += c;
+            offsets[i++] = v;
+        }
+    }
+
+    // Constructor from vector-of-vectors
+    FlatCounts(const std::vector<std::vector<int>> &inVals)
+    {
+        offsets.resize(inVals.size() + 1);
+        offsets[0] = 0;
+        size_t i = 1, v = 0;
+        for (const auto &sub : inVals) {
+            v += sub.size();
+            offsets[i++] = v;
+            values.insert(values.end(), sub.begin(), sub.end());
+        }
+    }
+
+    // Constructor from unordered_map of vectors
+    FlatCounts(const std::unordered_map<int, std::vector<int>> &inVals)
+    {
+        std::vector<int> allkeys;
+        allkeys.reserve(inVals.size());
+        for (const auto &[key, value] : inVas) {
+            allkeys.push_back(key);
+        }
+        std::sort(allkeys.begin(), allkeys.end());
+
+        size_t offset = 0;
+        for (size_t i = 0; i < allkeys[allkeys.size() - 1]; ++i) {
+            auto search = inVals.find(i);
+            if (search != inVals.end()) {
+                offset += search->second.size();
+                values.insert(values.end(), search->second.begin(), search->second.end());
+            }
+            offsets.push_back(offset);
+        }
+    }
+
+    // Constructor from map of vectors
+    FlatCounts(const std::map<int, std::vector<int>> &inVals)
+    {
+        size_t offset = 0;
+        size_t prev = 0;
+        for (const auto &[key, value] : inVals) {
+            for (size_t k = prev; k < key; k++) {
+                // Fill in the sections we skipped
+                offsets.push_back(offset);
+            }
+            prev = k;
+            offset += value.length();
+            values.insert(values.end(), value.begin(), value.end());
+        }
+    }
+
+    const std::span<const int> operator[](size_t i) const
+    {
+        return std::span<const int>(values.begin() + offsets[i], values.begin() + offsets[i + 1]);
+    }
+};
+
+void getAllConnections(
+    MFnMesh &meshFn,   // For getting the mesh data
+    MDagPath &meshDag, // So I can get the "maya canonical" edges
+
+    std::vector<std::vector<int>> &perVertexFaces, // x[vertIdx] -> [list-of-faceIdxs]
+    std::vector<std::vector<int>> &perVertexEdges, // x[vertIdx] -> [list-of-edgeIdxs]
+    std::vector<std::vector<int>>
+        &perVertexVertices, // x[vertIdx] -> [list-of-vertIdxs that share a face with the input]
+    std::vector<std::vector<int>> &perFaceVertices,   // x[faceIdx] -> [list-of-vertIdxs]
+    std::vector<std::array<int, 2>> &perEdgeVertices, // x[edgeIdx] -> [pair-of-vertIdxs]
+    std::vector<std::vector<std::array<int, 3>>>
+        &perFaceTriangleVertices // x[face][triIdx] -> [list_of_vertIdxs]
+)
+{
+    // Get the data from the mesh and dag path
+    MIntArray counts, flatFaces, triangleCounts, triangleVertices;
+    meshFn.getVertices(counts, flatFaces);
+    meshFn.getTriangles(triangleCounts, triangleVertices);
+    int numVertices = meshFn.numVertices();
+    int numFaces = meshFn.numPolygons();
+    int numEdges = meshFn.numEdges();
+
+    // Reset all the output vectors
+    perVertexFaces.clear();
+    perVertexFaces.resize(numVertices);
+    perVertexEdges.clear();
+    perVertexEdges.resize(numVertices);
+    perVertexVertices.clear();
+    perVertexVertices.resize(numVertices);
+
+    perFaceVertices.clear();
+    perFaceVertices.resize(numFaces);
+    perFaceTriangleVertices.clear();
+    perFaceTriangleVertices.resize(numFaces);
+
+    perEdgeVertices.clear();
+    perEdgeVertices.resize(numEdges);
+
+    // Get the face/vert correlations
+    unsigned int iter = 0, triIter = 0;
+    for (unsigned int faceId = 0; faceId < numFaces; ++faceId) {
+        for (int i = 0; i < counts[faceId]; ++i, ++iter) {
+            int indVertex = flatFaces[iter];
+            perFaceVertices[faceId].push_back(indVertex);
+            perVertexFaces[indVertex].push_back(faceId);
+        }
+        perFaceTriangleVertices[faceId].resize(triangleCounts[faceId]);
+        for (int triId = 0; triId < triangleCounts[faceId]; ++triId) {
+            perFaceTriangleVertices[faceId][triId][0] = triangleVertices[triIter++];
+            perFaceTriangleVertices[faceId][triId][1] = triangleVertices[triIter++];
+            perFaceTriangleVertices[faceId][triId][2] = triangleVertices[triIter++];
+        }
+    }
+
+    // Get the edge/vert correlations
+    MItMeshEdge edgeIter(meshDag);
+    for (unsigned i = 0; !edgeIter.isDone(); edgeIter.next(), ++i) {
+        int pt0Index = edgeIter.index(0);
+        int pt1Index = edgeIter.index(1);
+        perVertexEdges[pt0Index].push_back(i);
+        perVertexEdges[pt1Index].push_back(i);
+        perEdgeVertices[i][0] = pt0Index;
+        perEdgeVertices[i][1] = pt1Index;
+    }
+
+    // Build the face-growing neighbors
+#pragma omp parallel for
+    for (int vertIdx = 0; vertIdx < numVertices; ++vertIdx) {
+        std::vector<int> &toAdd = perVertexVertices[vertIdx];
+        for (int faceIdx : perVertexFaces[vertIdx]) {
+            std::vector<int> &faceVerts = perFaceVertices[faceIdx];
+            toAdd.insert(toAdd.end(), faceVerts.begin(), faceVerts.end());
+        }
+        // For such a short vec, sorting then erasing is the fastest
+        std::sort(toAdd.begin(), toAdd.end());
+        toAdd.erase(std::unique(toAdd.begin(), toAdd.end()), toAdd.end());
+    }
+
+    // TODO: Flatten all connections
+    // And make a class type that provides easy access to count/connect data
+    FlatCounts pvFaces(perVertexFaces);
+    FlatCounts pvEdges(perVertexEdges);
+    FlatCounts pvVerts(perVertexVertices);
+    FlatCounts pfVerts(perFaceVertices);
+}
 
 void SkinBrushContext::getConnectedVertices()
 {
@@ -2806,6 +2892,7 @@ void SkinBrushContext::getConnectedVertices()
         this->perEdgeVertices[i++] = std::make_pair(pt0Index, pt1Index);
     }
 }
+
 void SkinBrushContext::getConnectedVerticesSecond()
 {
     // Second run --------------------------------------------------------
@@ -2813,7 +2900,7 @@ void SkinBrushContext::getConnectedVerticesSecond()
     perFaceVerticesSet.resize(this->numFaces);
     for (int faceTmp = 0; faceTmp < numFaces; ++faceTmp) {
         std::vector<int> tmpSet;
-        MIntArray surroundingVertices = perFaceVertices[faceTmp];
+        MIntArray surroundingVertices = this->perFaceVertices[faceTmp];
 
         tmpSet.resize(surroundingVertices.length());
         surroundingVertices.get(&tmpSet[0]);
@@ -2822,6 +2909,7 @@ void SkinBrushContext::getConnectedVerticesSecond()
         perFaceVerticesSet[faceTmp] = tmpSet;
     }
 }
+
 void SkinBrushContext::getConnectedVerticesThird()
 {
     // fill the std_array connectedSetVertices ------------------------
@@ -2913,7 +3001,11 @@ void SkinBrushContext::getFromMeshNormals()
         }
     }
 }
-void SkinBrushContext::getConnectedVerticesFlatten()
+
+void SkinBrushContext::getConnectedVerticesFlatten(
+    std::vector<int> &perVertexVerticesSetFLAT, std::vector<int> &perVertexVerticesSetINDEX,
+    std::vector<int> &perFaceVerticesSetFLAT, std::vector<int> &perFaceVerticesSetINDEX
+) const
 {
     perVertexVerticesSetFLAT.clear();
     perVertexVerticesSetINDEX.clear();
@@ -2939,21 +3031,22 @@ void SkinBrushContext::getConnectedVerticesFlatten()
     }
     perFaceVerticesSetINDEX.push_back(sum); // one extra for easy access
 }
-std::vector<int> SkinBrushContext::getSurroundingVerticesPerVert(int vertexIndex)
+
+std::vector<int> SkinBrushContext::getSurroundingVerticesPerVert(int vertexIndex) const
 {
     auto first = perVertexVerticesSetFLAT.begin() + perVertexVerticesSetINDEX[vertexIndex];
     auto last = perVertexVerticesSetFLAT.begin() + perVertexVerticesSetINDEX[vertexIndex + (int)1];
     std::vector<int> newVec(first, last);
     return newVec;
-};
+}
 
-std::vector<int> SkinBrushContext::getSurroundingVerticesPerFace(int vertexIndex)
+std::vector<int> SkinBrushContext::getSurroundingVerticesPerFace(int vertexIndex) const
 {
     auto first = perFaceVerticesSetFLAT.begin() + perFaceVerticesSetINDEX[vertexIndex];
     auto last = perFaceVerticesSetFLAT.begin() + perFaceVerticesSetINDEX[vertexIndex + (int)1];
     std::vector<int> newVec(first, last);
     return newVec;
-};
+}
 
 //
 // Description:
@@ -3064,10 +3157,6 @@ MStatus SkinBrushContext::getSkinCluster(MDagPath &meshDag, MObject &skinCluster
 MStatus SkinBrushContext::fillArrayValues(MObject &skinCluster, bool doColors)
 {
     MStatus status = MS::kSuccess;
-    if (verbose) {
-        MGlobal::displayInfo(" FILLED ARRAY VALUES ");
-    }
-
     MFnSkinCluster skinFn(skinCluster, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     unsigned int infCount;
@@ -3109,23 +3198,10 @@ MStatus SkinBrushContext::fillArrayValues(MObject &skinCluster, bool doColors)
                     else {
                         theColor += this->jointsColors[indexInfluence] * theWeight;
                     }
-                    if ((verbose) && (vertexIndex == 144)) {
-                        MGlobal::displayInfo(
-                            MString(" jnt : [") + indexInfluence + MString("] VTX 144 R: ") +
-                            theColor.r + MString("  G: ") + theColor.g + MString("  B: ") +
-                            theColor.b + MString("  ")
-                        );
-                    }
                 }
             }
             if (doColors) { // not store lock vert color
                 this->multiCurrentColors[vertexIndex] = theColor;
-                if ((verbose) && (vertexIndex == 4)) {
-                    MGlobal::displayInfo(
-                        MString(" VTX 4 R: ") + theColor.r + MString("  G: ") + theColor.g +
-                        MString("  B: ") + theColor.b + MString("  ")
-                    );
-                }
             }
         }
     }
@@ -3133,7 +3209,7 @@ MStatus SkinBrushContext::fillArrayValues(MObject &skinCluster, bool doColors)
     return status;
 }
 
-MStatus SkinBrushContext::displayWeightValue(int vertexIndex, bool displayZero)
+MStatus SkinBrushContext::displayWeightValue(int vertexIndex, bool displayZero) const
 {
     MString toDisplay = MString("weigth of vtx (") + vertexIndex + MString(") : ");
     for (unsigned int indexInfluence = 0; indexInfluence < this->nbJoints;
@@ -3155,9 +3231,6 @@ MStatus SkinBrushContext::displayWeightValue(int vertexIndex, bool displayZero)
 MStatus SkinBrushContext::fillArrayValuesDEP(MObject &skinCluster, bool doColors)
 {
     MStatus status = MS::kSuccess;
-    if (verbose) {
-        MGlobal::displayInfo(" FILLED ARRAY VALUES ");
-    }
 
     MFnDependencyNode skinClusterDep(skinCluster);
 
@@ -3176,14 +3249,6 @@ MStatus SkinBrushContext::fillArrayValuesDEP(MObject &skinCluster, bool doColors
         }
     }
     this->nbJointsBig += 1;
-    // this->nbJointsBig = this->deformersIndices[this->deformersIndices.length() - 1] +
-    // 1;//matrix_plug.evaluateNumElements();
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString(" nb jnts ") + this->nbJoints + MString(" nb jnts Big ") + this->nbJointsBig +
-            MString(" influenceIndices ") + this->influenceIndices.length()
-        );
-    }
     this->nbJoints = infCount;
 
     // For the first component, the weights are ordered by influence object in the same order that
@@ -3296,8 +3361,8 @@ MIntArray SkinBrushContext::getInfluenceIndices()
 }
 
 MStatus SkinBrushContext::querySkinClusterValues(
-    MObject &skinCluster, MIntArray &verticesIndices, bool doColors
-)
+    MObject &skinCluster, MIntArray &verticesIndices, MDoubleArray &theSkinWeightList, bool doColors
+) const
 {
     MStatus status = MS::kSuccess;
 
@@ -3338,9 +3403,9 @@ MStatus SkinBrushContext::querySkinClusterValues(
             double theWeight = weightsVertices[i * infCount + j];
             int ind_swl = vertexIndex * this->nbJoints + j;
             if (ind_swl >= this->skinWeightList.length()) {
-                this->skinWeightList.setLength(ind_swl + 1);
+                theSkinWeightList.setLength(ind_swl + 1);
             }
-            this->skinWeightList[ind_swl] = theWeight;
+            theSkinWeightList[ind_swl] = theWeight;
             if (doColors) {
                 if (lockJoints[j] == 1) {
                     theColor += lockJntColor * theWeight;
@@ -3371,7 +3436,7 @@ MStatus SkinBrushContext::querySkinClusterValues(
 void SkinBrushContext::getSkinClusterAttributes(
     MObject &skinCluster, unsigned int &maxInfluences, bool &maintainMaxInfluences,
     unsigned int &normalize
-)
+) const
 {
     // Get the settings from the skin cluster node.
     MFnDependencyNode skinMFn(skinCluster);
@@ -3386,7 +3451,7 @@ void SkinBrushContext::getSkinClusterAttributes(
     normalize = (unsigned)normalizePlug.asInt();
 }
 
-bool SkinBrushContext::getMirrorHit(bool getNormal, int &faceHit, MFloatPoint &hitPoint)
+bool SkinBrushContext::getMirrorHit(int &faceHit, MFloatPoint &hitPoint) const
 {
     MStatus stat;
 
@@ -3451,9 +3516,6 @@ bool SkinBrushContext::getMirrorHit(bool getNormal, int &faceHit, MFloatPoint &h
         faceHit = pointInfo.faceIndex();
         hitPoint = MFloatPoint(mirrorPoint);
     }
-    if (getNormal) {
-        meshFn.getPolygonNormal(faceHit, this->normalMirroredVector, MSpace::kWorld);
-    }
     return true;
 }
 
@@ -3508,7 +3570,7 @@ bool SkinBrushContext::computeHit(
 
 bool SkinBrushContext::expandHit(
     int faceHit, MFloatPoint &hitPoint, std::unordered_map<int, float> &dicVertsDist
-)
+) const
 {
     // ----------- compute the vertices around ---------------------
     auto verticesSet = getSurroundingVerticesPerFace(faceHit);
@@ -3530,7 +3592,7 @@ bool SkinBrushContext::expandHit(
     return foundHit;
 }
 
-void SkinBrushContext::addBrushShapeFallof(std::unordered_map<int, float> &dicVertsDist)
+void SkinBrushContext::addBrushShapeFallof(std::unordered_map<int, float> &dicVertsDist) const
 {
     double valueStrength = strengthVal;
     if (this->modifierNoneShiftControl == ModifierKeys::ControlShift ||
@@ -3644,13 +3706,12 @@ void SkinBrushContext::getColorWithMirror(
     }
 }
 
-MStatus SkinBrushContext::preparePaint(
+void SkinBrushContext::preparePaint(
     std::unordered_map<int, float> &dicVertsDist,
     std::unordered_map<int, float> &dicVertsDistPrevPaint, std::vector<float> &intensityValues,
-    std::unordered_map<int, float> &skinValToSet, bool mirror
+    std::unordered_map<int, float> &skinValToSet, std::set<int> &theVerticesPainted, bool mirror
 )
 {
-    MStatus status = MStatus::kSuccess;
 
     // MGlobal::displayInfo("perform Paint");
     double multiplier = 1.0;
@@ -3687,7 +3748,7 @@ MStatus SkinBrushContext::preparePaint(
             ret.first->second = std::max(value, ret.first->second);
         }
         else {
-            this->verticesPainted.insert(index);
+            theVerticesPainted.insert(index);
         }
         // end add to array of values to set at the end--------------------
     }
@@ -3707,7 +3768,6 @@ MStatus SkinBrushContext::preparePaint(
             skinValToSet.clear();
         }
     }
-    return status;
 }
 MStatus SkinBrushContext::doPerformPaint()
 {
@@ -3784,44 +3844,6 @@ MObject SkinBrushContext::allVertexComponents()
 
 //
 // Description:
-//      Return the vertex indices within the brush volume.
-//
-// Input Arguments:
-//      None
-//
-// Return Value:
-//      int array           The array of indices in the volume.
-//
-MIntArray SkinBrushContext::getVerticesInVolume()
-{
-    MIntArray indices;
-
-    double radius = sizeVal * sizeVal;
-
-    MItMeshVertex vtxIter(meshDag);
-    while (!vtxIter.isDone()) {
-        MPoint pnt = vtxIter.position(MSpace::kWorld);
-
-        double x = pnt.x - surfacePoints[0].x;
-        double y = pnt.y - surfacePoints[0].y;
-        double z = pnt.z - surfacePoints[0].z;
-
-        x *= x;
-        y *= y;
-        z *= z;
-
-        if (x + y + z <= radius) {
-            indices.append(vtxIter.index());
-        }
-
-        vtxIter.next();
-    }
-
-    return indices;
-}
-
-//
-// Description:
 //      Return the vertex indices of the brush volume which are within
 //      the range of the current index.
 //
@@ -3837,8 +3859,27 @@ MIntArray SkinBrushContext::getVerticesInVolume()
 // Return Value:
 //      None
 //
-void SkinBrushContext::getVerticesInVolumeRange(
-    int index, MIntArray &volumeIndices, MIntArray &rangeIndices, MFloatArray &values
+
+double getFalloffValue(int curveVal, double value, double strength)
+{
+    switch (curveVal) {
+    case 0: // no falloff
+        return strength;
+    case 1: // linear
+        return value * strength;
+    case 2: // smoothstep
+        return (value * value * (3 - 2 * value)) * strength;
+    case 3: // narrow - quadratic
+        return (1 - pow((1 - value) / 1, 0.4)) * strength;
+    default:
+        return value;
+    }
+}
+
+void getVerticesInVolumeRange(
+    int index, int curveVal, double sizeVal, double rangeVal, double strengthVal,
+    double fractionOversamplingVal, double oversamplingVal, const MDagPath meshDag,
+    const MIntArray &volumeIndices, MIntArray &rangeIndices, MFloatArray &values
 )
 {
     unsigned int i;
@@ -3867,12 +3908,51 @@ void SkinBrushContext::getVerticesInVolumeRange(
         double x = pnt.x - point.x;
         double y = pnt.y - point.y;
         double z = pnt.z - point.z;
+        double delta = x * x + y * y + z * z;
 
-        x *= x;
-        y *= y;
-        z *= z;
+        if (volumeIndex != index && delta <= radius) {
+            rangeIndices.append(volumeIndex);
 
-        double delta = x + y + z;
+            float value = (float)(1 - (delta / radius));
+            value = (float)getFalloffValue(curveVal, value, smoothStrength);
+            values.append(value);
+        }
+
+        vtxIter.next();
+    }
+}
+
+void SkinBrushContext::getVerticesInVolumeRange(
+    int index, MIntArray &volumeIndices, MIntArray &rangeIndices, MFloatArray &values
+) const
+{
+    unsigned int i;
+
+    double radius = sizeVal * rangeVal;
+    radius *= radius;
+
+    double smoothStrength = strengthVal;
+    if (fractionOversamplingVal) {
+        smoothStrength /= oversamplingVal;
+    }
+
+    MItMeshVertex vtxIter(meshDag);
+    int prevIndex;
+    vtxIter.setIndex(index, prevIndex);
+
+    MPoint point = vtxIter.position(MSpace::kWorld);
+
+    for (i = 0; i < volumeIndices.length(); i++) {
+        int volumeIndex = volumeIndices[i];
+
+        vtxIter.setIndex(volumeIndex, prevIndex);
+
+        MPoint pnt = vtxIter.position(MSpace::kWorld);
+
+        double x = pnt.x - point.x;
+        double y = pnt.y - point.y;
+        double z = pnt.z - point.z;
+        double delta = x * x + y * y + z * z;
 
         if (volumeIndex != index && delta <= radius) {
             rangeIndices.append(volumeIndex);
@@ -3898,7 +3978,7 @@ void SkinBrushContext::getVerticesInVolumeRange(
 // Return Value:
 //      double              The brush curve-based falloff value.
 //
-double SkinBrushContext::getFalloffValue(double value, double strength)
+double SkinBrushContext::getFalloffValue(double value, double strength) const
 {
 
     switch (curveVal) {
@@ -3915,28 +3995,7 @@ double SkinBrushContext::getFalloffValue(double value, double strength)
     }
 }
 
-//
-// Description:
-//      Return if the given event is valid by querying the mouse button
-//      and ing the returned MStatus.
-//
-// Input Arguments:
-//      event               The MEvent to .
-//
-// Return Value:
-//      bool                True, if the event is valid.
-//
-bool SkinBrushContext::eventIsValid(MEvent &event)
-{
-    MStatus status;
-    event.mouseButton(&status);
-    if (!status) {
-        return false;
-    }
-    return true;
-}
-
-void SkinBrushContext::setInViewMessage(bool display)
+void SkinBrushContext::setInViewMessage(bool display) const
 {
     // TODO: Update this dynamically based on hotkey prefs
     if (display && messageVal) {

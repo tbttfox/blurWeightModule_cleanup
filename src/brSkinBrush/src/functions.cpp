@@ -158,11 +158,8 @@ MStatus transferPointNurbsToMesh(MFnMesh &msh, MFnNurbsSurface &nurbsFn)
     return stat;
 }
 
-MStatus findNurbsTesselateOrig(MDagPath meshPath, MObject &origMeshObj, bool verbose)
+MStatus findNurbsTesselateOrig(MDagPath meshPath, MObject &origMeshObj)
 {
-    if (verbose) {
-        MGlobal::displayInfo(MString(" |||| findNurbsTesselateOrig ||||"));
-    }
     MStatus stat;
     // the deformed mesh comes into the visible mesh
     // through its "inmesh" plug
@@ -175,33 +172,18 @@ MStatus findNurbsTesselateOrig(MDagPath meshPath, MObject &origMeshObj, bool ver
         int nbconnections = connections.length();
         for (int i = 0; i < nbconnections; ++i) {
             MPlug conn = connections[0];
-            if (verbose) {
-                MGlobal::displayInfo(MString("---- connected to is : ") + conn.name());
-            }
 
             MFnDependencyNode sourceNode;
             sourceNode.setObject(conn.node());
-            if (verbose) {
-                MGlobal::displayInfo(MString("---- connected to is Name : ") + sourceNode.name());
-            }
             origMeshObj = sourceNode.object();
             return MS::kSuccess;
         }
     }
-    else {
-        if (verbose) {
-            MGlobal::displayInfo(MString(" CANT FIND origMesh Attribute"));
-        }
-    }
-
     return MS::kFailure;
 }
 
-MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj, bool verbose)
+MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj)
 {
-    if (verbose) {
-        MGlobal::displayInfo(MString(" ---- findNurbsTesselate ----"));
-    }
     MStatus stat;
     // the deformed mesh comes into the visible mesh
     // through its "inmesh" plug
@@ -213,15 +195,9 @@ MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj, bool verbose)
         outMeshPlug.connectedTo(connections, false, true);
         for (int i = 0; i < connections.length(); ++i) {
             MPlug conn = connections[0];
-            if (verbose) {
-                MGlobal::displayInfo(MString("---- connected to is : ") + conn.name());
-            }
 
             MFnDependencyNode sourceNode;
             sourceNode.setObject(conn.node());
-            if (verbose) {
-                MGlobal::displayInfo(MString("---- connected to is Name : ") + sourceNode.name());
-            }
             MeshObj = sourceNode.object();
             return MS::kSuccess;
         }
@@ -230,12 +206,8 @@ MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj, bool verbose)
 }
 
 // from the mesh retrieves the skinCluster
-MStatus
-findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster, bool verbose)
+MStatus findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster)
 {
-    if (verbose) {
-        MGlobal::displayInfo(MString(" ---- findSkinCluster ----"));
-    }
     MStatus stat;
 
     MFnDagNode dagNode(MeshPath); // path to the visible mesh
@@ -274,28 +246,17 @@ findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster, 
             }
         }
         int listSkinClustersLength = listSkinClusters.length();
-        if (verbose) {
-            MGlobal::displayInfo(MString("    nb skinClusters is ") + listSkinClustersLength);
-        }
         if (listSkinClustersLength > indSkinCluster) {
             theSkinCluster = listSkinClusters[indSkinCluster];
-
             MFnDependencyNode nodeFn(theSkinCluster);
-            if (verbose) {
-                MGlobal::displayInfo(MString("    returned skinCluster: ") + nodeFn.name());
-            }
-
             return MS::kSuccess;
         }
     }
     return MS::kFailure;
 }
 
-MStatus findMesh(MObject &skinCluster, MDagPath &theMeshPath, bool verbose)
+MStatus findMesh(MObject &skinCluster, MDagPath &theMeshPath)
 {
-    if (verbose) {
-        MGlobal::displayInfo(MString(" ---- findMesh ----"));
-    }
     MFnSkinCluster theSkinCluster(skinCluster);
     MObjectArray objectsDeformed;
     theSkinCluster.getOutputGeometry(objectsDeformed);
@@ -304,57 +265,27 @@ MStatus findMesh(MObject &skinCluster, MDagPath &theMeshPath, bool verbose)
     if (objectsDeformedCount != 0) {
         int j = 0;
         MDagPath::getAPathTo(objectsDeformed[j], theMeshPath);
-        if (verbose) {
-            MFnDependencyNode deformedNameMesh(objectsDeformed[j]);
-            MString deformedNameMeshSTR = deformedNameMesh.name();
-            if (verbose) {
-                MGlobal::displayInfo("     -> DEFORMING : " + deformedNameMeshSTR + "\n");
-            }
-        }
         return MS::kSuccess;
     }
     return MS::kFailure;
 }
 
-MStatus findOrigMesh(MObject &skinCluster, MObject &origMesh, bool verbose)
+MStatus findOrigMesh(MObject &skinCluster, MObject &origMesh)
 {
-    if (verbose) {
-        MGlobal::displayInfo(MString(" ---- find Orig Mesh ----"));
-    }
     MFnSkinCluster theSkinCluster(skinCluster);
     MObjectArray objectsDeformed;
     theSkinCluster.getInputGeometry(objectsDeformed);
     origMesh = objectsDeformed[0];
-    if (verbose) {
-        MFnDependencyNode deformedNameMesh(origMesh);
-        MGlobal::displayInfo("     -> DEFORMING : " + deformedNameMesh.name() + "\n");
-    }
     return MS::kSuccess;
 }
 
 MStatus getListColorsJoints(
     MObject &skinCluster, int nbJoints, MIntArray indicesForInfluenceObjects,
-    MColorArray &jointsColors, bool verbose
+    MColorArray &jointsColors
 )
 {
     MStatus stat = MS::kSuccess;
-    if (verbose) {
-        MGlobal::displayInfo(MString("---------------- [getListColorsJoints()]------------------"));
-    }
 
-    if (verbose) {
-        MDagPathArray listOfJoints;
-        MFnSkinCluster theSkinCluster(skinCluster);
-        theSkinCluster.influenceObjects(listOfJoints, &stat);
-        int nbJoints = listOfJoints.length();
-        MStringArray allJointsNames;
-        MGlobal::displayInfo(MString(" nbJoints from skinCluster ") + nbJoints);
-        for (int i = 0; i < nbJoints; i++) {
-            MFnDagNode jnt(listOfJoints[i]);
-            MString jointName = jnt.name();
-            MGlobal::displayInfo(jointName + " " + i);
-        }
-    }
     // start
     jointsColors.clear();
     jointsColors.setLength(nbJoints);
@@ -372,23 +303,10 @@ MStatus getListColorsJoints(
     }
     int nbElements = influenceColor_plug.numElements();
 
-    if (verbose) {
-        MGlobal::displayInfo(
-            influenceColor_plug.name() + " nbJoints [" + nbJoints + "] nbElements [" + nbElements +
-            "]"
-        );
-    }
     for (int i = 0; i < nbElements; ++i) { // for each joint
 
         MPlug colorPlug = influenceColor_plug.elementByPhysicalIndex(i);
         int logicalInd = colorPlug.logicalIndex();
-        if (verbose) {
-            int indexInfluence = indicesForInfluenceObjects[logicalInd];
-            MGlobal::displayInfo(
-                MString("i : ") + i + MString("logical Index: ") + logicalInd +
-                MString(" | indicesForInfluenceObjects ") + indexInfluence
-            );
-        }
         logicalInd = indicesForInfluenceObjects[logicalInd];
         if (logicalInd < 0 || logicalInd >= nbJoints) {
             MGlobal::displayError(
@@ -407,19 +325,9 @@ MStatus getListColorsJoints(
                     theConn.child(0).asFloat(), theConn.child(1).asFloat(),
                     theConn.child(2).asFloat(), 1
                 };
-                if (verbose) {
-                    MGlobal::displayInfo(
-                        colorPlug.name() + " " + element[0] + " " + element[1] + " " + element[2]
-                    );
-                }
                 jointsColors.set(element, logicalInd);
             }
             else {
-                if (verbose) {
-                    MGlobal::displayInfo(
-                        colorPlug.name() + " " + black[0] + " " + black[1] + " " + black[2]
-                    );
-                }
                 jointsColors.set(black, logicalInd);
             }
         }
@@ -428,11 +336,6 @@ MStatus getListColorsJoints(
                 colorPlug.child(0).asFloat(), colorPlug.child(1).asFloat(),
                 colorPlug.child(2).asFloat(), 1
             };
-            if (verbose) {
-                MGlobal::displayInfo(
-                    colorPlug.name() + " " + element[0] + " " + element[1] + " " + element[2]
-                );
-            }
             jointsColors.set(element, logicalInd);
         }
     }
@@ -634,37 +537,19 @@ editLocks(MObject &skinCluster, MIntArray &inputVertsToLock, bool addToLock, MIn
 MStatus editArray(
     ModifierCommands command, int influence, int nbJoints, MIntArray &lockJoints,
     MDoubleArray &fullWeightArray, std::map<int, double> &valuesToSet, MDoubleArray &theWeights,
-    bool normalize, double mutliplier, bool verbose
+    bool normalize, double mutliplier
 )
 {
     MStatus stat;
     // 0 Add - 1 Remove - 2 AddPercent - 3 Absolute - 4 Smooth - 5 Sharpen - 6 LockVertices - 7
     // UnLockVertices
     //
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString("-> editArray | command ") + static_cast<int>(command) +
-            MString(" | influence ") + influence
-        );
-    }
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString("-> editArray | nbJoints ") + nbJoints + MString(" | lockJoints ") +
-            lockJoints.length()
-        );
-    }
     if (lockJoints.length() < nbJoints) {
         MGlobal::displayInfo(
             MString("-> editArray FAILED | nbJoints ") + nbJoints + MString(" | lockJoints ") +
             lockJoints.length()
         );
         return MStatus::kFailure;
-    }
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString("-> editArray | theWeights ") + theWeights.length() +
-            MString(" | fullWeightArray ") + fullWeightArray.length()
-        );
     }
     if (command == ModifierCommands::Sharpen) {
         int i = 0;
@@ -720,25 +605,11 @@ MStatus editArray(
     else {
         // do the command --------------------------
         int i = -1; // i is a short index instead of theVert
-        if (verbose) {
-            MGlobal::displayInfo(
-                MString("-> editArray | valuesToSet ") + (unsigned int)valuesToSet.size()
-            );
-        }
-        if (verbose) {
-            MGlobal::displayInfo(MString("-> editArray | mutliplier ") + mutliplier);
-        }
         for (const auto &elem : valuesToSet) {
             i++;
             int theVert = elem.first;
             double theVal = mutliplier * elem.second;
             // get the sum of weights
-            if (verbose) {
-                MGlobal::displayInfo(
-                    MString("-> editArray | theVert ") + theVert + MString(" | i ") + i +
-                    MString(" | theVal ") + theVal
-                );
-            }
 
             double sumUnlockWeights = 0.0;
             for (int jnt = 0; jnt < nbJoints; ++jnt) {
@@ -770,9 +641,6 @@ MStatus editArray(
                 }
                 theWeights[indexArray_theWeight] =
                     fullWeightArray[indexArray_fullWeightArray]; // preset array
-            }
-            if (verbose) {
-                MGlobal::displayInfo(MString("-> editArray | AFTER joints  loop"));
             }
             double currentW = fullWeightArray[theVert * nbJoints + influence];
 
@@ -856,7 +724,7 @@ MStatus editArrayMirror(
     ModifierCommands command, int influence, int influenceMirror, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray,
     std::map<int, std::pair<float, float>> &valuesToSetMirror, MDoubleArray &theWeights,
-    bool normalize, double mutliplier, bool verbose
+    bool normalize, double mutliplier
 )
 {
     MStatus stat;
@@ -869,12 +737,6 @@ MStatus editArrayMirror(
             MString(" | lockJoints ") + lockJoints.length()
         );
         return MStatus::kFailure;
-    }
-    if (verbose) {
-        MGlobal::displayInfo(
-            MString("-> editArrayMirror | theWeights ") + theWeights.length() +
-            MString(" | fullWeightArray ") + fullWeightArray.length()
-        );
     }
     if (command == ModifierCommands::Sharpen) {
         int i = 0;
@@ -935,15 +797,6 @@ MStatus editArrayMirror(
     else {
         // do the other command --------------------------
         int i = -1; // i is a short index instead of theVert
-        if (verbose) {
-            MGlobal::displayInfo(
-                MString("-> editArrayMirror | valuesToSet ") +
-                (unsigned int)valuesToSetMirror.size()
-            );
-        }
-        if (verbose) {
-            MGlobal::displayInfo(MString("-> editArrayMirror | mutliplier ") + mutliplier);
-        }
         for (const auto &elem : valuesToSetMirror) {
             i++;
             int theVert = elem.first;
@@ -966,9 +819,6 @@ MStatus editArrayMirror(
                     fullWeightArray[indexArray_fullWeightArray]; // preset array
             }
 
-            if (verbose) {
-                MGlobal::displayInfo(MString("-> editArrayMirror | AFTER joints  loop"));
-            }
             double currentW = fullWeightArray[theVert * nbJoints + influence];
             double currentWMirror = fullWeightArray[theVert * nbJoints + influenceMirror];
             // 1 Remove 3 Absolute
