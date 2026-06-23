@@ -177,8 +177,8 @@ MStatus blurSkinCmd::getListLockJoints()
         // get the index from the name for our list of joints
         MString jointName = jnt.name();
         int jntIndex = listJoints_.indexOf(jointName);
-        if ((jntIndex != -1) &&
-            listJointsValues_.length() > i) { // if the joint is in the list of joints name
+        if (jntIndex != -1 &&
+            (unsigned)jntIndex < listJointsValues_.length()) { // if the joint is in the list of joints name
             perJointAddingValues_.set(listJointsValues_[jntIndex], i);
         }
         if (verbose) {
@@ -273,7 +273,6 @@ MStatus blurSkinCmd::getAverageWeight(MIntArray vertices, int currentVertex)
     }
 
     double totalBaseVtxUnlock = 0.0, totalBaseVtxLock = 0.0;
-    ;
     double totalVtxUnlock = 0.0, totalVtxLock = 0.0;
 
     for (j = 0; j < nbJoints; j++) {
@@ -673,19 +672,15 @@ MStatus blurSkinCmd::getAllWeights()
     if (meshPath_.apiType() == MFn::kMesh) { // if is mesh
 
         MFnMesh meshFn(meshPath_, &stat); // this is the visible mesh
-        MIntArray ObjVertices;
         if (verbose) {
             MGlobal::displayInfo(MString("    mesh is") + meshPath_.fullPathName());
         }
 
         int nbVertices = meshFn.numVertices(&stat);
-        for (int i = 0; i < nbVertices; i++) {
-            ObjVertices.append(i);
-        }
 
         MFnSingleIndexedComponent allVertices;
-        allVertices.addElements(ObjVertices);
         allVerticesObj = allVertices.create(MFn::kMeshVertComponent);
+        allVertices.setCompleteData(nbVertices);
         unsigned int infCount;
         stat = theSkinCluster.getWeights(meshPath_, allVerticesObj, fullOrigWeights, infCount);
         if (stat == MS::kFailure) {
@@ -1322,7 +1317,7 @@ MStatus blurSkinCmd::executeAction()
 
     // now set the values
     redoIt();
-    return MS::kFailure;
+    return MS::kSuccess;
 }
 
 MStatus blurSkinCmd::redoIt()

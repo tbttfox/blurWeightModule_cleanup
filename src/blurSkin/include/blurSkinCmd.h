@@ -151,7 +151,7 @@ class blurSkinCmd : public MPxCommand {
     int nbJoints;
 
     MDoubleArray fullOrigWeights, weigthsForUndo, currentWeights, newWeights, weightsForSetting;
-    MIntArray lockJoints, lockVertices;
+    MIntArray lockJoints;
 
     MIntArray indicesVertices_, indicesU_, indicesV_;
     MFloatArray weightVertices_;

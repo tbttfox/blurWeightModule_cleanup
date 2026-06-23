@@ -978,12 +978,11 @@ void blurSkinDisplay::refreshVertsConnection()
         for (unsigned int itVtx = 0; itVtx < surroundingVertices.length(); itVtx++) {
             setOfVerts.insert(surroundingVertices[itVtx]);
         }
-        // for the repeats
-        for (int d = 1; d < this->smoothDepth; d++) { // <= to add one more
-            for (unsigned int itVtx = 0; itVtx < surroundingVertices.length(); itVtx++) {
-                int vtx = surroundingVertices[itVtx];
-                // for (int vtx : setOfVerts) {
-                MIntArray repeatVertices = this->connectedVertices[vtx];
+        // expand depth rings outward
+        for (int d = 1; d < this->smoothDepth; d++) {
+            std::unordered_set<int> frontier(setOfVerts);
+            for (int vtx : frontier) {
+                const MIntArray &repeatVertices = this->connectedVertices[vtx];
                 for (unsigned int itVtx = 0; itVtx < repeatVertices.length(); itVtx++) {
                     setOfVerts.insert(repeatVertices[itVtx]);
                 }
@@ -1053,7 +1052,7 @@ void blurSkinDisplay::setInfluenceColorAttr()
     }
     influenceColor_Plug.getExistingArrayAttributeIndices(this->deformersIndices);
     // for (int i = 0; i < this->jointsColors.length(); ++i) {
-    for (int i = 0; this->deformersIndices.length(); ++i) {
+    for (int i = 0; i < (int)this->deformersIndices.length(); ++i) {
         int indexLogical = this->deformersIndices[i];
         MPlug thecolorPlug = influenceColor_Plug.elementByLogicalIndex(indexLogical, &status);
         MColor theColor = this->jointsColors[i];
@@ -1118,9 +1117,6 @@ MStatus blurSkinDisplay::refreshColors(
             multiColor += jointsColors[j] * val;
             if (j == this->influenceIndex) {
                 this->soloColorsValues[theVert] = val;
-                if ((theVert == 22038) && verbose) {
-                    MGlobal::displayInfo(MString(" vert  22038 ") + val);
-                }
                 soloColor = getASoloColor(val);
             }
         }
@@ -1548,9 +1544,8 @@ MStatus blurSkinDisplay::initialize()
     // attributeAffects(blurSkinDisplay::_paintableAttr, blurSkinDisplay::_fakeAttr);
     attributeAffects(blurSkinDisplay::_paintableAttr, blurSkinDisplay::_s_skin_weights);
     // attributeAffects(blurSkinDisplay::_paintableAttr, blurSkinDisplay::_outMesh);
-    return status;
-
     MGlobal::executeCommand("makePaintable -attrType doubleArray blurSkinDisplay paintAttr");
+    return status;
 }
 
 MStatus blurSkinDisplay::connectionBroken(const MPlug &plug, const MPlug &otherPlug, bool asSrc)

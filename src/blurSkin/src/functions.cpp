@@ -154,20 +154,12 @@ MStatus findMesh(MObject &skinCluster, MDagPath &theMeshPath, bool verbose)
     MObjectArray objectsDeformed;
     theSkinCluster.getOutputGeometry(objectsDeformed);
     int objectsDeformedCount = objectsDeformed.length();
-    bool doContinue = false;
-    if (objectsDeformedCount == 0) {
-        int j = 0;
-        // for (int j = 0; j < objectsDeformedCount; j++) {
-        // theMeshPath.getAPathTo(objectsDeformed[j]); // deprecated
-        MDagPath::getAPathTo(objectsDeformed[j], theMeshPath);
+    if (objectsDeformedCount != 0) {
+        MDagPath::getAPathTo(objectsDeformed[0], theMeshPath);
         if (verbose) {
-            MFnDependencyNode deformedNameMesh(objectsDeformed[j]);
-            MString deformedNameMeshSTR = deformedNameMesh.name();
-            if (verbose) {
-                MGlobal::displayInfo("     -> DEFORMING : " + deformedNameMeshSTR + "\n");
-            }
+            MFnDependencyNode deformedNameMesh(objectsDeformed[0]);
+            MGlobal::displayInfo("     -> DEFORMING : " + deformedNameMesh.name() + "\n");
         }
-        //}
         return MS::kSuccess;
     }
     return MS::kFailure;
@@ -466,8 +458,8 @@ MStatus getListColors(MObject &skinCluster, int nbVertices, MColorArray &currCol
         MFnSingleIndexedComponent allVertices;
         MDoubleArray fullOrigWeights;
 
-        allVertices.setCompleteData(nbVertices);
         allVerticesObj = allVertices.create(MFn::kMeshVertComponent);
+        allVertices.setCompleteData(nbVertices);
         unsigned int infCount;
 
         MDagPath path;
@@ -696,10 +688,10 @@ MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWei
             }
         }
         // now normalize
-        if (total != 1.0) {
+        if (total > 0.0 && total != 1.0) {
             for (jnt = 0; jnt < nbJoints; jnt++) {
                 posiInArray = vertIndex * nbJoints + jnt;
-                theWeights[posiInArray] /= total; // that should normalize
+                theWeights[posiInArray] /= total;
             }
         }
     }
