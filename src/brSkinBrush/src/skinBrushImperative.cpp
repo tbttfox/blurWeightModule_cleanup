@@ -422,8 +422,9 @@ MStatus drawMeshWhileDrag(
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int f : mesh.perVertexFaces[ptIndex]) {
-                fatFaces_bitset[f] = true;
+            for (int fi = mesh.perVertexFacesSetINDEX[ptIndex];
+                 fi < mesh.perVertexFacesSetINDEX[ptIndex + 1]; ++fi) {
+                fatFaces_bitset[mesh.perVertexFacesSetFLAT[fi]] = true;
             }
         }
     }
@@ -432,8 +433,9 @@ MStatus drawMeshWhileDrag(
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int e : mesh.perVertexEdges[ptIndex]) {
-                fatEdges_bitset[e] = true;
+            for (int ei = mesh.perVertexEdgesSetINDEX[ptIndex];
+                 ei < mesh.perVertexEdgesSetINDEX[ptIndex + 1]; ++ei) {
+                fatEdges_bitset[mesh.perVertexEdgesSetFLAT[ei]] = true;
             }
         }
     }
@@ -446,19 +448,23 @@ MStatus drawMeshWhileDrag(
             if (!fatFaces_bitset[f]) {
                 continue;
             }
-            for (auto &tri : mesh.perFaceTriangleVertices[f]) {
-                if (!vertMap_bitset[tri[0]]) {
+            for (int t = mesh.perFaceTriangleStartINDEX[f];
+                 t < mesh.perFaceTriangleStartINDEX[f + 1]; ++t) {
+                int v0 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 0];
+                int v1 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 1];
+                int v2 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 2];
+                if (!vertMap_bitset[v0]) {
                     continue;
                 }
-                if (!vertMap_bitset[tri[1]]) {
+                if (!vertMap_bitset[v1]) {
                     continue;
                 }
-                if (!vertMap_bitset[tri[2]]) {
+                if (!vertMap_bitset[v2]) {
                     continue;
                 }
-                auto it0 = verticesMap.find(tri[0]);
-                auto it1 = verticesMap.find(tri[1]);
-                auto it2 = verticesMap.find(tri[2]);
+                auto it0 = verticesMap.find(v0);
+                auto it1 = verticesMap.find(v1);
+                auto it2 = verticesMap.find(v2);
                 indices.append(it0->second);
                 indices.append(it1->second);
                 indices.append(it2->second);
@@ -953,18 +959,20 @@ bool getMirrorHit(
         float hitBary1, hitBary2;
         pointInfo.getBarycentricCoords(hitBary1, hitBary2);
 
-        MIntArray triangle = mesh.perFaceTriangleVertices[faceHit][hitTriangle];
+        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
+        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
+        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
+        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
 
         float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = mesh.mayaRawPoints[triangle[0] * 3] * hitBary1 +
-                  mesh.mayaRawPoints[triangle[1] * 3] * hitBary2 +
-                  mesh.mayaRawPoints[triangle[2] * 3] * hitBary3;
-        float y = mesh.mayaRawPoints[triangle[0] * 3 + 1] * hitBary1 +
-                  mesh.mayaRawPoints[triangle[1] * 3 + 1] * hitBary2 +
-                  mesh.mayaRawPoints[triangle[2] * 3 + 1] * hitBary3;
-        float z = mesh.mayaRawPoints[triangle[0] * 3 + 2] * hitBary1 +
-                  mesh.mayaRawPoints[triangle[1] * 3 + 2] * hitBary2 +
-                  mesh.mayaRawPoints[triangle[2] * 3 + 2] * hitBary3;
+        float x = mesh.mayaRawPoints[t0 * 3] * hitBary1 + mesh.mayaRawPoints[t1 * 3] * hitBary2 +
+                  mesh.mayaRawPoints[t2 * 3] * hitBary3;
+        float y = mesh.mayaRawPoints[t0 * 3 + 1] * hitBary1 +
+                  mesh.mayaRawPoints[t1 * 3 + 1] * hitBary2 +
+                  mesh.mayaRawPoints[t2 * 3 + 1] * hitBary3;
+        float z = mesh.mayaRawPoints[t0 * 3 + 2] * hitBary1 +
+                  mesh.mayaRawPoints[t1 * 3 + 2] * hitBary2 +
+                  mesh.mayaRawPoints[t2 * 3 + 2] * hitBary3;
         hitPoint = MFloatPoint(x, y, z) * mesh.inclusiveMatrix;
     }
     else {
@@ -1009,17 +1017,20 @@ bool computeHit(
     }
 
     if (ui.paintMirror > 0 && ui.paintMirror < 4) { // if we compute the orig
-        MIntArray triangle = mesh.perFaceTriangleVertices[faceHit][hitTriangle];
+        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
+        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
+        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
+        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
         float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = mesh.mayaOrigRawPoints[triangle[0] * 3] * hitBary1 +
-                  mesh.mayaOrigRawPoints[triangle[1] * 3] * hitBary2 +
-                  mesh.mayaOrigRawPoints[triangle[2] * 3] * hitBary3;
-        float y = mesh.mayaOrigRawPoints[triangle[0] * 3 + 1] * hitBary1 +
-                  mesh.mayaOrigRawPoints[triangle[1] * 3 + 1] * hitBary2 +
-                  mesh.mayaOrigRawPoints[triangle[2] * 3 + 1] * hitBary3;
-        float z = mesh.mayaOrigRawPoints[triangle[0] * 3 + 2] * hitBary1 +
-                  mesh.mayaOrigRawPoints[triangle[1] * 3 + 2] * hitBary2 +
-                  mesh.mayaOrigRawPoints[triangle[2] * 3 + 2] * hitBary3;
+        float x = mesh.mayaOrigRawPoints[t0 * 3] * hitBary1 +
+                  mesh.mayaOrigRawPoints[t1 * 3] * hitBary2 +
+                  mesh.mayaOrigRawPoints[t2 * 3] * hitBary3;
+        float y = mesh.mayaOrigRawPoints[t0 * 3 + 1] * hitBary1 +
+                  mesh.mayaOrigRawPoints[t1 * 3 + 1] * hitBary2 +
+                  mesh.mayaOrigRawPoints[t2 * 3 + 1] * hitBary3;
+        float z = mesh.mayaOrigRawPoints[t0 * 3 + 2] * hitBary1 +
+                  mesh.mayaOrigRawPoints[t1 * 3 + 2] * hitBary2 +
+                  mesh.mayaOrigRawPoints[t2 * 3 + 2] * hitBary3;
         frame.origHitPoint = MFloatPoint(x, y, z);
     }
 
@@ -2544,7 +2555,7 @@ MStatus doPressCommon(
         mirror.successFullDragHit = false;
         base.dicVertsDistSTART.clear();
         weights.mirroredJoinedArray.clear();
-        // TODO: these need full arg lists — view, accelParams, pressDistance,
+        // TODO: these need full arg lists - view, accelParams, pressDistance,
         // perFaceTriangleVertices, mayaOrigRawPoints, origHitPoint, normalVector, sizeVal,
         // perFaceVerticesSetFLAT, perFaceVerticesSetINDEX, inclusiveMatrix, mirrorMinDist, etc.
         base.successfullHit = false;
@@ -2753,7 +2764,7 @@ void doTheAction(
             }
         }
     }
-    // TODO: refreshColors — needs editVertsIndices, multiEditColors, soloEditColors populated first
+    // TODO: refreshColors - needs editVertsIndices, multiEditColors, soloEditColors populated first
     // refreshColors(editVertsIndices, multiEditColors, soloEditColors, ui, infl, weights);
     mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet);
     mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet);

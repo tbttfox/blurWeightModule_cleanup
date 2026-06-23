@@ -1,4 +1,3 @@
-﻿
 #include "skinBrushFlags.h"
 #include "skinBrushTool.h"
 #include <span>
@@ -677,8 +676,9 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int f : this->mesh.perVertexFaces[ptIndex]) {
-                fatFaces_bitset[f] = true;
+            for (int fi = mesh.perVertexFacesSetINDEX[ptIndex];
+                 fi < mesh.perVertexFacesSetINDEX[ptIndex + 1]; ++fi) {
+                fatFaces_bitset[mesh.perVertexFacesSetFLAT[fi]] = true;
             }
         }
     }
@@ -687,8 +687,9 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int e : this->mesh.perVertexEdges[ptIndex]) {
-                fatEdges_bitset[e] = true;
+            for (int ei = mesh.perVertexEdgesSetINDEX[ptIndex];
+                 ei < mesh.perVertexEdgesSetINDEX[ptIndex + 1]; ++ei) {
+                fatEdges_bitset[mesh.perVertexEdgesSetFLAT[ei]] = true;
             }
         }
     }
@@ -701,19 +702,23 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
             if (!fatFaces_bitset[f]) {
                 continue;
             }
-            for (auto &tri : this->mesh.perFaceTriangleVertices[f]) {
-                if (!vertMap_bitset[tri[0]]) {
+            for (int t = mesh.perFaceTriangleStartINDEX[f];
+                 t < mesh.perFaceTriangleStartINDEX[f + 1]; ++t) {
+                int v0 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 0];
+                int v1 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 1];
+                int v2 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 2];
+                if (!vertMap_bitset[v0]) {
                     continue;
                 }
-                if (!vertMap_bitset[tri[1]]) {
+                if (!vertMap_bitset[v1]) {
                     continue;
                 }
-                if (!vertMap_bitset[tri[2]]) {
+                if (!vertMap_bitset[v2]) {
                     continue;
                 }
-                auto it0 = verticesMap.find(tri[0]);
-                auto it1 = verticesMap.find(tri[1]);
-                auto it2 = verticesMap.find(tri[2]);
+                auto it0 = verticesMap.find(v0);
+                auto it1 = verticesMap.find(v1);
+                auto it2 = verticesMap.find(v2);
                 indices.append(it0->second);
                 indices.append(it1->second);
                 indices.append(it2->second);
@@ -2218,89 +2223,111 @@ void SkinBrushContext::getConnectedVertices()
 {
     MStatus status;
 
-    // MIntArray vertexCount, vertexList;
     MIntArray VertexCountPerPolygon;
     status = mesh.meshFn.getVertices(VertexCountPerPolygon, fullVertexList);
 
-    MIntArray triangleCounts, triangleVertices; // get the triangles to draw the mesh
+    MIntArray triangleCounts, triangleVertices;
     status = mesh.meshFn.getTriangles(triangleCounts, triangleVertices);
 
-    // First set array sizes ----------------------------------------------
-    this->perFaceVertices.clear();
-    this->mesh.perVertexFaces.clear();
-    this->mesh.perFaceTriangleVertices.clear();
+    // -- face -> vertices (perFaceVerticesSet) ---------------------------------
+    mesh.perFaceVerticesSetFLAT.clear();
+    mesh.perFaceVerticesSetFLAT.reserve(fullVertexList.length());
+    mesh.perFaceVerticesSetINDEX.resize(mesh.numFaces + 1);
 
-    this->perFaceVertices.resize(this->mesh.numFaces);
-    this->mesh.perVertexFaces.resize(this->mesh.numVertices);
-    this->mesh.perFaceTriangleVertices.resize(this->mesh.numFaces);
+    // -- vertex -> faces (perVertexFacesSet) - counting-sort build -------------
+    mesh.perVertexFacesSetINDEX.assign(mesh.numVertices + 1, 0);
 
-    // end set array sizes ----------------------------------------------
-    // First run --------------------------------------------------------
-    for (unsigned int faceId = 0, iter = 0, triIter = 0; faceId < VertexCountPerPolygon.length();
-         ++faceId) {
-        perFaceVertices[faceId].clear();
+    for (int faceId = 0, iter = 0; faceId < mesh.numFaces; ++faceId) {
+        mesh.perFaceVerticesSetINDEX[faceId] = (int)mesh.perFaceVerticesSetFLAT.size();
         for (int i = 0; i < VertexCountPerPolygon[faceId]; ++i, ++iter) {
-            int indVertex = fullVertexList[iter];
-            perFaceVertices[faceId].append(indVertex);
-            mesh.perVertexFaces[indVertex].append(faceId);
-        }
-        mesh.perFaceTriangleVertices[faceId].resize(triangleCounts[faceId]);
-        for (int triId = 0; triId < triangleCounts[faceId]; ++triId) {
-            mesh.perFaceTriangleVertices[faceId][triId].setLength(3);
-            mesh.perFaceTriangleVertices[faceId][triId][0] = triangleVertices[triIter++];
-            mesh.perFaceTriangleVertices[faceId][triId][1] = triangleVertices[triIter++];
-            mesh.perFaceTriangleVertices[faceId][triId][2] = triangleVertices[triIter++];
+            int v = fullVertexList[iter];
+            mesh.perFaceVerticesSetFLAT.push_back(v);
+            mesh.perVertexFacesSetINDEX[v + 1]++;
         }
     }
-    // get the edgesIndices to draw the wireframe --------------------
+    mesh.perFaceVerticesSetINDEX[mesh.numFaces] = (int)mesh.perFaceVerticesSetFLAT.size();
+
+    for (int v = 0; v < mesh.numVertices; ++v) {
+        mesh.perVertexFacesSetINDEX[v + 1] += mesh.perVertexFacesSetINDEX[v];
+    }
+    mesh.perVertexFacesSetFLAT.resize(mesh.perVertexFacesSetINDEX[mesh.numVertices]);
+    {
+        std::vector<int> writePos(
+            mesh.perVertexFacesSetINDEX.begin(), mesh.perVertexFacesSetINDEX.end() - 1
+        );
+        for (int faceId = 0, iter = 0; faceId < mesh.numFaces; ++faceId) {
+            for (int i = 0; i < VertexCountPerPolygon[faceId]; ++i, ++iter) {
+                int v = fullVertexList[iter];
+                mesh.perVertexFacesSetFLAT[writePos[v]++] = faceId;
+            }
+        }
+    }
+
+    // -- triangles flat (perFaceTriangleStartINDEX + perFaceTriangleVerticesFLAT) --
+    mesh.perFaceTriangleStartINDEX.resize(mesh.numFaces + 1);
+    mesh.perFaceTriangleVerticesFLAT.resize(triangleVertices.length());
+    {
+        int runningTri = 0;
+        for (int f = 0; f < mesh.numFaces; ++f) {
+            mesh.perFaceTriangleStartINDEX[f] = runningTri;
+            runningTri += triangleCounts[f];
+        }
+        mesh.perFaceTriangleStartINDEX[mesh.numFaces] = runningTri;
+        for (unsigned i = 0; i < triangleVertices.length(); ++i) {
+            mesh.perFaceTriangleVerticesFLAT[i] = triangleVertices[i];
+        }
+    }
+
+    // -- edges (perEdgeVertices + perVertexEdgesSet) ---------------------------
     MItMeshEdge edgeIter(mesh.meshDag);
+    mesh.perEdgeVertices.clear();
+    mesh.perEdgeVertices.resize(mesh.numEdges);
+    mesh.perVertexEdgesSetINDEX.assign(mesh.numVertices + 1, 0);
 
-    this->mesh.perEdgeVertices.clear();
-    this->mesh.perVertexEdges.clear();
-    this->mesh.perEdgeVertices.resize(edgeIter.count());
-    this->mesh.perVertexEdges.resize(this->mesh.numVertices);
-
-    unsigned int i = 0;
-    for (; !edgeIter.isDone(); edgeIter.next()) {
-        int pt0Index = edgeIter.index(0);
-        int pt1Index = edgeIter.index(1);
-        this->mesh.perVertexEdges[pt0Index].append(i);
-        this->mesh.perVertexEdges[pt1Index].append(i);
-        this->mesh.perEdgeVertices[i++] = std::make_pair(pt0Index, pt1Index);
+    for (unsigned i = 0; !edgeIter.isDone(); edgeIter.next(), ++i) {
+        int pt0 = edgeIter.index(0), pt1 = edgeIter.index(1);
+        mesh.perEdgeVertices[i] = {pt0, pt1};
+        mesh.perVertexEdgesSetINDEX[pt0 + 1]++;
+        mesh.perVertexEdgesSetINDEX[pt1 + 1]++;
+    }
+    for (int v = 0; v < mesh.numVertices; ++v) {
+        mesh.perVertexEdgesSetINDEX[v + 1] += mesh.perVertexEdgesSetINDEX[v];
+    }
+    mesh.perVertexEdgesSetFLAT.resize(mesh.perVertexEdgesSetINDEX[mesh.numVertices]);
+    {
+        std::vector<int> writePos(
+            mesh.perVertexEdgesSetINDEX.begin(), mesh.perVertexEdgesSetINDEX.end() - 1
+        );
+        for (int i = 0; i < mesh.numEdges; ++i) {
+            int pt0 = mesh.perEdgeVertices[i].first;
+            int pt1 = mesh.perEdgeVertices[i].second;
+            mesh.perVertexEdgesSetFLAT[writePos[pt0]++] = i;
+            mesh.perVertexEdgesSetFLAT[writePos[pt1]++] = i;
+        }
     }
 }
 
 void SkinBrushContext::getDerivedConnectivity()
 {
-    // Build face → vertices flat array
-    mesh.perFaceVerticesSetFLAT.clear();
-    mesh.perFaceVerticesSetINDEX.clear();
-    int sum = 0;
-    for (int f = 0; f < mesh.numFaces; ++f) {
-        mesh.perFaceVerticesSetINDEX.push_back(sum);
-        const MIntArray &fv = perFaceVertices[f];
-        for (unsigned int i = 0; i < fv.length(); ++i) {
-            mesh.perFaceVerticesSetFLAT.push_back((int)fv[i]);
-            sum++;
-        }
-    }
-    mesh.perFaceVerticesSetINDEX.push_back(sum);
-
-    // Build vertex → face-sharing-vertices flat array, excluding self
+    // perFaceVerticesSetFLAT/INDEX already built by getConnectedVertices.
+    // Build vertex -> face-sharing-vertices flat array, excluding self.
     std::vector<std::unordered_set<int>> vertNeighbors(mesh.numVertices);
     for (int f = 0; f < mesh.numFaces; ++f) {
-        const MIntArray &fv = perFaceVertices[f];
-        for (unsigned int a = 0; a < fv.length(); ++a) {
-            for (unsigned int b = 0; b < fv.length(); ++b) {
+        int start = mesh.perFaceVerticesSetINDEX[f];
+        int end = mesh.perFaceVerticesSetINDEX[f + 1];
+        for (int a = start; a < end; ++a) {
+            for (int b = start; b < end; ++b) {
                 if (a != b) {
-                    vertNeighbors[(int)fv[a]].insert((int)fv[b]);
+                    vertNeighbors[mesh.perFaceVerticesSetFLAT[a]].insert(
+                        mesh.perFaceVerticesSetFLAT[b]
+                    );
                 }
             }
         }
     }
     mesh.perVertexVerticesSetFLAT.clear();
     mesh.perVertexVerticesSetINDEX.clear();
-    sum = 0;
+    int sum = 0;
     for (int v = 0; v < mesh.numVertices; ++v) {
         mesh.perVertexVerticesSetINDEX.push_back(sum);
         for (int u : vertNeighbors[v]) {
@@ -2315,24 +2342,20 @@ void SkinBrushContext::getFromMeshNormals()
 {
     this->mesh.verticesNormals.clear();
     this->mesh.verticesNormals.setLength(this->mesh.numVertices);
-    // fill the normals ----------------------------------------------------
-    this->normalsIds.clear();
-    this->normalsIds.resize(this->mesh.numFaces);
+
     MIntArray normalCounts, normals;
     this->mesh.meshFn.getNormalIds(normalCounts, normals);
 
-    int startIndex = 0;
-#pragma omp parallel for
-    for (int faceTmp = 0; faceTmp < normalCounts.length(); ++faceTmp) {
-        int nbNormals = normalCounts[faceTmp];
-        std::vector<int> tmpNormalsIds(nbNormals, 0);
-        for (unsigned int k = 0; k < nbNormals; ++k) {
-            int normalId = normals[k + startIndex];
-            tmpNormalsIds[k] = normalId;
+    // Store the first normal ID per face (only index [0] is ever needed).
+    mesh.normalIdPerFace.resize(mesh.numFaces);
+    {
+        int startIndex = 0;
+        for (int f = 0; f < mesh.numFaces; ++f) {
+            mesh.normalIdPerFace[f] = normals[startIndex];
+            startIndex += normalCounts[f];
         }
-        this->normalsIds[faceTmp] = tmpNormalsIds;
-        startIndex += nbNormals;
     }
+
     MStatus stat;
     this->mesh.rawNormals = const_cast<float *>(this->mesh.meshFn.getRawNormals(&stat));
 
@@ -2340,15 +2363,18 @@ void SkinBrushContext::getFromMeshNormals()
     this->mesh.verticesNormalsIndices.clear();
     this->mesh.verticesNormalsIndices.setLength(mesh.numVertices);
 #pragma omp parallel for
-    for (int vertexInd = 0; vertexInd < this->mesh.numVertices; vertexInd++) {
-        auto vertToFace = this->mesh.perVertexFaces[vertexInd];
-        if (vertToFace.length() > 0) {
-            int indFace = vertToFace[0];
-            MIntArray surroundingVertices = this->perFaceVertices[indFace];
+    for (int vertexInd = 0; vertexInd < this->mesh.numVertices; ++vertexInd) {
+        int fStart = mesh.perVertexFacesSetINDEX[vertexInd];
+        int fEnd = mesh.perVertexFacesSetINDEX[vertexInd + 1];
+        if (fStart < fEnd) {
+            int indFace = mesh.perVertexFacesSetFLAT[fStart];
             int indNormal = -1;
-            for (unsigned int j = 0; j < surroundingVertices.length(); ++j) {
-                if (surroundingVertices[j] == vertexInd) {
-                    indNormal = this->normalsIds[indFace][0];
+            int vStart = mesh.perFaceVerticesSetINDEX[indFace];
+            int vEnd = mesh.perFaceVerticesSetINDEX[indFace + 1];
+            for (int j = vStart; j < vEnd; ++j) {
+                if (mesh.perFaceVerticesSetFLAT[j] == vertexInd) {
+                    indNormal = mesh.normalIdPerFace[indFace];
+                    break;
                 }
             }
             if (indNormal == -1) {
@@ -2511,8 +2537,6 @@ MStatus SkinBrushContext::fillArrayValues(MObject &skinCluster, bool doColors)
     this->influence.ignoreLockJoints = MIntArray(this->influence.nbJoints, 0);
 
     if (doColors) {
-        skin_weights_.resize(this->mesh.numVertices);
-
         this->weights.multiCurrentColors.clear();
         this->weights.multiCurrentColors.setLength(this->mesh.numVertices);
         // get values for array --
@@ -2571,7 +2595,6 @@ MStatus SkinBrushContext::fillArrayValuesDEP(MObject &skinCluster, bool doColors
     // For the first component, the weights are ordered by influence object in the same order that
     // is returned by the MFnSkinCluster::influenceObjects method.
     // use influence.influenceIndices
-    skin_weights_.resize(nbElements);
     if (doColors) {
         this->weights.multiCurrentColors.clear();
         this->weights.multiCurrentColors.setLength(nbElements);
@@ -2809,18 +2832,21 @@ bool SkinBrushContext::getMirrorHit(int &faceHit, MFloatPoint &hitPoint) const
         float hitBary1, hitBary2;
         pointInfo.getBarycentricCoords(hitBary1, hitBary2);
 
-        MIntArray triangle = this->mesh.perFaceTriangleVertices[faceHit][hitTriangle];
+        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
+        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
+        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
+        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
 
         float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = this->mesh.mayaRawPoints[triangle[0] * 3] * hitBary1 +
-                  this->mesh.mayaRawPoints[triangle[1] * 3] * hitBary2 +
-                  this->mesh.mayaRawPoints[triangle[2] * 3] * hitBary3;
-        float y = this->mesh.mayaRawPoints[triangle[0] * 3 + 1] * hitBary1 +
-                  this->mesh.mayaRawPoints[triangle[1] * 3 + 1] * hitBary2 +
-                  this->mesh.mayaRawPoints[triangle[2] * 3 + 1] * hitBary3;
-        float z = this->mesh.mayaRawPoints[triangle[0] * 3 + 2] * hitBary1 +
-                  this->mesh.mayaRawPoints[triangle[1] * 3 + 2] * hitBary2 +
-                  this->mesh.mayaRawPoints[triangle[2] * 3 + 2] * hitBary3;
+        float x = this->mesh.mayaRawPoints[t0 * 3] * hitBary1 +
+                  this->mesh.mayaRawPoints[t1 * 3] * hitBary2 +
+                  this->mesh.mayaRawPoints[t2 * 3] * hitBary3;
+        float y = this->mesh.mayaRawPoints[t0 * 3 + 1] * hitBary1 +
+                  this->mesh.mayaRawPoints[t1 * 3 + 1] * hitBary2 +
+                  this->mesh.mayaRawPoints[t2 * 3 + 1] * hitBary3;
+        float z = this->mesh.mayaRawPoints[t0 * 3 + 2] * hitBary1 +
+                  this->mesh.mayaRawPoints[t1 * 3 + 2] * hitBary2 +
+                  this->mesh.mayaRawPoints[t2 * 3 + 2] * hitBary3;
         hitPoint = MFloatPoint(x, y, z) * this->mesh.inclusiveMatrix;
     }
     else {
@@ -2864,17 +2890,20 @@ bool SkinBrushContext::computeHit(
     }
 
     if (input.paintMirror > 0 && input.paintMirror < 4) { // if we compute the orig
-        MIntArray triangle = this->mesh.perFaceTriangleVertices[faceHit][hitTriangle];
+        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
+        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
+        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
+        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
         float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = this->mesh.mayaOrigRawPoints[triangle[0] * 3] * hitBary1 +
-                  this->mesh.mayaOrigRawPoints[triangle[1] * 3] * hitBary2 +
-                  this->mesh.mayaOrigRawPoints[triangle[2] * 3] * hitBary3;
-        float y = this->mesh.mayaOrigRawPoints[triangle[0] * 3 + 1] * hitBary1 +
-                  this->mesh.mayaOrigRawPoints[triangle[1] * 3 + 1] * hitBary2 +
-                  this->mesh.mayaOrigRawPoints[triangle[2] * 3 + 1] * hitBary3;
-        float z = this->mesh.mayaOrigRawPoints[triangle[0] * 3 + 2] * hitBary1 +
-                  this->mesh.mayaOrigRawPoints[triangle[1] * 3 + 2] * hitBary2 +
-                  this->mesh.mayaOrigRawPoints[triangle[2] * 3 + 2] * hitBary3;
+        float x = this->mesh.mayaOrigRawPoints[t0 * 3] * hitBary1 +
+                  this->mesh.mayaOrigRawPoints[t1 * 3] * hitBary2 +
+                  this->mesh.mayaOrigRawPoints[t2 * 3] * hitBary3;
+        float y = this->mesh.mayaOrigRawPoints[t0 * 3 + 1] * hitBary1 +
+                  this->mesh.mayaOrigRawPoints[t1 * 3 + 1] * hitBary2 +
+                  this->mesh.mayaOrigRawPoints[t2 * 3 + 1] * hitBary3;
+        float z = this->mesh.mayaOrigRawPoints[t0 * 3 + 2] * hitBary1 +
+                  this->mesh.mayaOrigRawPoints[t1 * 3 + 2] * hitBary2 +
+                  this->mesh.mayaOrigRawPoints[t2 * 3 + 2] * hitBary3;
         interFrame.origHitPoint = MFloatPoint(x, y, z);
     }
 

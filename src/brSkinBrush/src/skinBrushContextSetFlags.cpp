@@ -1,4 +1,4 @@
-﻿#include "skinBrushTool.h"
+#include "skinBrushTool.h"
 
 // ---------------------------------------------------------------------
 // setting values from the command flags

@@ -1,5 +1,4 @@
-﻿#include "skinBrushTool.h"
-
+#include "skinBrushTool.h"
 #include "skinBrushFlags.h"
 
 // Macro for the press/drag/release methods in case there is nothing
