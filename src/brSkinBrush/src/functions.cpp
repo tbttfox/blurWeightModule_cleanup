@@ -15,10 +15,7 @@ coord_t distance_sq(const point_t &a, const point_t &b)
 }
 coord_t distance(const point_t &a, const point_t &b)
 {
-    coord_t x = std::get<0>(a) - std::get<0>(b);
-    coord_t y = std::get<1>(a) - std::get<1>(b);
-    coord_t z = std::get<2>(a) - std::get<2>(b);
-    return std::sqrt(x * x + y * y + z * z);
+    return std::sqrt(distance_sq(a, b));
 }
 
 unsigned int getMIntArrayIndex(const MIntArray &myArray, int searching)
@@ -135,47 +132,18 @@ MStatus transferPointNurbsToMesh(MFnMesh &msh, MFnNurbsSurface &nurbsFn)
     return stat;
 }
 
-MStatus findNurbsTesselateOrig(MDagPath meshPath, MObject &origMeshObj)
+MStatus findNurbsTesselate(MDagPath nurbsPath, MObject &meshObj, const char *plugName)
 {
     MStatus stat;
-    // the deformed mesh comes into the visible mesh
-    // through its "inmesh" plug
-    MFnDependencyNode deformedNameMesh(meshPath.node());
-    MPlug outMeshPlug = deformedNameMesh.findPlug("origMeshNurbs", false, &stat);
-    MGlobal::displayInfo(MString("---- searching from: ") + outMeshPlug.name());
+    MFnDependencyNode depNode(nurbsPath.node());
+    MPlug outMeshPlug = depNode.findPlug(plugName, false, &stat);
     if (stat == MS::kSuccess) {
         MPlugArray connections;
         outMeshPlug.connectedTo(connections, false, true);
-        int nbconnections = connections.length();
-        for (int i = 0; i < nbconnections; ++i) {
-            MPlug conn = connections[0];
-
+        for (int i = 0; i < (int)connections.length(); ++i) {
             MFnDependencyNode sourceNode;
-            sourceNode.setObject(conn.node());
-            origMeshObj = sourceNode.object();
-            return MS::kSuccess;
-        }
-    }
-    return MS::kFailure;
-}
-
-MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj)
-{
-    MStatus stat;
-    // the deformed mesh comes into the visible mesh
-    // through its "inmesh" plug
-    MFnDependencyNode deformedNameMesh(NurbsPath.node());
-    MPlug outMeshPlug = deformedNameMesh.findPlug("nurbsTessellate", false, &stat);
-
-    if (stat == MS::kSuccess) {
-        MPlugArray connections;
-        outMeshPlug.connectedTo(connections, false, true);
-        for (int i = 0; i < connections.length(); ++i) {
-            MPlug conn = connections[0];
-
-            MFnDependencyNode sourceNode;
-            sourceNode.setObject(conn.node());
-            MeshObj = sourceNode.object();
+            sourceNode.setObject(connections[i].node());
+            meshObj = sourceNode.object();
             return MS::kSuccess;
         }
     }
@@ -448,7 +416,7 @@ MStatus getSymetryAttributes(MObject &skinCluster, MIntArray &symetryList)
 }
 
 MStatus getMirrorVertices(
-    MIntArray mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
+    const MIntArray &mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
     MIntArray &editAndMirrorVerts, MDoubleArray &editVertsWeights, MDoubleArray &mirrorVertsWeights,
     MDoubleArray &editAndMirrorWeights, bool doMerge
 )
@@ -1179,15 +1147,15 @@ void getRawNeighbors(
 )
 {
     std::vector<std::unordered_set<int>> faceNeighbors(numVerts);
-    std::vector<std::unordered_set<int>> edgeNeigbors(numVerts);
+    std::vector<std::unordered_set<int>> edgeNeighbors(numVerts);
     size_t ptr = 0;
     for (const int &c : counts) {
         for (int i = 0; i < c; ++i) {
             int j = (i + 1) % c;
             int rgt = indices[ptr + i];
             int lft = indices[ptr + j];
-            edgeNeigbors[rgt].insert(lft);
-            edgeNeigbors[lft].insert(rgt);
+            edgeNeighbors[rgt].insert(lft);
+            edgeNeighbors[lft].insert(rgt);
             for (int x = 0; x < c; ++x) {
                 if (x == i) {
                     continue;
@@ -1204,22 +1172,8 @@ void getRawNeighbors(
     for (int v = 0; v < numVerts; ++v) {
         faceNeighborsINDEX[v + 1] = faceNeighborsINDEX[v] + (int)faceNeighbors[v].size();
         faceNeighborsFLAT.insert(faceNeighborsFLAT.end(), faceNeighbors[v].begin(), faceNeighbors[v].end());
-        edgeNeighborsINDEX[v + 1] = edgeNeighborsINDEX[v] + (int)edgeNeigbors[v].size();
-        edgeNeighborsFLAT.insert(edgeNeighborsFLAT.end(), edgeNeigbors[v].begin(), edgeNeigbors[v].end());
-    }
-}
-
-void convertToCountIndex(
-    const std::vector<std::unordered_set<int>> &input, std::vector<int> &counts,
-    std::vector<int> &indices
-)
-{
-    // Convert to the flattened vector/vector for usage.
-    // This can have faster access later because it uses contiguous memory
-    counts.push_back(0);
-    for (auto &uSet : input) {
-        counts.push_back(counts.back() + uSet.size());
-        indices.insert(indices.end(), uSet.begin(), uSet.end());
+        edgeNeighborsINDEX[v + 1] = edgeNeighborsINDEX[v] + (int)edgeNeighbors[v].size();
+        edgeNeighborsFLAT.insert(edgeNeighborsFLAT.end(), edgeNeighbors[v].begin(), edgeNeighbors[v].end());
     }
 }
 

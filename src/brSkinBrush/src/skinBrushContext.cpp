@@ -26,6 +26,8 @@ MStatus editSoloColorSet(
     bool doBlack, const UserInputData &ui, const InfluenceData &infl, WeightData &weights,
     MeshState &mesh
 );
+std::vector<int> getSurroundingVerticesPerVert(int vertexIndex, const MeshState &mesh);
+std::vector<int> getSurroundingVerticesPerFace(int vertexIndex, const MeshState &mesh);
 
 // ---------------------------------------------------------------------
 // the context
@@ -1246,41 +1248,38 @@ void SkinBrushContext::growArrayOfHitsFromCenters(
     std::unordered_map<int, float> &dicVertsDist, MFloatPointArray &AllHitPoints
 )
 {
-    // set of visited vertices
-    std::vector<int> vertsVisited, vertsWithinDistance;
-
-    for (const auto &element : dicVertsDist) {
-        vertsVisited.push_back(element.first);
+    if (AllHitPoints.length() == 0) {
+        return;
     }
-    std::sort(vertsVisited.begin(), vertsVisited.end());
-    vertsWithinDistance = vertsVisited;
 
-    // start of growth---------------------
-    bool processing = true;
-
-    std::vector<int> borderOfGrowth;
-    borderOfGrowth = vertsVisited;
-
-    // make the std vector points for faster sorting -----------
+    // build hit point list for distance queries
     std::vector<point_t> points;
     for (auto hitPt : AllHitPoints) {
         points.push_back(std::make_tuple(hitPt.x, hitPt.y, hitPt.z));
     }
-    if (AllHitPoints.length() == 0) {
-        return; // if not it will crash
+
+    // set of visited vertices
+    std::unordered_set<int> vertsVisited;
+    for (const auto &element : dicVertsDist) {
+        vertsVisited.insert(element.first);
     }
+
+    std::unordered_set<int> borderOfGrowth = vertsVisited;
+    bool processing = true;
+
     while (processing) {
         processing = false;
-        // -------------------- grow the vertices ----------------------------------------------
-        std::vector<int> setOfVertsGrow;
+        // grow one ring out from the current frontier
+        std::unordered_set<int> setOfVertsGrow;
         for (int vertexIndex : borderOfGrowth) {
-            setOfVertsGrow = setOfVertsGrow + getSurroundingVerticesPerVert(vertexIndex);
+            auto neighbors = getSurroundingVerticesPerVert(vertexIndex);
+            setOfVertsGrow.insert(neighbors.begin(), neighbors.end());
         }
-        // get the vertices that are grown -----------------------------------------------------
-        std::vector<int> verticesontheborder = setOfVertsGrow - vertsVisited;
+        // only consider vertices not yet visited
+        std::unordered_set<int> verticesontheborder = setOfVertsGrow - vertsVisited;
         std::vector<int> foundGrowVertsWithinDistance;
 
-        // for all vertices grown ------------------------------
+        // for all vertices grown
         for (int vertexBorder : verticesontheborder) {
             // First check the normal
             if (!this->coverageVal) {
@@ -1290,26 +1289,17 @@ void SkinBrushContext::growArrayOfHitsFromCenters(
                     continue;
                 }
             }
-            float closestDist = -1;
-            // find the closestDistance and closest Vertex from visited vertices
-            // ------------------------
             point_t thisPoint = std::make_tuple(
                 this->mesh.mayaRawPoints[vertexBorder * 3],
                 this->mesh.mayaRawPoints[vertexBorder * 3 + 1],
                 this->mesh.mayaRawPoints[vertexBorder * 3 + 2]
             );
             auto glambda = [&thisPoint](const point_t &a, const point_t &b) {
-                float aRes = distance_sq(a, thisPoint);
-                float bRes = distance_sq(b, thisPoint);
-                return aRes < bRes;
+                return distance_sq(a, thisPoint) < distance_sq(b, thisPoint);
             };
             std::partial_sort(points.begin(), points.begin() + 1, points.end(), glambda);
-            auto closestPoint = points.front();
-            closestDist = distance(closestPoint, thisPoint);
-            // get the new distance between the closest visited vertex and the grow vertex
-            if (closestDist <= this->input.sizeVal) { // if in radius of the brush
-                // we found a vertex in the radius
-                // now add to the visited and add the distance to the dictionnary
+            float closestDist = distance(points.front(), thisPoint);
+            if (closestDist <= this->input.sizeVal) {
                 processing = true;
                 foundGrowVertsWithinDistance.push_back(vertexBorder);
                 auto ret = dicVertsDist.insert(std::make_pair(vertexBorder, closestDist));
@@ -1318,12 +1308,11 @@ void SkinBrushContext::growArrayOfHitsFromCenters(
                 }
             }
         }
-        // this vertices has been visited, let's not consider them anymore
-        std::sort(foundGrowVertsWithinDistance.begin(), foundGrowVertsWithinDistance.end());
-        vertsVisited = vertsVisited + verticesontheborder;
-        vertsWithinDistance = vertsWithinDistance + foundGrowVertsWithinDistance;
-
-        borderOfGrowth = foundGrowVertsWithinDistance;
+        vertsVisited.insert(verticesontheborder.begin(), verticesontheborder.end());
+        borderOfGrowth.clear();
+        borderOfGrowth.insert(
+            foundGrowVertsWithinDistance.begin(), foundGrowVertsWithinDistance.end()
+        );
     }
 }
 
@@ -2406,7 +2395,7 @@ MStatus SkinBrushContext::getTheOrigMeshForMirror()
     // get the origMesh ----------------------------------------
     MObject origObj;
     if (this->interFrame.isNurbs) {
-        findNurbsTesselateOrig(this->mesh.meshDag, origObj);
+        findNurbsTesselate(this->mesh.meshDag, origObj, "origMeshNurbs");
     }
     else {
         findOrigMesh(weights.skinObj, origObj);
@@ -2623,21 +2612,12 @@ void SkinBrushContext::getFromMeshNormals()
 
 std::vector<int> SkinBrushContext::getSurroundingVerticesPerVert(int vertexIndex) const
 {
-    auto first =
-        mesh.perVertexVerticesSetFLAT.begin() + mesh.perVertexVerticesSetINDEX[vertexIndex];
-    auto last = mesh.perVertexVerticesSetFLAT.begin() +
-                mesh.perVertexVerticesSetINDEX[vertexIndex + (int)1];
-    std::vector<int> newVec(first, last);
-    return newVec;
+    return ::getSurroundingVerticesPerVert(vertexIndex, this->mesh);
 }
 
 std::vector<int> SkinBrushContext::getSurroundingVerticesPerFace(int vertexIndex) const
 {
-    auto first = mesh.perFaceVerticesSetFLAT.begin() + mesh.perFaceVerticesSetINDEX[vertexIndex];
-    auto last =
-        mesh.perFaceVerticesSetFLAT.begin() + mesh.perFaceVerticesSetINDEX[vertexIndex + (int)1];
-    std::vector<int> newVec(first, last);
-    return newVec;
+    return ::getSurroundingVerticesPerFace(vertexIndex, this->mesh);
 }
 
 //

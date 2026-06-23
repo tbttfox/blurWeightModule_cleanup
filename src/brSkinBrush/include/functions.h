@@ -47,8 +47,7 @@ void CVsAround(
     MIntArray &vertices
 );
 MStatus findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster);
-MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj);
-MStatus findNurbsTesselateOrig(MDagPath meshPath, MObject &origMeshObj);
+MStatus findNurbsTesselate(MDagPath nurbsPath, MObject &meshObj, const char *plugName = "nurbsTessellate");
 
 MStatus findMesh(MObject &theSkinCluster, MDagPath &theMeshPath);
 MStatus findOrigMesh(MObject &theSkinCluster, MObject &origMesh);
@@ -62,7 +61,7 @@ MStatus getListLockJoints(
 MStatus getListLockVertices(MObject &skinCluster, MIntArray &vertsLocks, MIntArray &lockedIndices);
 MStatus getSymetryAttributes(MObject &skinCluster, MIntArray &symetryList);
 MStatus getMirrorVertices(
-    MIntArray mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
+    const MIntArray &mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
     MIntArray &editAndMirrorVerts, MDoubleArray &editVertsWeights, MDoubleArray &mirrorVertsWeights,
     MDoubleArray &editAndMirrorWeights, bool doMerge = true
 );
@@ -105,11 +104,6 @@ void getRawNeighbors(
     std::vector<int> &faceNeighborsFLAT, std::vector<int> &faceNeighborsINDEX,
     std::vector<int> &edgeNeighborsFLAT, std::vector<int> &edgeNeighborsINDEX
 );
-void convertToCountIndex(
-    const std::vector<std::unordered_set<int>> &input, std::vector<int> &counts,
-    std::vector<int> &indices
-);
-
 std::vector<int> findClosestWithinThreshold(
     const std::vector<int> &indices, const float *pos,
     const std::vector<int> &connVertFLAT, const std::vector<int> &connVertINDEX,
