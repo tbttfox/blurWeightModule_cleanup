@@ -26,8 +26,8 @@ MStatus editSoloColorSet(
     bool doBlack, const UserInputData &ui, const InfluenceData &infl, WeightData &weights,
     MeshState &mesh
 );
-std::vector<int> getSurroundingVerticesPerVert(int vertexIndex, const MeshState &mesh);
-std::vector<int> getSurroundingVerticesPerFace(int vertexIndex, const MeshState &mesh);
+std::span<const int> getSurroundingVerticesPerVert(int vertexIndex, const MeshState &mesh);
+std::span<const int> getSurroundingVerticesPerFace(int faceIndex, const MeshState &mesh);
 
 // ---------------------------------------------------------------------
 // the context
@@ -714,9 +714,8 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int fi = mesh.perVertexFacesSetINDEX[ptIndex];
-                 fi < mesh.perVertexFacesSetINDEX[ptIndex + 1]; ++fi) {
-                fatFaces_bitset[mesh.perVertexFacesSetFLAT[fi]] = true;
+            for (int fi : mesh.perVertexFaces[ptIndex]) {
+                fatFaces_bitset[fi] = true;
             }
         }
     }
@@ -725,9 +724,8 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int ei = mesh.perVertexEdgesSetINDEX[ptIndex];
-                 ei < mesh.perVertexEdgesSetINDEX[ptIndex + 1]; ++ei) {
-                fatEdges_bitset[mesh.perVertexEdgesSetFLAT[ei]] = true;
+            for (int ei : mesh.perVertexEdges[ptIndex]) {
+                fatEdges_bitset[ei] = true;
             }
         }
     }
@@ -740,11 +738,9 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
             if (!fatFaces_bitset[f]) {
                 continue;
             }
-            for (int t = mesh.perFaceTriangleStartINDEX[f];
-                 t < mesh.perFaceTriangleStartINDEX[f + 1]; ++t) {
-                int v0 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 0];
-                int v1 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 1];
-                int v2 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 2];
+            for (size_t t = 0; t < mesh.perFaceTriangles.length2(f); ++t) {
+                auto tri = mesh.perFaceTriangles(f, t);
+                int v0 = tri[0], v1 = tri[1], v2 = tri[2];
                 if (!vertMap_bitset[v0]) {
                     continue;
                 }
@@ -2427,94 +2423,46 @@ void SkinBrushContext::getConnectedVertices()
     MIntArray triangleCounts, triangleVertices;
     status = mesh.meshFn.getTriangles(triangleCounts, triangleVertices);
 
-    // -- face -> vertices (perFaceVerticesSet) ---------------------------------
-    mesh.perFaceVerticesSetFLAT.clear();
-    mesh.perFaceVerticesSetFLAT.reserve(fullVertexList.length());
-    mesh.perFaceVerticesSetINDEX.resize(mesh.numFaces + 1);
+    // face -> vertices
+    mesh.perFaceVertices.set(VertexCountPerPolygon, fullVertexList);
 
-    // -- vertex -> faces (perVertexFacesSet) - counting-sort build -------------
-    mesh.perVertexFacesSetINDEX.assign(mesh.numVertices + 1, 0);
+    // face -> triangles
+    mesh.perFaceTriangles.set(triangleCounts, triangleVertices);
 
+    // vertex -> faces
+    std::vector<std::vector<int>> perVertexFaces(mesh.numVertices);
     for (int faceId = 0, iter = 0; faceId < mesh.numFaces; ++faceId) {
-        mesh.perFaceVerticesSetINDEX[faceId] = (int)mesh.perFaceVerticesSetFLAT.size();
         for (int i = 0; i < VertexCountPerPolygon[faceId]; ++i, ++iter) {
-            int v = fullVertexList[iter];
-            mesh.perFaceVerticesSetFLAT.push_back(v);
-            mesh.perVertexFacesSetINDEX[v + 1]++;
+            perVertexFaces[fullVertexList[iter]].push_back(faceId);
         }
     }
-    mesh.perFaceVerticesSetINDEX[mesh.numFaces] = (int)mesh.perFaceVerticesSetFLAT.size();
+    mesh.perVertexFaces.set(perVertexFaces);
 
-    for (int v = 0; v < mesh.numVertices; ++v) {
-        mesh.perVertexFacesSetINDEX[v + 1] += mesh.perVertexFacesSetINDEX[v];
-    }
-    mesh.perVertexFacesSetFLAT.resize(mesh.perVertexFacesSetINDEX[mesh.numVertices]);
-    {
-        std::vector<int> writePos(
-            mesh.perVertexFacesSetINDEX.begin(), mesh.perVertexFacesSetINDEX.end() - 1
-        );
-        for (int faceId = 0, iter = 0; faceId < mesh.numFaces; ++faceId) {
-            for (int i = 0; i < VertexCountPerPolygon[faceId]; ++i, ++iter) {
-                int v = fullVertexList[iter];
-                mesh.perVertexFacesSetFLAT[writePos[v]++] = faceId;
-            }
-        }
-    }
-
-    // -- triangles flat (perFaceTriangleStartINDEX + perFaceTriangleVerticesFLAT) --
-    mesh.perFaceTriangleStartINDEX.resize(mesh.numFaces + 1);
-    mesh.perFaceTriangleVerticesFLAT.resize(triangleVertices.length());
-    {
-        int runningTri = 0;
-        for (int f = 0; f < mesh.numFaces; ++f) {
-            mesh.perFaceTriangleStartINDEX[f] = runningTri;
-            runningTri += triangleCounts[f];
-        }
-        mesh.perFaceTriangleStartINDEX[mesh.numFaces] = runningTri;
-        for (unsigned i = 0; i < triangleVertices.length(); ++i) {
-            mesh.perFaceTriangleVerticesFLAT[i] = triangleVertices[i];
-        }
-    }
-
-    // -- edges (perEdgeVertices + perVertexEdgesSet) ---------------------------
+    // edges + vertex -> edges
     MItMeshEdge edgeIter(mesh.meshDag);
     mesh.perEdgeVertices.clear();
     mesh.perEdgeVertices.resize(mesh.numEdges);
-    mesh.perVertexEdgesSetINDEX.assign(mesh.numVertices + 1, 0);
     this->borderVertices.clear();
+    std::vector<std::vector<int>> perVertexEdges(mesh.numVertices);
 
     for (unsigned i = 0; !edgeIter.isDone(); edgeIter.next(), ++i) {
         int pt0 = edgeIter.index(0), pt1 = edgeIter.index(1);
         mesh.perEdgeVertices[i] = {pt0, pt1};
-        mesh.perVertexEdgesSetINDEX[pt0 + 1]++;
-        mesh.perVertexEdgesSetINDEX[pt1 + 1]++;
+        perVertexEdges[pt0].push_back(i);
+        perVertexEdges[pt1].push_back(i);
         if (edgeIter.onBoundary()) {
             borderVertices.push_back(pt0);
             borderVertices.push_back(pt1);
         }
     }
-    for (int v = 0; v < mesh.numVertices; ++v) {
-        mesh.perVertexEdgesSetINDEX[v + 1] += mesh.perVertexEdgesSetINDEX[v];
-    }
-    mesh.perVertexEdgesSetFLAT.resize(mesh.perVertexEdgesSetINDEX[mesh.numVertices]);
-    {
-        std::vector<int> writePos(
-            mesh.perVertexEdgesSetINDEX.begin(), mesh.perVertexEdgesSetINDEX.end() - 1
-        );
-        for (int i = 0; i < mesh.numEdges; ++i) {
-            int pt0 = mesh.perEdgeVertices[i].first;
-            int pt1 = mesh.perEdgeVertices[i].second;
-            mesh.perVertexEdgesSetFLAT[writePos[pt0]++] = i;
-            mesh.perVertexEdgesSetFLAT[writePos[pt1]++] = i;
-        }
-    }
+    mesh.perVertexEdges.set(perVertexEdges);
 }
 
 void SkinBrushContext::getConnectedBorderVertices()
 {
     this->vertToVertBorder = findClosestWithinThreshold(
         borderVertices, this->mesh.mayaOrigRawPoints,
-        mesh.perVertexVerticesSetFLAT, mesh.perVertexVerticesSetINDEX,
+        mesh.perVertexVertices,
         sewVerticesMinDist, this->mesh.numVertices, 0
     );
     if (verbose) {
@@ -2531,33 +2479,20 @@ void SkinBrushContext::getConnectedBorderVertices()
 
 void SkinBrushContext::getDerivedConnectivity()
 {
-    // perFaceVerticesSetFLAT/INDEX already built by getConnectedVertices.
-    // Build vertex -> face-sharing-vertices flat array, excluding self.
+    // Build vertex -> face-sharing-vertices, excluding self.
     std::vector<std::unordered_set<int>> vertNeighbors(mesh.numVertices);
     for (int f = 0; f < mesh.numFaces; ++f) {
-        int start = mesh.perFaceVerticesSetINDEX[f];
-        int end = mesh.perFaceVerticesSetINDEX[f + 1];
-        for (int a = start; a < end; ++a) {
-            for (int b = start; b < end; ++b) {
-                if (a != b) {
-                    vertNeighbors[mesh.perFaceVerticesSetFLAT[a]].insert(
-                        mesh.perFaceVerticesSetFLAT[b]
-                    );
-                }
+        for (int v : mesh.perFaceVertices[f]) {
+            for (int u : mesh.perFaceVertices[f]) {
+                if (v != u) vertNeighbors[v].insert(u);
             }
         }
     }
-    mesh.perVertexVerticesSetFLAT.clear();
-    mesh.perVertexVerticesSetINDEX.clear();
-    int sum = 0;
+    std::vector<std::vector<int>> perVertexVertices(mesh.numVertices);
     for (int v = 0; v < mesh.numVertices; ++v) {
-        mesh.perVertexVerticesSetINDEX.push_back(sum);
-        for (int u : vertNeighbors[v]) {
-            mesh.perVertexVerticesSetFLAT.push_back(u);
-            sum++;
-        }
+        perVertexVertices[v].assign(vertNeighbors[v].begin(), vertNeighbors[v].end());
     }
-    mesh.perVertexVerticesSetINDEX.push_back(sum);
+    mesh.perVertexVertices.set(perVertexVertices);
 }
 
 void SkinBrushContext::getFromMeshNormals()
@@ -2586,15 +2521,12 @@ void SkinBrushContext::getFromMeshNormals()
     this->mesh.verticesNormalsIndices.setLength(mesh.numVertices);
 #pragma omp parallel for
     for (int vertexInd = 0; vertexInd < this->mesh.numVertices; ++vertexInd) {
-        int fStart = mesh.perVertexFacesSetINDEX[vertexInd];
-        int fEnd = mesh.perVertexFacesSetINDEX[vertexInd + 1];
-        if (fStart < fEnd) {
-            int indFace = mesh.perVertexFacesSetFLAT[fStart];
+        auto faces = mesh.perVertexFaces[vertexInd];
+        if (!faces.empty()) {
+            int indFace = faces[0];
             int indNormal = -1;
-            int vStart = mesh.perFaceVerticesSetINDEX[indFace];
-            int vEnd = mesh.perFaceVerticesSetINDEX[indFace + 1];
-            for (int j = vStart; j < vEnd; ++j) {
-                if (mesh.perFaceVerticesSetFLAT[j] == vertexInd) {
+            for (int v : mesh.perFaceVertices[indFace]) {
+                if (v == vertexInd) {
                     indNormal = mesh.normalIdPerFace[indFace];
                     break;
                 }
@@ -2612,12 +2544,14 @@ void SkinBrushContext::getFromMeshNormals()
 
 std::vector<int> SkinBrushContext::getSurroundingVerticesPerVert(int vertexIndex) const
 {
-    return ::getSurroundingVerticesPerVert(vertexIndex, this->mesh);
+    auto sp = ::getSurroundingVerticesPerVert(vertexIndex, this->mesh);
+    return {sp.begin(), sp.end()};
 }
 
-std::vector<int> SkinBrushContext::getSurroundingVerticesPerFace(int vertexIndex) const
+std::vector<int> SkinBrushContext::getSurroundingVerticesPerFace(int faceIndex) const
 {
-    return ::getSurroundingVerticesPerFace(vertexIndex, this->mesh);
+    auto sp = ::getSurroundingVerticesPerFace(faceIndex, this->mesh);
+    return {sp.begin(), sp.end()};
 }
 
 //
@@ -3050,10 +2984,8 @@ bool SkinBrushContext::getMirrorHit(int &faceHit, MFloatPoint &hitPoint) const
         float hitBary1, hitBary2;
         pointInfo.getBarycentricCoords(hitBary1, hitBary2);
 
-        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
-        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
-        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
-        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
+        auto tri = mesh.perFaceTriangles(faceHit, hitTriangle);
+        int t0 = tri[0], t1 = tri[1], t2 = tri[2];
 
         hitPoint =
             barycentricInterpolate(this->mesh.mayaRawPoints, t0, t1, t2, hitBary1, hitBary2) *
@@ -3100,10 +3032,8 @@ bool SkinBrushContext::computeHit(
     }
 
     if (input.paintMirror > 0 && input.paintMirror < 4) { // if we compute the orig
-        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
-        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
-        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
-        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
+        auto tri = mesh.perFaceTriangles(faceHit, hitTriangle);
+        int t0 = tri[0], t1 = tri[1], t2 = tri[2];
         interFrame.origHitPoint =
             barycentricInterpolate(this->mesh.mayaOrigRawPoints, t0, t1, t2, hitBary1, hitBary2);
     }

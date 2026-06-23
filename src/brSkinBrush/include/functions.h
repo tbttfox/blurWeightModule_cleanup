@@ -1,5 +1,6 @@
 #pragma once
 
+#include "csrFormat.h"
 #include "enums.h"
 // MAYA HEADER FILES:
 
@@ -80,7 +81,7 @@ MStatus editArrayMirror(
 );
 
 MStatus setAverageWeight(
-    std::vector<int> &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
+    std::span<const int> verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray, MDoubleArray &theWeights,
     double strengthVal
 );
@@ -106,7 +107,7 @@ void getRawNeighbors(
 );
 std::vector<int> findClosestWithinThreshold(
     const std::vector<int> &indices, const float *pos,
-    const std::vector<int> &connVertFLAT, const std::vector<int> &connVertINDEX,
+    const FlatCounts<int> &connVerts,
     float threshold, int nbVertices, int mirrorVal
 );
 

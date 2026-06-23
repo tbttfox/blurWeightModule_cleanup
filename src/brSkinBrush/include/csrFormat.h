@@ -37,7 +37,10 @@ template <typename T = int> class FlatCounts {
     {
         offsets.clear();
         values.clear();
-        values = inVals;
+        values.reserve(inVals.length());
+        for (unsigned i = 0; i < inVals.length(); ++i) {
+            values.push_back(inVals[i]);
+        }
         offsets.resize(inCounts.length() + 1);
         offsets[0] = 0;
         size_t i = 1, v = 0;
@@ -53,11 +56,9 @@ template <typename T = int> class FlatCounts {
         values.clear();
         offsets.reserve(inVals.size() + 1);
         offsets.push_back(0);
-        size_t i = 1, v = 0;
         for (const auto &sub : inVals) {
-            v += sub.size();
-            offsets[i++] = v;
             values.insert(values.end(), sub.begin(), sub.end());
+            offsets.push_back(values.size());
         }
     }
 

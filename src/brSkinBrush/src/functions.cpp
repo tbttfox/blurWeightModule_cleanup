@@ -874,7 +874,7 @@ MStatus editArrayMirror(
 }
 
 MStatus setAverageWeight(
-    std::vector<int> &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
+    std::span<const int> verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray, MDoubleArray &theWeights,
     double strengthVal
 )
@@ -1208,12 +1208,12 @@ bool areDagPathArraysEqual(const MDagPathArray &a, const MDagPathArray &b)
 
 std::vector<int> findClosestWithinThreshold(
     const std::vector<int> &indices, const float *pos,
-    const std::vector<int> &connVertFLAT, const std::vector<int> &connVertINDEX,
+    const FlatCounts<int> &connVerts,
     float threshold, int nbVertices, int mirrorVal
 )
 {
-    std::vector<int> results(nbVertices, -1);        // Initialize with -1 (no neighbor found)
-    const float thresholdSq = threshold * threshold; // Compare squared values
+    std::vector<int> results(nbVertices, -1);
+    const float thresholdSq = threshold * threshold;
     float XMult = 1.0f;
     float YMult = 1.0f;
     float ZMult = 1.0f;
@@ -1237,25 +1237,17 @@ std::vector<int> findClosestWithinThreshold(
         float min_dist_sq = thresholdSq;
         int best_neighbor = -1;
 
-        int csrStart = connVertINDEX[idxA];
-        int csrEnd = connVertINDEX[idxA + 1];
-        // for (size_t j = 0; j < indices.size(); ++j) {
-        for (size_t j = i; j < indices.size(); ++j) {
-            if (i == j) {
-                continue;
-            }
-
+        auto neighbors = connVerts[idxA];
+        for (size_t j = i + 1; j < indices.size(); ++j) {
             int idxB = indices[j];
             if (idxA == idxB) {
                 continue;
             }
-            if (std::find(connVertFLAT.begin() + csrStart, connVertFLAT.begin() + csrEnd, idxB) !=
-                connVertFLAT.begin() + csrEnd) {
+            if (std::find(neighbors.begin(), neighbors.end(), idxB) != neighbors.end()) {
                 continue;
             }
 
             float dx = pos[idxB * 3] - ax;
-            // Early exit on X-axis if you sort your array by X first
             if (dx * dx >= min_dist_sq) {
                 continue;
             }

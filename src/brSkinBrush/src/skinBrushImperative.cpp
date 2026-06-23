@@ -390,9 +390,8 @@ MStatus drawMeshWhileDrag(
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int fi = mesh.perVertexFacesSetINDEX[ptIndex];
-                 fi < mesh.perVertexFacesSetINDEX[ptIndex + 1]; ++fi) {
-                fatFaces_bitset[mesh.perVertexFacesSetFLAT[fi]] = true;
+            for (int fi : mesh.perVertexFaces[ptIndex]) {
+                fatFaces_bitset[fi] = true;
             }
         }
     }
@@ -401,9 +400,8 @@ MStatus drawMeshWhileDrag(
         for (unsigned i = 0; i < mja.size(); ++i) {
             const auto &pt = mja[i];
             int ptIndex = pt.first;
-            for (int ei = mesh.perVertexEdgesSetINDEX[ptIndex];
-                 ei < mesh.perVertexEdgesSetINDEX[ptIndex + 1]; ++ei) {
-                fatEdges_bitset[mesh.perVertexEdgesSetFLAT[ei]] = true;
+            for (int ei : mesh.perVertexEdges[ptIndex]) {
+                fatEdges_bitset[ei] = true;
             }
         }
     }
@@ -416,11 +414,9 @@ MStatus drawMeshWhileDrag(
             if (!fatFaces_bitset[f]) {
                 continue;
             }
-            for (int t = mesh.perFaceTriangleStartINDEX[f];
-                 t < mesh.perFaceTriangleStartINDEX[f + 1]; ++t) {
-                int v0 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 0];
-                int v1 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 1];
-                int v2 = mesh.perFaceTriangleVerticesFLAT[t * 3 + 2];
+            for (size_t t = 0; t < mesh.perFaceTriangles.length2(f); ++t) {
+                auto tri = mesh.perFaceTriangles(f, t);
+                int v0 = tri[0], v1 = tri[1], v2 = tri[2];
                 if (!vertMap_bitset[v0]) {
                     continue;
                 }
@@ -481,15 +477,10 @@ MStatus drawMeshWhileDrag(
     return MStatus::kSuccess;
 }
 
-std::vector<int> getSurroundingVerticesPerVert(int vertexIndex, const MeshState &mesh)
+std::span<const int> getSurroundingVerticesPerVert(int vertexIndex, const MeshState &mesh)
 {
-    auto first =
-        mesh.perVertexVerticesSetFLAT.begin() + mesh.perVertexVerticesSetINDEX[vertexIndex];
-    auto last = mesh.perVertexVerticesSetFLAT.begin() +
-                mesh.perVertexVerticesSetINDEX[vertexIndex + (int)1];
-    std::vector<int> newVec(first, last);
-    return newVec;
-};
+    return mesh.perVertexVertices[vertexIndex];
+}
 
 coord_t distance_sq(const point_t &a, const point_t &b)
 {
@@ -536,7 +527,7 @@ void growArrayOfHitsFromCenters(
         // std::vector<int> setOfVertsGrow;
         std::unordered_set<int> setOfVertsGrow;
         for (const int &vertexIndex : borderOfGrowth) {
-            std::vector<int> neighborVerts = getSurroundingVerticesPerVert(vertexIndex, mesh);
+            auto neighborVerts = getSurroundingVerticesPerVert(vertexIndex, mesh);
             setOfVertsGrow.insert(neighborVerts.begin(), neighborVerts.end());
         }
 
@@ -711,10 +702,8 @@ bool getMirrorHit(
         float hitBary1, hitBary2;
         pointInfo.getBarycentricCoords(hitBary1, hitBary2);
 
-        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
-        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
-        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
-        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
+        auto tri = mesh.perFaceTriangles(faceHit, hitTriangle);
+        int t0 = tri[0], t1 = tri[1], t2 = tri[2];
 
         hitPoint = barycentricInterpolate(mesh.mayaRawPoints, t0, t1, t2, hitBary1, hitBary2) *
                    mesh.inclusiveMatrix;
@@ -761,10 +750,8 @@ bool computeHit(
     }
 
     if (ui.paintMirror > 0 && ui.paintMirror < 4) { // if we compute the orig
-        int triBase = (mesh.perFaceTriangleStartINDEX[faceHit] + hitTriangle) * 3;
-        int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
-        int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
-        int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
+        auto tri = mesh.perFaceTriangles(faceHit, hitTriangle);
+        int t0 = tri[0], t1 = tri[1], t2 = tri[2];
         frame.origHitPoint =
             barycentricInterpolate(mesh.mayaOrigRawPoints, t0, t1, t2, hitBary1, hitBary2);
     }
@@ -776,13 +763,9 @@ bool computeHit(
     return true;
 }
 
-std::vector<int> getSurroundingVerticesPerFace(int vertexIndex, const MeshState &mesh)
+std::span<const int> getSurroundingVerticesPerFace(int faceIndex, const MeshState &mesh)
 {
-    auto first = mesh.perFaceVerticesSetFLAT.begin() + mesh.perFaceVerticesSetINDEX[vertexIndex];
-    auto last =
-        mesh.perFaceVerticesSetFLAT.begin() + mesh.perFaceVerticesSetINDEX[vertexIndex + (int)1];
-    std::vector<int> newVec(first, last);
-    return newVec;
+    return mesh.perFaceVertices[faceIndex];
 }
 
 bool expandHit(
@@ -791,7 +774,7 @@ bool expandHit(
 )
 {
     // ----------- compute the vertices around ---------------------
-    std::vector<int> verticesSet = getSurroundingVerticesPerFace(faceHit, mesh);
+    auto verticesSet = getSurroundingVerticesPerFace(faceHit, mesh);
     bool foundHit = false;
     for (int ptIndex : verticesSet) {
         MFloatPoint posPoint(
@@ -860,7 +843,7 @@ void mergeMirrorArray(WeightData &weights, const MirrorableData &base, const Mir
 }
 
 static MStatus setAverageWeight(
-    std::vector<int> &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
+    std::span<const int> verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray, MDoubleArray &theWeights,
     double strengthVal
 )
@@ -1393,7 +1376,7 @@ MStatus applyCommand(
                 for (const auto &elem : valuesToSetOrdered) {
                     int theVert = elem.first;
                     double theWeight = elem.second;
-                    std::vector<int> vertsAround = getSurroundingVerticesPerVert(theVert, mesh);
+                    auto vertsAround = getSurroundingVerticesPerVert(theVert, mesh);
 
                     status = setAverageWeight(
                         vertsAround, theVert, i, infl.nbJoints, infl.lockJoints,
@@ -1652,7 +1635,7 @@ MStatus applyCommandMirror(
                 float biggestValue = std::max(valueBase, valueMirror);
 
                 double theWeight = (double)biggestValue;
-                std::vector<int> vertsAround = getSurroundingVerticesPerVert(theVert, mesh);
+                auto vertsAround = getSurroundingVerticesPerVert(theVert, mesh);
 
                 status = setAverageWeight(
                     vertsAround, theVert, indexCurrVert, infl.nbJoints, infl.lockJoints,

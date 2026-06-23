@@ -48,8 +48,11 @@
 #include <maya/MUserEventMessage.h>
 
 #include <set>
+#include <span>
 #include <unordered_map>
 #include <vector>
+
+#include "csrFormat.h"
 
 inline MFloatPoint
 barycentricInterpolate(const float *rawPoints, int t0, int t1, int t2, float b1, float b2)
@@ -89,27 +92,11 @@ struct MeshState {
 
     std::vector<std::pair<int, int>> perEdgeVertices; // The endpoint vertex indices of each edge
 
-    // face -> vertices (CSR): perFaceVerticesSetINDEX[f]..perFaceVerticesSetINDEX[f+1]
-    std::vector<int> perFaceVerticesSetFLAT;
-    std::vector<int> perFaceVerticesSetINDEX;
-
-    // vertex -> neighboring vertices sharing a face (CSR), self excluded
-    std::vector<int> perVertexVerticesSetFLAT;
-    std::vector<int> perVertexVerticesSetINDEX;
-
-    // vertex -> faces (CSR): perVertexFacesSetINDEX[v]..perVertexFacesSetINDEX[v+1]
-    std::vector<int> perVertexFacesSetFLAT;
-    std::vector<int> perVertexFacesSetINDEX;
-
-    // vertex -> edges (CSR): perVertexEdgesSetINDEX[v]..perVertexEdgesSetINDEX[v+1]
-    std::vector<int> perVertexEdgesSetFLAT;
-    std::vector<int> perVertexEdgesSetINDEX;
-
-    // face -> triangles (CSR in triangle units):
-    // perFaceTriangleStartINDEX[f]..perFaceTriangleStartINDEX[f+1] perFaceTriangleVerticesFLAT
-    // packed in groups of 3: [t*3+0, t*3+1, t*3+2]
-    std::vector<int> perFaceTriangleStartINDEX;
-    std::vector<int> perFaceTriangleVerticesFLAT;
+    FlatCounts<int> perFaceVertices;    // face -> verts:           perFaceVertices[f]
+    FlatCounts<int> perVertexVertices;  // vert -> neighbor verts:  perVertexVertices[v]
+    FlatCounts<int> perVertexFaces;     // vert -> faces:           perVertexFaces[v]
+    FlatCounts<int> perVertexEdges;     // vert -> edges:           perVertexEdges[v]
+    DoubleChunks<int> perFaceTriangles; // face -> triangles:       perFaceTriangles(f, t) -> span<int,3>
 
     // first normal ID for each face (used for per-vertex normal lookup)
     std::vector<int> normalIdPerFace;
