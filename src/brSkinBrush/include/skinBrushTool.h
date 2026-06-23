@@ -265,6 +265,8 @@ class SkinBrushContext : public MPxContext {
     MStatus refreshColors(
         MIntArray &editVertsIndices, MColorArray &multiEditColors, MColorArray &soloEditColors
     );
+    void
+    applyVertexColors(const MIntArray &indices, const MColorArray &multi, const MColorArray &solo);
     MStatus editSoloColorSet(bool doBlack);
     MColor getASoloColor(double val);
     MStatus refreshPointsNormals();
@@ -437,7 +439,6 @@ class SkinBrushContext : public MPxContext {
     int nbJointsBig = 0;
     MIntArray deformersIndices;
     MIntArray cpIds; // vertex ids passed to update skin
-    std::vector<std::vector<std::pair<int, float>>> skin_weights_;
     MIntArray fullVertexList;
     MPointArray surfacePoints; // cursor positions on the mesh in world space
     MPoint worldMirrorPoint;
@@ -452,22 +453,18 @@ class SkinBrushContext : public MPxContext {
     bool UIsPeriodic_ = false, VIsPeriodic_ = false;
     unsigned int UDeg_ = 0, VDeg_ = 0;
     MIntArray vtxSelection; // currently selected vertices (flooding)
-    MObject attrValue;
     MDoubleArray valuesForAttribute, paintArrayValues;
-    std::vector<bool> selectedIndices;
     MObject allVtxCompObj;
     std::vector<bool> influenceLocks;
     MDGModifier colorSetMod;
     bool toggleColorState = false;
-    std::vector<std::vector<int>> normalsIds; // vector of face normal ids
-    std::vector<MIntArray> perFaceVertices;   // per face vertices (MIntArray form)
     MSelectionList prevSelection;
     MSelectionList prevHilite;
     M3dView view;
     unsigned int width;
     unsigned int height;
 
-    // ── Structured state ────────────────────────────────────────────────────
+    // -- Structured state ----------------------------------------------------
     MeshState mesh;                         // Mesh geometry, topology, and raw-pointer caches
     NurbsData nurbs;                        // NURBS surface data
     InfluenceData influence;                // Skin cluster influences, colors, locks

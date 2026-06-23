@@ -1,5 +1,4 @@
-#ifndef __skinBrushTool__enums__
-#define __skinBrushTool__enums__
+#pragma once
 
 enum class ModifierKeys : int { NoModifier, Shift, Control, ControlShift };
 
@@ -13,5 +12,3 @@ enum class ModifierCommands : int {
     LockVertices = 6,
     UnlockVertices = 7
 };
-
-#endif

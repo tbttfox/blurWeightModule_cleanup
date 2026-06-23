@@ -202,12 +202,7 @@ void SkinBrushContext::toolOnSetup(MEvent &)
     refreshColors(editVertsIndices, multiEditColors, soloEditColors);
     this->paint.skinValuesToSet.clear();
 
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet);
-
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet2);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet2);
-
+    applyVertexColors(editVertsIndices, multiEditColors, soloEditColors);
     mesh.meshFn.setDisplayColors(true);
 
     view = M3dView::active3dView();
@@ -273,11 +268,7 @@ void SkinBrushContext::refreshTheseVertices(MIntArray &verticesIndices)
     MColorArray multiEditColors, soloEditColors;
     refreshColors(verticesIndices, multiEditColors, soloEditColors);
     this->paint.skinValuesToSet.clear();
-    mesh.meshFn.setSomeColors(verticesIndices, multiEditColors, &this->interFrame.fullColorSet);
-    mesh.meshFn.setSomeColors(verticesIndices, soloEditColors, &this->interFrame.soloColorSet);
-
-    mesh.meshFn.setSomeColors(verticesIndices, multiEditColors, &this->interFrame.fullColorSet2);
-    mesh.meshFn.setSomeColors(verticesIndices, soloEditColors, &this->interFrame.soloColorSet2);
+    applyVertexColors(verticesIndices, multiEditColors, soloEditColors);
 
     // if locking or unlocking
     // without that it doesn't refresh because mesh is not invalidated, meaning the skinCluster
@@ -324,11 +315,7 @@ void SkinBrushContext::refreshDeformerColor(int deformerInd)
     // display the locks ----------------------
     MColorArray multiEditColors, soloEditColors;
     refreshColors(editVertsIndices, multiEditColors, soloEditColors);
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet);
-
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet2);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet2);
+    applyVertexColors(editVertsIndices, multiEditColors, soloEditColors);
 
     if (input.soloColorVal == 1) {
         editSoloColorSet(true); // solo
@@ -383,11 +370,7 @@ void SkinBrushContext::refresh()
     // display the locks ----------------------
     MColorArray multiEditColors, soloEditColors;
     refreshColors(editVertsIndices, multiEditColors, soloEditColors);
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet);
-
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet2);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet2);
+    applyVertexColors(editVertsIndices, multiEditColors, soloEditColors);
 
     if (input.soloColorVal == 1) {
         editSoloColorSet(true); // solo
@@ -549,12 +532,6 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
         else if (theCommandIndex == ModifierCommands::Sharpen) {
             baseColor = white;
         }
-        else if (theCommandIndex == ModifierCommands::LockVertices) {
-            baseColor = white;
-        }
-        else if (theCommandIndex == ModifierCommands::UnlockVertices) {
-            baseColor = white;
-        }
         else {
             baseColor = this->influence.jointsColors[this->input.influenceIndex];
             if (this->input.paintMirror != 0) {
@@ -573,13 +550,10 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
         }
     }
 
-    // pull data out of the dictionary
-    // TODO: There's probably a copy-less way to do this
-    std::vector<std::pair<int, std::pair<float, float>>> mja;
-    mja.reserve(this->weights.mirroredJoinedArray.size());
-    for (const auto &pt : this->weights.mirroredJoinedArray) {
-        mja.push_back(pt);
-    }
+    // copy to vector for indexed parallel access (unordered_map lacks random access)
+    std::vector<std::pair<int, std::pair<float, float>>> mja(
+        this->weights.mirroredJoinedArray.begin(), this->weights.mirroredJoinedArray.end()
+    );
 
     MColorArray colors, colorsSolo;
     colors.setLength(mja.size());
@@ -782,7 +756,7 @@ MStatus SkinBrushContext::refreshPointsNormals()
         this->mesh.meshFn.freeCachedIntersectionAccelerator(); // yes ?
         this->mesh.mayaRawPoints = const_cast<float *>(this->mesh.meshFn.getRawPoints(&status));
         this->mesh.rawNormals = const_cast<float *>(this->mesh.meshFn.getRawNormals(&status));
-        int rawNormalsLength = sizeof(this->mesh.rawNormals);
+        int rawNormalsLength = this->mesh.meshFn.numNormals() * 3;
 
 #pragma omp parallel for
         for (int vertexInd = 0; vertexInd < this->mesh.numVertices; vertexInd++) {
@@ -843,7 +817,7 @@ int SkinBrushContext::getHighestInfluence(int faceHit, MFloatPoint &hitPoint)
     // get closest vertex
     auto verticesSet = getSurroundingVerticesPerFace(faceHit);
     int indexVertex = -1;
-    float closestDist;
+    float closestDist = FLT_MAX;
     for (int ptIndex : verticesSet) {
         MFloatPoint posPoint(
             this->mesh.mayaRawPoints[ptIndex * 3], this->mesh.mayaRawPoints[ptIndex * 3 + 1],
@@ -1692,11 +1666,7 @@ void SkinBrushContext::doTheAction()
         }
     }
     refreshColors(editVertsIndices, multiEditColors, soloEditColors);
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet);
-
-    mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &this->interFrame.fullColorSet2);
-    mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &this->interFrame.soloColorSet2);
+    applyVertexColors(editVertsIndices, multiEditColors, soloEditColors);
     if ((theCommandIndex == ModifierCommands::LockVertices) ||
         (theCommandIndex == ModifierCommands::UnlockVertices)) {
         // without that it doesn't refresh because mesh is not invalidated, meaning the skinCluster
@@ -1805,7 +1775,6 @@ void SkinBrushContext::mergeMirrorArray(
 MStatus SkinBrushContext::applyCommandMirror()
 {
     MStatus status;
-    MGlobal::displayInfo(MString("applyCommandMirror "));
     std::map<int, std::pair<float, float>> mirroredJoinedArrayOrdered(
         weights.mirroredJoinedArray.begin(), weights.mirroredJoinedArray.end()
     );
@@ -1990,7 +1959,6 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
             // now set the weights -----------------------------------------------------
             // here we should normalize -----------------------------------------------------
             int i = 0;
-            // int prevVert = -1;
             for (const auto &elem : valuesToSetOrdered) {
                 int theVert = elem.first;
                 for (int j = 0; j < this->influence.nbJoints; ++j) {
@@ -2058,6 +2026,16 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
 MStatus SkinBrushContext::editSoloColorSet(bool doBlack)
 {
     return ::editSoloColorSet(doBlack, this->input, this->influence, this->weights, this->mesh);
+}
+
+void SkinBrushContext::applyVertexColors(
+    const MIntArray &indices, const MColorArray &multi, const MColorArray &solo
+)
+{
+    mesh.meshFn.setSomeColors(indices, multi, &interFrame.fullColorSet);
+    mesh.meshFn.setSomeColors(indices, solo, &interFrame.soloColorSet);
+    mesh.meshFn.setSomeColors(indices, multi, &interFrame.fullColorSet2);
+    mesh.meshFn.setSomeColors(indices, solo, &interFrame.soloColorSet2);
 }
 
 MStatus SkinBrushContext::refreshColors(
@@ -2837,17 +2815,9 @@ bool SkinBrushContext::getMirrorHit(int &faceHit, MFloatPoint &hitPoint) const
         int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
         int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
 
-        float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = this->mesh.mayaRawPoints[t0 * 3] * hitBary1 +
-                  this->mesh.mayaRawPoints[t1 * 3] * hitBary2 +
-                  this->mesh.mayaRawPoints[t2 * 3] * hitBary3;
-        float y = this->mesh.mayaRawPoints[t0 * 3 + 1] * hitBary1 +
-                  this->mesh.mayaRawPoints[t1 * 3 + 1] * hitBary2 +
-                  this->mesh.mayaRawPoints[t2 * 3 + 1] * hitBary3;
-        float z = this->mesh.mayaRawPoints[t0 * 3 + 2] * hitBary1 +
-                  this->mesh.mayaRawPoints[t1 * 3 + 2] * hitBary2 +
-                  this->mesh.mayaRawPoints[t2 * 3 + 2] * hitBary3;
-        hitPoint = MFloatPoint(x, y, z) * this->mesh.inclusiveMatrix;
+        hitPoint =
+            barycentricInterpolate(this->mesh.mayaRawPoints, t0, t1, t2, hitBary1, hitBary2) *
+            this->mesh.inclusiveMatrix;
     }
     else {
         MPoint mirrorPoint = MPoint(this->paint.centerOfBrush) * mirrorMatrix;
@@ -2894,17 +2864,8 @@ bool SkinBrushContext::computeHit(
         int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
         int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
         int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
-        float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = this->mesh.mayaOrigRawPoints[t0 * 3] * hitBary1 +
-                  this->mesh.mayaOrigRawPoints[t1 * 3] * hitBary2 +
-                  this->mesh.mayaOrigRawPoints[t2 * 3] * hitBary3;
-        float y = this->mesh.mayaOrigRawPoints[t0 * 3 + 1] * hitBary1 +
-                  this->mesh.mayaOrigRawPoints[t1 * 3 + 1] * hitBary2 +
-                  this->mesh.mayaOrigRawPoints[t2 * 3 + 1] * hitBary3;
-        float z = this->mesh.mayaOrigRawPoints[t0 * 3 + 2] * hitBary1 +
-                  this->mesh.mayaOrigRawPoints[t1 * 3 + 2] * hitBary2 +
-                  this->mesh.mayaOrigRawPoints[t2 * 3 + 2] * hitBary3;
-        interFrame.origHitPoint = MFloatPoint(x, y, z);
+        interFrame.origHitPoint =
+            barycentricInterpolate(this->mesh.mayaOrigRawPoints, t0, t1, t2, hitBary1, hitBary2);
     }
 
     // ----------- get normal for display ---------------------

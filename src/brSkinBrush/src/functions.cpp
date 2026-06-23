@@ -5,28 +5,6 @@
 
 #include <limits>
 
-/* yourBiggestNumber * scaleFactor < cp */
-double scaleFactor = 65530.0;
-double cp = 256.0 * 256.0;
-
-/* packs given two floats into one float */
-float pack_float(float x, float y)
-{
-    int x1 = (int)(x * scaleFactor);
-    int y1 = (int)(y * scaleFactor);
-    float f = (y1 * cp) + x1;
-    return f;
-}
-/* unpacks given float to two floats */
-int unpack_float(float f, float *x, float *y)
-{
-    double dy = floor(f / cp);
-    double dx = f - (dy * cp);
-    *y = (float)(dy / scaleFactor);
-    *x = (float)(dx / scaleFactor);
-    return 0;
-}
-
 coord_t distance_sq(const point_t &a, const point_t &b)
 {
     coord_t x = std::get<0>(a) - std::get<0>(b);
@@ -42,9 +20,7 @@ coord_t distance(const point_t &a, const point_t &b)
     return std::sqrt(x * x + y * y + z * z);
 }
 
-bool comp(int a, int b) { return (a < b); }
-
-unsigned int getMIntArrayIndex(MIntArray &myArray, int searching)
+unsigned int getMIntArrayIndex(const MIntArray &myArray, int searching)
 {
     unsigned int toReturn = -1;
     for (unsigned int element = 0; element < myArray.length(); ++element) {
@@ -534,10 +510,59 @@ editLocks(MObject &skinCluster, MIntArray &inputVertsToLock, bool addToLock, MIn
     return stat;
 }
 
+static void applyLockNormalize(
+    int i, int theVert, int nbJoints, const MIntArray &lockJoints,
+    const MDoubleArray &fullWeightArray, const MDoubleArray &producedWeights,
+    MDoubleArray &theWeights, double totalBaseVtxLock, double totalVtxUnlock
+)
+{
+    double available = 1.0 - totalBaseVtxLock;
+    if (available > 0.0 && totalVtxUnlock > 0.0) {
+        double mult = available / totalVtxUnlock;
+        for (unsigned int j = 0; j < (unsigned)nbJoints; ++j) {
+            double currentW = fullWeightArray[theVert * nbJoints + j];
+            double targetW = producedWeights[j];
+            if (lockJoints[j] == 0) {
+                targetW *= mult;
+                theWeights[i * nbJoints + j] = targetW;
+            }
+            else {
+                theWeights[i * nbJoints + j] = currentW;
+            }
+        }
+    }
+    else {
+        for (unsigned int j = 0; j < (unsigned)nbJoints; ++j) {
+            theWeights[i * nbJoints + j] = fullWeightArray[theVert * nbJoints + j];
+        }
+    }
+}
+
+static void finalizeWeightRow(
+    int i, int theVert, int nbJoints, const MIntArray &lockJoints,
+    const MDoubleArray &fullWeightArray, MDoubleArray &theWeights, double sum,
+    double sumUnlockWeights, bool normalize
+)
+{
+    if (sum == 0 || sum < 0.5 * sumUnlockWeights) {
+        for (int jnt = 0; jnt < nbJoints; ++jnt) {
+            theWeights[i * nbJoints + jnt] = fullWeightArray[theVert * nbJoints + jnt];
+        }
+    }
+    else if (normalize && sum != sumUnlockWeights) {
+        for (int jnt = 0; jnt < nbJoints; ++jnt) {
+            if (lockJoints[jnt] == 0) {
+                theWeights[i * nbJoints + jnt] /= sum;
+                theWeights[i * nbJoints + jnt] *= sumUnlockWeights;
+            }
+        }
+    }
+}
+
 MStatus editArray(
     ModifierCommands command, int influence, int nbJoints, MIntArray &lockJoints,
     MDoubleArray &fullWeightArray, std::map<int, double> &valuesToSet, MDoubleArray &theWeights,
-    bool normalize, double mutliplier
+    bool normalize, double multiplier
 )
 {
     MStatus stat;
@@ -555,7 +580,7 @@ MStatus editArray(
         int i = 0;
         for (const auto &elem : valuesToSet) {
             int theVert = elem.first;
-            double theVal = mutliplier * elem.second + 1.0;
+            double theVal = multiplier * elem.second + 1.0;
             double substract = theVal / nbJoints;
             MDoubleArray producedWeigths(nbJoints, 0.0);
             double totalBaseVtxUnlock = 0.0, totalBaseVtxLock = 0.0;
@@ -577,28 +602,10 @@ MStatus editArray(
                     totalVtxLock += targetW;
                 }
             }
-            // now normalize for lockJoints
-            double normalizedValueAvailable = 1.0 - totalBaseVtxLock;
-            if (normalizedValueAvailable > 0.0 &&
-                totalVtxUnlock > 0.0) { // we have room to set weights
-                double mult = normalizedValueAvailable / totalVtxUnlock;
-                for (unsigned int j = 0; j < nbJoints; ++j) {
-                    double currentW = fullWeightArray[theVert * nbJoints + j];
-                    double targetW = producedWeigths[j];
-                    if (lockJoints[j] == 0) { // unlock
-                        targetW *= mult;      // normalement divide par 1, sauf cas lock joints
-                        theWeights[i * nbJoints + j] = targetW;
-                    }
-                    else {
-                        theWeights[i * nbJoints + j] = currentW;
-                    }
-                }
-            }
-            else {
-                for (unsigned int j = 0; j < nbJoints; ++j) {
-                    theWeights[i * nbJoints + j] = fullWeightArray[theVert * nbJoints + j];
-                }
-            }
+            applyLockNormalize(
+                i, theVert, nbJoints, lockJoints, fullWeightArray, producedWeigths, theWeights,
+                totalBaseVtxLock, totalVtxUnlock
+            );
             i++;
         }
     }
@@ -608,7 +615,7 @@ MStatus editArray(
         for (const auto &elem : valuesToSet) {
             i++;
             int theVert = elem.first;
-            double theVal = mutliplier * elem.second;
+            double theVal = multiplier * elem.second;
             // get the sum of weights
 
             double sumUnlockWeights = 0.0;
@@ -700,21 +707,10 @@ MStatus editArray(
                 theWeights[i * nbJoints + jnt] = weightValue;
             }
 
-            if ((sum == 0) ||
-                (sum <
-                 0.5 * sumUnlockWeights)) { // zero problem revert weights ----------------------
-                for (int jnt = 0; jnt < nbJoints; ++jnt) {
-                    theWeights[i * nbJoints + jnt] = fullWeightArray[theVert * nbJoints + jnt];
-                }
-            }
-            else if (normalize && (sum != sumUnlockWeights)) { // normalize ---------------
-                for (int jnt = 0; jnt < nbJoints; ++jnt) {
-                    if (lockJoints[jnt] == 0) {
-                        theWeights[i * nbJoints + jnt] /= sum;              // to 1
-                        theWeights[i * nbJoints + jnt] *= sumUnlockWeights; // to sum weights
-                    }
-                }
-            }
+            finalizeWeightRow(
+                i, theVert, nbJoints, lockJoints, fullWeightArray, theWeights, sum,
+                sumUnlockWeights, normalize
+            );
         }
     }
     return stat;
@@ -724,7 +720,7 @@ MStatus editArrayMirror(
     ModifierCommands command, int influence, int influenceMirror, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray,
     std::map<int, std::pair<float, float>> &valuesToSetMirror, MDoubleArray &theWeights,
-    bool normalize, double mutliplier
+    bool normalize, double multiplier
 )
 {
     MStatus stat;
@@ -748,7 +744,7 @@ MStatus editArrayMirror(
             float sumValue = std::min(float(1.0), valueBase + valueMirror);
             float biggestValue = std::max(valueBase, valueMirror);
 
-            double theVal = mutliplier * (double)biggestValue + 1.0;
+            double theVal = multiplier * (double)biggestValue + 1.0;
             double substract = theVal / nbJoints;
 
             MDoubleArray producedWeigths(nbJoints, 0.0);
@@ -769,28 +765,10 @@ MStatus editArrayMirror(
                     totalVtxLock += targetW;
                 }
             }
-            // now normalize
-            double normalizedValueAvailable = 1.0 - totalBaseVtxLock;
-            if (normalizedValueAvailable > 0.0 &&
-                totalVtxUnlock > 0.0) { // we have room to set weights
-                double mult = normalizedValueAvailable / totalVtxUnlock;
-                for (unsigned int j = 0; j < nbJoints; ++j) {
-                    double currentW = fullWeightArray[theVert * nbJoints + j];
-                    double targetW = producedWeigths[j];
-                    if (lockJoints[j] == 0) { // unlock
-                        targetW *= mult;      // normalement divide par 1, sauf cas lock joints
-                        theWeights[i * nbJoints + j] = targetW;
-                    }
-                    else {
-                        theWeights[i * nbJoints + j] = currentW;
-                    }
-                }
-            }
-            else {
-                for (unsigned int j = 0; j < nbJoints; ++j) {
-                    theWeights[i * nbJoints + j] = fullWeightArray[theVert * nbJoints + j];
-                }
-            }
+            applyLockNormalize(
+                i, theVert, nbJoints, lockJoints, fullWeightArray, producedWeigths, theWeights,
+                totalBaseVtxLock, totalVtxUnlock
+            );
             i++;
         }
     }
@@ -800,8 +778,8 @@ MStatus editArrayMirror(
         for (const auto &elem : valuesToSetMirror) {
             i++;
             int theVert = elem.first;
-            double valueBase = mutliplier * (double)elem.second.first;
-            double valueMirror = mutliplier * (double)elem.second.second;
+            double valueBase = multiplier * (double)elem.second.first;
+            double valueMirror = multiplier * (double)elem.second.second;
 
             if (influenceMirror == influence) {
                 valueBase = std::max(valueBase, valueMirror);
@@ -893,19 +871,10 @@ MStatus editArrayMirror(
                 sum += weightValue;
                 theWeights[i * nbJoints + jnt] = weightValue;
             }
-            if ((sum == 0) || (sum < 0.5 * sumUnlockWeights)) { // zero problem revert weights
-                for (int jnt = 0; jnt < nbJoints; ++jnt) {
-                    theWeights[i * nbJoints + jnt] = fullWeightArray[theVert * nbJoints + jnt];
-                }
-            }
-            else if (normalize && (sum != sumUnlockWeights)) { // normalize
-                for (int jnt = 0; jnt < nbJoints; ++jnt) {
-                    if (lockJoints[jnt] == 0) {
-                        theWeights[i * nbJoints + jnt] /= sum;              // to 1
-                        theWeights[i * nbJoints + jnt] *= sumUnlockWeights; // to sum weights
-                    }
-                }
-            }
+            finalizeWeightRow(
+                i, theVert, nbJoints, lockJoints, fullWeightArray, theWeights, sum,
+                sumUnlockWeights, normalize
+            );
         }
     }
     return stat;
@@ -972,7 +941,7 @@ MStatus setAverageWeight(
                 theWeights[posiToSet] = currentW;
             }
             else {
-                targetW *= mult; // normalement divide par 1, sauf cas lock joints
+                targetW *= mult; // divide by 1 unless locked joints reduce available room
                 theWeights[posiToSet] = targetW;
             }
         }
@@ -1045,10 +1014,6 @@ void lineC(short x0, short y0, short x1, short y1, std::vector<std::pair<short, 
         }
     }
 }
-float dist2D(short x0, short y0, short x1, short y1)
-{
-    return sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
-};
 
 bool RayIntersectsBBox(MPoint minPt, MPoint maxPt, MPoint orig, MVector direction)
 {

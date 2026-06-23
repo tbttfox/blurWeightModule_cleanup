@@ -1,38 +1,4 @@
 
-/*
-#computeHit
-#drawMeshWhileDrag
-#expandHit
-#getASoloColor
-#getColorWithMirror
-#getCommandIndexModifiers
-#getFalloffValue
-#getMirrorHit
-#getSurroundingVerticesPerVert
-#growArrayOfHitsFromCenters
-#addBrushShapeFallof
-#mergeMirrorArray
-#preparePaint
-#refreshPointsNormals
-#refreshColors
-#applyCommand
-#applyCommandMirror
-#editArrayMirror
-#doDrag
-#doDragCommon
-#doPerformPaint
-#maya2019RefreshColors
-
-#doPress
-#doPressCommon
-
-#doRelease
-#doReleaseCommon
-
-doTheAction
-
-*/
-
 #include "enums.h"
 #include "skinBrushStructured.h"
 #include <math.h>
@@ -568,21 +534,21 @@ void growArrayOfHitsFromCenters(
         // std::vector<int> setOfVertsGrow;
         std::unordered_set<int> setOfVertsGrow;
         for (const int &vertexIndex : borderOfGrowth) {
-            std::vector<int> ttt = getSurroundingVerticesPerVert(vertexIndex, mesh);
-            setOfVertsGrow.insert(ttt.begin(), ttt.end());
+            std::vector<int> neighborVerts = getSurroundingVerticesPerVert(vertexIndex, mesh);
+            setOfVertsGrow.insert(neighborVerts.begin(), neighborVerts.end());
         }
 
         // get the vertices that are grown
-        std::vector<int> verticesontheborder;
+        std::vector<int> borderVertices;
         std::set_difference(
             setOfVertsGrow.begin(), setOfVertsGrow.end(), vertsVisited.begin(), vertsVisited.end(),
-            std::inserter(verticesontheborder, verticesontheborder.end())
+            std::inserter(borderVertices, borderVertices.end())
         );
 
         std::unordered_set<int> foundGrowVertsWithinDistance;
 
         // for all vertices grown
-        for (int vertexBorder : verticesontheborder) {
+        for (int vertexBorder : borderVertices) {
             // First check the normal
             if (!coverageVal) {
                 MVector vertexBorderNormal = mesh.verticesNormals[vertexBorder];
@@ -620,7 +586,7 @@ void growArrayOfHitsFromCenters(
         }
         // this vertices has been visited, let's not consider them anymore
 
-        vertsVisited.insert(verticesontheborder.begin(), verticesontheborder.end());
+        vertsVisited.insert(borderVertices.begin(), borderVertices.end());
         vertsWithinDistance.insert(
             foundGrowVertsWithinDistance.begin(), foundGrowVertsWithinDistance.end()
         );
@@ -964,16 +930,8 @@ bool getMirrorHit(
         int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
         int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
 
-        float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = mesh.mayaRawPoints[t0 * 3] * hitBary1 + mesh.mayaRawPoints[t1 * 3] * hitBary2 +
-                  mesh.mayaRawPoints[t2 * 3] * hitBary3;
-        float y = mesh.mayaRawPoints[t0 * 3 + 1] * hitBary1 +
-                  mesh.mayaRawPoints[t1 * 3 + 1] * hitBary2 +
-                  mesh.mayaRawPoints[t2 * 3 + 1] * hitBary3;
-        float z = mesh.mayaRawPoints[t0 * 3 + 2] * hitBary1 +
-                  mesh.mayaRawPoints[t1 * 3 + 2] * hitBary2 +
-                  mesh.mayaRawPoints[t2 * 3 + 2] * hitBary3;
-        hitPoint = MFloatPoint(x, y, z) * mesh.inclusiveMatrix;
+        hitPoint = barycentricInterpolate(mesh.mayaRawPoints, t0, t1, t2, hitBary1, hitBary2) *
+                   mesh.inclusiveMatrix;
     }
     else {
         MPoint mirrorPoint = MPoint(mdata.centerOfBrush) * mirrorMatrix;
@@ -1021,17 +979,8 @@ bool computeHit(
         int t0 = mesh.perFaceTriangleVerticesFLAT[triBase + 0];
         int t1 = mesh.perFaceTriangleVerticesFLAT[triBase + 1];
         int t2 = mesh.perFaceTriangleVerticesFLAT[triBase + 2];
-        float hitBary3 = (1 - hitBary1 - hitBary2);
-        float x = mesh.mayaOrigRawPoints[t0 * 3] * hitBary1 +
-                  mesh.mayaOrigRawPoints[t1 * 3] * hitBary2 +
-                  mesh.mayaOrigRawPoints[t2 * 3] * hitBary3;
-        float y = mesh.mayaOrigRawPoints[t0 * 3 + 1] * hitBary1 +
-                  mesh.mayaOrigRawPoints[t1 * 3 + 1] * hitBary2 +
-                  mesh.mayaOrigRawPoints[t2 * 3 + 1] * hitBary3;
-        float z = mesh.mayaOrigRawPoints[t0 * 3 + 2] * hitBary1 +
-                  mesh.mayaOrigRawPoints[t1 * 3 + 2] * hitBary2 +
-                  mesh.mayaOrigRawPoints[t2 * 3 + 2] * hitBary3;
-        frame.origHitPoint = MFloatPoint(x, y, z);
+        frame.origHitPoint =
+            barycentricInterpolate(mesh.mayaOrigRawPoints, t0, t1, t2, hitBary1, hitBary2);
     }
 
     // ----------- get normal for display ---------------------
@@ -1611,7 +1560,7 @@ MStatus refreshPointsNormals(MeshState &mesh, const WeightData &weights)
         mesh.meshFn.freeCachedIntersectionAccelerator(); // yes ?
         mesh.mayaRawPoints = const_cast<float *>(mesh.meshFn.getRawPoints(&status));
         mesh.rawNormals = const_cast<float *>(mesh.meshFn.getRawNormals(&status));
-        int rawNormalsLength = sizeof(mesh.rawNormals);
+        int rawNormalsLength = mesh.meshFn.numNormals() * 3;
 
 #pragma omp parallel for
         for (int vertexInd = 0; vertexInd < mesh.numVertices; vertexInd++) {
@@ -1881,7 +1830,6 @@ MStatus applyCommandMirror(
 )
 {
     MStatus status;
-    MGlobal::displayInfo(MString("applyCommandMirror "));
     std::map<int, std::pair<float, float>> mirroredJoinedArrayOrdered(
         weights.mirroredJoinedArray.begin(), weights.mirroredJoinedArray.end()
     );
@@ -2555,13 +2503,7 @@ MStatus doPressCommon(
         mirror.successFullDragHit = false;
         base.dicVertsDistSTART.clear();
         weights.mirroredJoinedArray.clear();
-        // TODO: these need full arg lists - view, accelParams, pressDistance,
-        // perFaceTriangleVertices, mayaOrigRawPoints, origHitPoint, normalVector, sizeVal,
-        // perFaceVerticesSetFLAT, perFaceVerticesSetINDEX, inclusiveMatrix, mirrorMinDist, etc.
         base.successfullHit = false;
-        // base.successfullHit = computeHit(frame.screenX, frame.screenY, false,
-        //     M3dView::active3dView(), ui, mesh, frame, persist.previousfaceHit,
-        //     base.centerOfBrush);
         if (!base.successfullHit) {
             return MStatus::kNotFound;
         }
@@ -2571,24 +2513,16 @@ MStatus doPressCommon(
         // we put it inside our world matrix
         base.inMatrixHit = base.centerOfBrush * mesh.inclusiveMatrixInverse;
         base.successfullHit = false;
-        // base.successfullHit = expandHit(persist.previousfaceHit, base.inMatrixHit, ui, mesh,
-        // base.dicVertsDistSTART);
 
         // mirror part -------------------
         if (ui.paintMirror != 0) { // if mirror is not OFf
             mirror.dicVertsDistSTART.clear();
             int faceMirrorHit = 0;
             mirror.successfullHit = false;
-            // mirror.successfullHit = getMirrorHit(ui, mesh, start, frame, base, faceMirrorHit,
-            // mirror.centerOfBrush);
             MVector normalMirroredVector;
             mesh.meshFn.getPolygonNormal(faceMirrorHit, normalMirroredVector, MSpace::kWorld);
 
             mirror.inMatrixHit = mirror.centerOfBrush * mesh.inclusiveMatrixInverse;
-            if (mirror.successfullHit) {
-                // TODO: expandHit(faceMirrorHit, mirror.inMatrixHit, ui, mesh,
-                // mirror.dicVertsDistSTART);
-            }
         }
         // Store the initial surface point and view vector to use when
         // the brush settings are adjusted because the brush circle
@@ -2624,10 +2558,6 @@ MStatus doReleaseCommon(
                 ui.strengthVal = persist.adjustValue;
             }
         }
-    }
-    if (persist.performBrush) {
-        // TODO: doTheAction() needs all its params threaded through here
-        // doTheAction(ui, infl, weights, mesh, nurbs, persist, frame, base, mirror);
     }
     return MS::kSuccess;
 }
@@ -2713,8 +2643,6 @@ void doTheAction(
         (theCommandIndex == ModifierCommands::UnlockVertices)) {
         undoLocks.copy(weights.lockVertices);
         bool addLocks = theCommandIndex == ModifierCommands::LockVertices;
-        // TODO: editLocks needs forward declaration (defined in functions.cpp)
-        // editLocks(weights.skinObj, editVertsIndices, addLocks, weights.lockVertices);
         redoLocks.copy(weights.lockVertices);
     }
     else {
@@ -2764,8 +2692,6 @@ void doTheAction(
             }
         }
     }
-    // TODO: refreshColors - needs editVertsIndices, multiEditColors, soloEditColors populated first
-    // refreshColors(editVertsIndices, multiEditColors, soloEditColors, ui, infl, weights);
     mesh.meshFn.setSomeColors(editVertsIndices, multiEditColors, &fullColorSet);
     mesh.meshFn.setSomeColors(editVertsIndices, soloEditColors, &soloColorSet);
 
@@ -2787,7 +2713,5 @@ void doTheAction(
         MUserEventMessage::postUserEvent("brSkinBrush_cleanCloseUndo");
     }
 
-    // TODO: maya2019RefreshColors needs toggleColorState threaded through here
-    // maya2019RefreshColors(false, toggleColorState, ui, mesh);
     MUserEventMessage::postUserEvent("brSkinBrush_afterPaint");
 }
