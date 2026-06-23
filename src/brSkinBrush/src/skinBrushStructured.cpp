@@ -49,28 +49,20 @@
 #include <unordered_map>
 #include <vector>
 
-struct drawingDeformers {
-    MMatrix mat;
-    MPoint center;
-    MPoint minPt;
-    MPoint maxPt;
-    MVector up, right;
-    double width, height, depth;
-};
-
 struct MeshData {
     // Holds unchanging variables related to the mesh
     // like the quick accessors and octree
 
-    MDagPath meshDag;                    // The MDagPath pointing to a mesh
-    MFnMesh meshFn;                      // The Mesh Functionset for this mesh
+    MDagPath meshDag; // The MDagPath pointing to a mesh
+    MFnMesh meshFn;   // The Mesh Functionset for this mesh
+    int numFaces;     // The number of faces on the current mesh
+    int numEdges;     // The number of edges on the current mesh
+    int numVertices;  // The number of vertices on the current mesh
+
     MMeshIsectAccelParams accelParams;   // Octree for speeding up raycasting
     MFloatMatrix inclusiveMatrix;        // The worldspace matrix of this mesh
     MFloatMatrix inclusiveMatrixInverse; // The inverse worldspace matrix of this mesh
 
-    int numFaces;             // The number of faces on the current mesh
-    int numEdges;             // The number of edges on the current mesh
-    int numVertices;          // The number of vertices on the current mesh
     float *mayaOrigRawPoints; // The flattened point positions of the UNDEFORMED mesh
     float *mayaRawPoints;     // The flattened point positions of the mesh
     float *rawNormals;        // The flattened per-face-vertex normals
@@ -97,10 +89,10 @@ struct MeshData {
 };
 
 struct NurbsData {
-    int numCVsInU_;          // The U dimensions of CVs when painting nurbs
-    int numCVsInV_;          // The V dimensions of CVs when painting nurbs
     MDagPath nurbsDag;       // The dagpath to the nurbs object
     MFnNurbsSurface nurbsFn; // The nurbs funciton set to the dagpath
+    int numCVsInU_;          // The U dimensions of CVs when painting nurbs
+    int numCVsInV_;          // The V dimensions of CVs when painting nurbs
 };
 
 struct InfluenceData {
@@ -146,53 +138,64 @@ struct WeightData {
 
 struct UserInputData {
     // The user options from the UI
-    MColor colorVal;   // -colorR -colorG -colorB // The color of the brush circle
-    int curveVal;      // -curve // The falloff curve value
-    bool drawBrushVal; // -drawBrush // Whether to draw the brush value to the screen for setting
-                       // size/weight
-    bool drawRangeVal; // -drawRange // Whether to draw the range of the brusn when painting (??)
-    MString moduleImportString;  // -importPython // Where is the python module for this tool
-    MString enterToolCommandVal; // -enterToolCommand // A mel command to run when entering the tool
-    MString exitToolCommandVal;  // -exitToolCommand // A mel command to run when exiting the tool
-    bool ignoreLockVal;          // -ignoreLock // Whether to ignore the lock value when painting
-    int lineWidthVal;            // The width of the line drawn to screen
-    bool messageVal;             // Show the usage message at the top of the screen
-    double oversamplingVal; // Value to scale the *effect* of the brush falloff by. Basically, make
-                            // the falloffs quicker or slower
-    double fractionOversamplingVal; // Whether to take the oversampling val into account (THIS IS A
-                                    // TERRIBLE NAME!)
-    double sizeVal;                 // -size // The current size of the brush
-    double smoothStrengthVal;       // -smoothStrength // The current smoothing strength value
-    double strengthVal;             // -strength // the current strength value
-    int undersamplingVal; // -undersampling // The number of drag-steps between evaluation when MMB
-                          // dragging
-    bool volumeVal;       // -volume // whether to draw the volume range of the brush
-    double mirrorMinDist; // -toleranceMirror //The tolerance for finding the mirrored vertices
-    MIntArray mirrorInfluences;     // -mirrorInfluences // A list of influences in-order of the
-                                    // skincluster that are the mirrors at the same index
-    int paintMirror;                // -mirrorPaint // The mirror behavior index
-    bool useColorSetsWhilePainting; // -useColorSetsWhilePainting // Whether to use colorsets while
+    MColor colorVal;   // -colorR -colorG -colorB      The color of the brush circle
+    int curveVal;      // -curve                       The falloff curve value
+    bool drawBrushVal; // -drawBrush                   Whether to draw the brush value to the screen
+                       // for setting size/weight
+    bool drawRangeVal; // -drawRange                   Whether to draw the range of the brusn when
+                       // painting (??)
+    MString
+        moduleImportString; // -importPython                Where is the python module for this tool
+    MString enterToolCommandVal; // -enterToolCommand            A mel command to run when entering
+                                 // the tool
+    MString exitToolCommandVal;  // -exitToolCommand             A mel command to run when exiting
+                                 // the tool
+    bool ignoreLockVal; // -ignoreLock                  Whether to ignore the lock value when
+                        // painting
+    int lineWidthVal;   // -lineWidth                   The width of the line drawn to screen
+    bool messageVal; // -message                     Show the usage message at the top of the screen
+    double oversamplingVal; // -oversampling                Value to scale the *effect* of the brush
+                            // falloff by. Basically, make the falloffs quicker or slower
+    double fractionOversamplingVal; // -fractionOversampling        Whether to take the oversampling
+                                    // val into account (THIS IS A TERRIBLE NAME!)
+    double sizeVal;                 // -size                        The current size of the brush
+    double smoothStrengthVal; // -smoothStrength              The current smoothing strength value
+    double strengthVal;       // -strength                    the current strength value
+    int undersamplingVal;     // -undersampling               The number of drag-steps between
+                              // evaluation when MMB dragging
+    bool volumeVal; // -volume                      whether to draw the volume range of the brush
+    double mirrorMinDist; // -toleranceMirror             The tolerance for finding the mirrored
+                          // vertices
+    MIntArray mirrorInfluences; // -mirrorInfluences            A list of influences in-order of the
+                                // skincluster that are the mirrors at the same index
+    int paintMirror;            // -mirrorPaint                 The mirror behavior index
+    bool useColorSetsWhilePainting; // -useColorSetsWhilePainting   Whether to use colorsets while
                                     // painting
-    bool drawTriangles;             // -meshdrawTriangles // Whether to draw Triangles
-    bool drawEdges;                 // -meshdrawEdges // Whether to draw Edges
-    bool drawPoints;                // -meshdrawPoints // Whether to draw points
-    bool drawTransparency;          // -meshdrawTransparency // Whether to draw transparency
-    double minSoloColor;           // -minColor // The minimum DISPLAY value for nonzero solo colors
-    double maxSoloColor;           // -maxColor // The maximum DISPLAY value for nonzero solo colors
-    ModifierCommands commandIndex; // -commandIndex // The command index to run
-    int smoothRepeat; // -smoothRepeat // The number of iterations of smooth while dragging
-    int soloColorVal; // -soloColor // Whether we color solo, or we color rainbow (SHOULD BE BOOL)
-    int soloColorTypeVal;     // The "enum" of the color type for soloing (lava, color, black/white
-                              // (stuff like that))
-    bool pickMaxInfluenceVal; // -pickMaxInfluence // Whether we're picking the largest influence of
-                              // the verts under the mouse
-    bool pickInfluenceVal; // -pickInfluence // Whether to pick the influence based on the influence
-                           // object bounding box
-    bool postSetting; // -postSetting // whether to set the weights every loop, or wait until mouse
-                      // release
-    ModifierKeys smoothModifier; // -shiftSmooths // What key smooths
-    ModifierKeys removeModifier; // -shiftSmooths // What key removes
-    int influenceIndex;          // -influenceIndex // The current influence index we're painting to
+    bool drawTriangles;             // -meshdrawTriangles           Whether to draw Triangles
+    bool drawEdges;                 // -meshdrawEdges               Whether to draw Edges
+    bool drawPoints;                // -meshdrawPoints              Whether to draw points
+    bool drawTransparency;          // -meshdrawTransparency        Whether to draw transparency
+    double minSoloColor; // -minColor                    The minimum DISPLAY value for nonzero solo
+                         // colors
+    double maxSoloColor; // -maxColor                    The maximum DISPLAY value for nonzero solo
+                         // colors
+    ModifierCommands commandIndex; // -commandIndex                The command index to run
+    int smoothRepeat;     // -smoothRepeat                The number of iterations of smooth while
+                          // dragging
+    int soloColorVal;     // -soloColor                   Whether we color solo, or we color rainbow
+                          // (SHOULD BE BOOL)
+    int soloColorTypeVal; // -soloColorType               The "enum" of the color type for soloing
+                          // (lava, color, black/white (stuff like that))
+    bool pickMaxInfluenceVal; // -pickMaxInfluence            Whether we're picking the largest
+                              // influence of the verts under the mouse
+    bool pickInfluenceVal;    // -pickInfluence               Whether to pick the influence based on
+                              // the influence object bounding box
+    bool postSetting; // -postSetting                 whether to set the weights every loop, or wait
+                      // until mouse release
+    ModifierKeys smoothModifier; // -shiftSmooths                What key smooths
+    ModifierKeys removeModifier; // -shiftSmooths                What key removes
+    int influenceIndex; // -influenceIndex              The current influence index we're painting
+                        // to
 
     // NEVER SET
     // double rangeVal;  // -range // A multiplier on the adjustment.  Unused, hard-coded to 0.5
@@ -206,63 +209,20 @@ struct UserInputData {
     // double interactiveValue2
 };
 
-struct InteractionData {
-    // All of the current data for where the mouse is, and what its interacting with
-    // and the current keyboard options
+struct drawingDeformers {
+    MMatrix mat;
+    MPoint center;
+    MPoint minPt;
+    MPoint maxPt;
+    MVector up, right;
+    double width, height, depth;
+};
 
-    // This chould probably be split into "data needed for current paint and can be discarded"
-    // and "data needed for next paint and needs to be stored"
-
-    // And this part of the keys and commands should probably be its own thing as well
-    ModifierKeys modifierNoneShiftControl;
-    ModifierKeys smoothModifier; // Constant
-    ModifierKeys removeModifier; // Constant
-    bool shiftMiddleDrag; // whether we're holding shift when dragging for fine-adjust scaling
-
-    bool isNurbs; // whether we're painting on NURBS ... I think.  This may go in interaction data,
-                  // or mesh data
-
-    // Color set names (probably static, maybe unused)
-    bool toggleColorState; // Whether to use the colorset or colorset2. Basically buffered rendering
-                           // of the colors
-    MString fullColorSet = MString("multiColorsSet");
-    MString soloColorSet = MString("soloColorsSet");
-    MString fullColorSet2 = MString("multiColorsSet2");
-    MString soloColorSet2 = MString("soloColorsSet2");
-
-    std::unordered_map<int, float> dicVertsDist; // A dictionary of index and distance
-
-    // From (pseudo-code) view.viewToWorld(event.getPosition())
-    MVector worldVector; // The worldspace click ray direction
-    MPoint worldPoint;   // The worldspace click ray starting point
-
-    int faceHit;          // The index of the face that was hit
-    int triHit;           // The index of the triangle in the face that was hit ... (added by TFox)
-    MFloatPoint hitPoint; // The 3d point that was hit by the click-ray
-    MFloatPoint origHitPoint; // Translate the barycentric coordinates of the deformed hit into the
-                              // rest-space hit (for mirroring)
-    MVector normalVector;     // The normal at the hit
+struct InteractionStartData {
+    // Octrees for our current paint objects
+    // I should maybe use the BVH library to speed up the volume selection process
     MMeshIntersector intersectorOrigShape;
     MMeshIntersector intersector;
-
-    float pressDistance; // The parametric distance of the hit... hitPoint = raySource +
-                         // (hitRayParam * rayDirection)
-
-    bool getNormal; // Whether to get the normal of the hit. This changes over interaction
-    MDoubleArray
-        skinWeightsForUndo; // An array to hold the original skin weights for undoing ... I think
-    MDoubleArray fullUndoSkinWeightList; // An array to hold the whole skin weights list for undoing
-                                         // ... I think
-
-    std::set<int> verticesPainted; // The full set of vertices that are currently being painted
-
-    int previousfaceHit; // The index of the face that was hit previously
-    bool performBrush;   // Whether we should actually `doTheAction()` on drag ... ie, whether we
-                         // actually hit on the drag
-
-    // When MMB dragging to change size/strangth, don't actually draw every frame. Draw every N
-    // frames. This value keeps track of where we are in that loop Look at undersamplingVal for "N"
-    int undersamplingSteps;
 
     // The X and Y screen positions where the drag started for MMB dragging
     short startScreenX;
@@ -272,9 +232,29 @@ struct InteractionData {
     short viewCenterX;
     short viewCenterY;
 
-    // Hold the current screenspace x/y values
-    short screenX;
-    short screenY;
+    std::vector<drawingDeformers>
+        BBoxOfDeformers; // The vector of bounding boxes of all the deformers
+
+    // Store the initial surface point and view vector to use when
+    // the brush settings are adjusted because the brush circle
+    // needs to be static during the adjustment.
+    MFloatPoint surfacePointAdjust;
+    MVector worldVectorAdjust;
+};
+
+struct InteractionPersistentData {
+    MDoubleArray
+        skinWeightsForUndo; // An array to hold the original skin weights for undoing ... I think
+    MDoubleArray fullUndoSkinWeightList; // An array to hold the whole skin weights list for undoing
+                                         // ... I think
+    std::set<int> verticesPainted; // The full set of vertices that are currently being painted
+    int previousfaceHit;           // The index of the face that was hit previously
+    bool performBrush; // Whether we should actually `doTheAction()` on drag ... ie, whether we
+                       // actually hit on the drag
+
+    // When MMB dragging to change size/strangth, don't actually draw every frame. Draw every N
+    // frames. This value keeps track of where we are in that loop Look at undersamplingVal for "N"
+    int undersamplingSteps;
 
     // Switch if the size should get adjusted or the strength based on the drag direction. A drag
     // along the x axis defines size and a drag along the y axis defines strength. InitAdjust makes
@@ -288,33 +268,56 @@ struct InteractionData {
     // shift
     double storedDistance;
 
-    // Store the modified value for drawing and for setting the values when releasing the mouse
-    // button.
-    double adjustValue;
+    double adjustValue; // Store the modified value for drawing and for setting the values when
+                        // releasing the mouse button.
 
-    // The name of the currently picked influence
-    MString pickedInfluence;
+    MString pickedInfluence; // The name of the currently picked influence
 
-    std::vector<drawingDeformers>
-        BBoxOfDeformers;  // The vector of bounding boxes of all the deformers
     int biggestInfluence; // Storage of the biggest influence index on mouseover
 
     bool firstPaintDone; // Keep track of if we're done ... I think.  This one's weird.  Probably
                          // keeping track of if we close out unexpectedly or somethign
-
     MStatus pressStatus; // Store the status of the initial press, so if it fails, we can skip doing
                          // the drag stuff
-
-    // Store the initial surface point and view vector to use when
-    // the brush settings are adjusted because the brush circle
-    // needs to be static during the adjustment.
-    MFloatPoint surfacePointAdjust;
-    MVector worldVectorAdjust;
 
     MStringArray orderedIndicesByWeights; // An array to hold the list of names of the influences
                                           // ordered by weights
     MStringArray orderedIndicesByWeightsVals; // An array to hold the list of indices of the
                                               // influences ordered by weights
+};
+
+struct InteractionPerFrameData {
+    // All of the interaction data that we get every single frame
+    // Some of it may be useful to us the next frame, so we'll store that in the persistent data
+    // struct
+
+    ModifierKeys modifierNoneShiftControl;
+    bool shiftMiddleDrag; // whether we're holding shift when dragging for fine-adjust scaling
+    bool isNurbs; // whether we're painting on NURBS ... I think.  This may go in interaction data,
+                  // or mesh data
+
+    // Color set names (probably static, maybe unused)
+    MString fullColorSet = MString("multiColorsSet");
+    MString soloColorSet = MString("soloColorsSet");
+    MString fullColorSet2 = MString("multiColorsSet2");
+    MString soloColorSet2 = MString("soloColorsSet2");
+
+    // From (pseudo-code) view.viewToWorld(event.getPosition())
+    MVector worldVector; // The worldspace click ray direction
+    MPoint worldPoint;   // The worldspace click ray origin point
+
+    int faceHit;          // The index of the face that was hit
+    int triHit;           // The index of the triangle in the face that was hit ... (added by TFox)
+    MFloatPoint hitPoint; // The 3d point that was hit by the click-ray
+    MFloatPoint origHitPoint; // Translate the barycentric coordinates of the deformed hit into the
+                              // rest-space hit (for mirroring)
+    MVector normalVector;     // The normal at the hit
+    float pressDistance;      // The parametric distance of the hit... hitPoint = raySource +
+                              // (hitRayParam * rayDirection)
+
+    // Hold the current screenspace x/y values
+    short screenX;
+    short screenY;
 };
 
 struct MirrorableData {
