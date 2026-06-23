@@ -1,25 +1,24 @@
 #include <maya/MDagPath.h>
-#include <maya/MFnMesh.h>
 #include <maya/MFloatMatrix.h>
-#include <maya/MMatrix.h>
+#include <maya/MFnMesh.h>
 #include <maya/MIntArray.h>
 #include <maya/MItMeshEdge.h>
+#include <maya/MMatrix.h>
 
-#include <vector>
-#include <span>
-#include <array>
 #include <algorithm>
+#include <array>
+#include <span>
+#include <vector>
 
-
-template <typename T=int>
-class FlatCounts {
-private:
-    std::vector<size_t> offsets;  // actually offsets
+template <typename T = int> class FlatCounts {
+  private:
+    std::vector<size_t> offsets; // actually offsets
     std::vector<T> values;
 
-public:
+  public:
     // Setter from counts/vals pair of vectors
-    void set(const std::vector<T> &inCounts, const std::vector<T> &inVals){
+    void set(const std::vector<T> &inCounts, const std::vector<T> &inVals)
+    {
         offsets.clear();
         values.clear();
         values = inVals;
@@ -27,13 +26,14 @@ public:
         offsets.resize(inCounts.size() + 1);
         offsets[0] = 0;
         size_t i = 1, v = 0;
-        for (const auto& c : inCounts) {
+        for (const auto &c : inCounts) {
             v += c;
             offsets[i++] = v;
         }
     }
 
-    void set(const MIntArray &inCounts, const MIntArray &inVals){
+    void set(const MIntArray &inCounts, const MIntArray &inVals)
+    {
         offsets.clear();
         values.clear();
         values = inVals;
@@ -41,75 +41,75 @@ public:
         offsets.resize(inCounts.length() + 1);
         offsets[0] = 0;
         size_t i = 1, v = 0;
-        for (const auto& c : inCounts) {
+        for (const auto &c : inCounts) {
             v += c;
             offsets[i++] = v;
         }
     }
 
     // Setter from vector-of-vectors
-    void set(const std::vector<std::vector<T>> &inVals){
+    void set(const std::vector<std::vector<T>> &inVals)
+    {
         offsets.clear();
         values.clear();
         offsets.reserve(inVals.size() + 1);
         offsets.push_back(0);
         size_t i = 1, v = 0;
-        for (const auto& sub : inVals) {
+        for (const auto &sub : inVals) {
             v += sub.size();
             offsets[i++] = v;
             values.insert(values.end(), sub.begin(), sub.end());
         }
     }
 
-    size_t length() const{
-        return offsets.size() - 1;
-    }
+    size_t length() const { return offsets.size() - 1; }
 
-    const std::span<const T> operator [](size_t i) const {
+    const std::span<const T> operator[](size_t i) const
+    {
         return std::span<const T>(values.begin() + offsets[i], values.begin() + offsets[i + 1]);
     }
 };
 
-template <typename T=int, size_t C = 2>
-class FlatChunks {
-private:
+template <typename T = int, size_t C = 2> class FlatChunks {
+  private:
     std::vector<T> values;
 
-public:
-    void set(const std::vector<std::array<int, C>> &invals){
+  public:
+    void set(const std::vector<std::array<int, C>> &invals)
+    {
         values.reserve(invals.size() * C);
-        for (const auto & ev : invals){
-            for (const auto & v : ev){
+        for (const auto &ev : invals) {
+            for (const auto &v : ev) {
                 values.push_back(v);
             }
         }
     }
 
-    void set(const T* invals, size_t length){
+    void set(const T *invals, size_t length)
+    {
         values.clear();
         values.insert(values.end(), invals, invals + (length * C));
     }
 
-    size_t length() const{
-        return values.size() / 2;
-    }
+    size_t length() const { return values.size() / 2; }
 
-    const std::span<const T> operator [](size_t i) const {
+    const std::span<const T> operator[](size_t i) const
+    {
         return std::span<const T>(values.begin() + (C * i), values.begin() + (C * (i + 1)));
     }
 };
 
-template <typename T=int, size_t C = 3>
-class DoubleChunks {
-private:
+template <typename T = int, size_t C = 3> class DoubleChunks {
+  private:
     std::vector<size_t> offsets;
     std::vector<T> values;
 
-public:
-    void set(const MIntArray &counts, const MIntArray &flattris){
+  public:
+    void set(const MIntArray &counts, const MIntArray &flattris)
+    {
         values.clear();
         values.reserve(flattris.length());
-        for (size_t i=0; i<flattris.length(); ++i){
+        for (size_t i = 0; i < flattris.length(); ++i) {
             values.push_back(flattris[i]);
         }
 
@@ -117,50 +117,55 @@ public:
         offsets.reserve(counts.length() + 1);
         offsets.push_back(0);
         size_t v = 0;
-        for (size_t i=0; i<counts.length(); ++i){
+        for (size_t i = 0; i < counts.length(); ++i) {
             v += counts[i];
             offsets.push_back(v);
         }
     }
 
-    size_t length() const{
-        return offsets.size() - 1;
-    }
+    size_t length() const { return offsets.size() - 1; }
 
-    size_t length2(size_t i) const {
-        return offsets[i + 1] - offsets[i];
-    }
+    size_t length2(size_t i) const { return offsets[i + 1] - offsets[i]; }
 
-    const std::span<const T> operator ()(size_t i, size_t j) const {
-        return std::span<const T>(values.begin() + offsets[i] + (C * j), values.begin() + offsets[i] + (C * (j + 1)));
+    const std::span<const T> operator()(size_t i, size_t j) const
+    {
+        return std::span<const T>(
+            values.begin() + offsets[i] + (C * j), values.begin() + offsets[i] + (C * (j + 1))
+        );
     }
 };
 
-
-class MeshData{
-private:
+class MeshData {
+  private:
     const MDagPath &dag;
     MFnMesh meshFn;
 
-    int numFaces; // The number of faces on the current mesh
-    int numEdges; // The number of edges on the current mesh
-    int numVertices; // The number of vertices on the current mesh
-    int numNormals; // The number of vertices on the current mesh
-    MMatrix inclusiveMatrix;  // The worldspace matrix of this mesh
+    int numFaces;                   // The number of faces on the current mesh
+    int numEdges;                   // The number of edges on the current mesh
+    int numVertices;                // The number of vertices on the current mesh
+    int numNormals;                 // The number of vertices on the current mesh
+    MMatrix inclusiveMatrix;        // The worldspace matrix of this mesh
     MMatrix inclusiveMatrixInverse; // The inverse worldspace matrix of this mesh
 
     FlatChunks<float, 3> origPoints; // The undeformed mesh points
-    FlatChunks<float, 3> rawPoints; // The possibly deformed mesh points
+    FlatChunks<float, 3> rawPoints;  // The possibly deformed mesh points
     FlatChunks<float, 3> rawNormals; // The undeformed per-face-vert normals
-    FlatCounts<int> pvFaces;  // x[vertIdx] -> [span-of-faceIdxs] faces that connect to the input vert
-    FlatCounts<int> pvEdges;  // x[vertIdx] -> [span-of-edgeIdxs] edges that connect to the input vert
-    FlatCounts<int> pvVerts;  // x[vertIdx] -> [span-of-vertIdxs] verts that share a face with the input vert
-    FlatCounts<int> pfVerts;  // x[faceIdx] -> [span-of-vertIdxs] verts that are part of the input face
-    FlatChunks<int> peVerts;  // x[edgeIdx] -> [2span-of-vertIdxs] verts that are part of the input edge
-    DoubleChunks<int> pftVerts;  // x(face, triIdx) -> [3span-of-vertIdxs] verts that are part of the tri at the inputs
+    FlatCounts<int>
+        pvFaces; // x[vertIdx] -> [span-of-faceIdxs] faces that connect to the input vert
+    FlatCounts<int>
+        pvEdges; // x[vertIdx] -> [span-of-edgeIdxs] edges that connect to the input vert
+    FlatCounts<int>
+        pvVerts; // x[vertIdx] -> [span-of-vertIdxs] verts that share a face with the input vert
+    FlatCounts<int>
+        pfVerts; // x[faceIdx] -> [span-of-vertIdxs] verts that are part of the input face
+    FlatChunks<int>
+        peVerts; // x[edgeIdx] -> [2span-of-vertIdxs] verts that are part of the input edge
+    DoubleChunks<int> pftVerts; // x(face, triIdx) -> [3span-of-vertIdxs] verts that are part of the
+                                // tri at the inputs
 
-public:
-    MeshData(MDagPath &indag): dag(indag){
+  public:
+    MeshData(MDagPath &indag) : dag(indag)
+    {
         MStatus status;
 
         meshFn.setObject(dag.node());
@@ -212,10 +217,10 @@ public:
         // Build the face-growing neighbors
         std::vector<std::vector<int>> perVertexVertices;
         perVertexVertices.resize(numVertices);
-        #pragma omp parallel for
+#pragma omp parallel for
         for (int vertIdx = 0; vertIdx < numVertices; ++vertIdx) {
             std::vector<int> &toAdd = perVertexVertices[vertIdx];
-            for (int faceIdx: pvFaces[vertIdx]){
+            for (int faceIdx : pvFaces[vertIdx]) {
                 // I don't know whether the span should be a reference
                 const std::span<const int> faceVerts = pfVerts[faceIdx];
                 toAdd.insert(toAdd.end(), faceVerts.begin(), faceVerts.end());
@@ -225,11 +230,33 @@ public:
             toAdd.erase(std::unique(toAdd.begin(), toAdd.end()), toAdd.end());
         }
         pvVerts.set(perVertexVertices);
-
     }
 
     // Explicitly delete the copy constructor since we're storing references
     // to the dag path and (consequently) the mesh function set
-    MeshData(const MeshData&) = delete;
-};
+    MeshData(const MeshData &) = delete;
 
+    // Getters
+    const MDagPath &getDag() const { return dag; }
+    MFnMesh &getMeshFn() { return meshFn; }
+    const MFnMesh &getMeshFn() const { return meshFn; }
+
+    int getNumFaces() const { return numFaces; }
+    int getNumEdges() const { return numEdges; }
+    int getNumVertices() const { return numVertices; }
+    int getNumNormals() const { return numNormals; }
+
+    const MMatrix &getInclusiveMatrix() const { return inclusiveMatrix; }
+    const MMatrix &getInclusiveMatrixInverse() const { return inclusiveMatrixInverse; }
+
+    const FlatChunks<float, 3> &getOrigPoints() const { return origPoints; }
+    const FlatChunks<float, 3> &getRawPoints() const { return rawPoints; }
+    const FlatChunks<float, 3> &getRawNormals() const { return rawNormals; }
+
+    const FlatCounts<int> &getPvFaces() const { return pvFaces; }
+    const FlatCounts<int> &getPvEdges() const { return pvEdges; }
+    const FlatCounts<int> &getPvVerts() const { return pvVerts; }
+    const FlatCounts<int> &getPfVerts() const { return pfVerts; }
+    const FlatChunks<int> &getPeVerts() const { return peVerts; }
+    const DoubleChunks<int> &getPftVerts() const { return pftVerts; }
+};
