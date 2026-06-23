@@ -34,14 +34,14 @@
 #include <vector>
 
 class blurSkinDisplay : public MPxNode {
-   private:
+  private:
     bool verbose = false;
     bool init = true;
     bool doConnectSkinCL = false;
     // void displayLayerWeights(const SkinLayer &layer);
     MObject skinCluster_;
     MColorArray multiCurrentColors, jointsColors,
-        soloCurrentColors;  // lock vertices color are not stored inside these arrays
+        soloCurrentColors; // lock vertices color are not stored inside these arrays
     MIntArray deformersIndices;
     int nbJointsBig = 0;
     MColor lockVertColor = MColor(0.2f, 0.2f, 0.2f);
@@ -53,35 +53,35 @@ class blurSkinDisplay : public MPxNode {
 
     MDoubleArray paintedValues;
     MIntArray fullVvertexList;
-    std::vector<MIntArray> connectedVertices;  // use by MItMeshVertex getConnectedVertices
-    std::vector<MIntArray> connectedFaces;     // use by MItMeshVertex getConnectedFaces
-    std::vector<MIntArray> allVertsAround;     // used verts around
+    std::vector<MIntArray> connectedVertices; // use by MItMeshVertex getConnectedVertices
+    std::vector<MIntArray> connectedFaces;    // use by MItMeshVertex getConnectedFaces
+    std::vector<MIntArray> allVertsAround;    // used verts around
     int fullVertexListLength = 0;
 
     MIntArray lockJoints, lockVertices;
     bool applyPaint = false;
     bool clearTheArray = false;
     bool reloadCommand = true;
-    bool postSetting = true;  // we apply paint as ssons as attr is changed
+    bool postSetting = true; // we apply paint as ssons as attr is changed
     bool refreshLockWeights = false;
     bool doNormalize = true;
     bool autoExpand = false;
     float minSoloColor = 0.0f;
     float maxSoloColor = 1.0f;
-    int colorCommand = 0;      // multi
-    int soloColorTypeVal = 1;  // 1 lava
-    int nbAutoExpand = 3;      // autoExpand mode how many time we repeat it
+    int colorCommand = 0;     // multi
+    int soloColorTypeVal = 1; // 1 lava
+    int nbAutoExpand = 3;     // autoExpand mode how many time we repeat it
     int changedColorInfluence = -1;
     bool reloadSoloColor = false;
     bool inputVerticesChanged = false;
 
     int influenceIndex = 0, commandIndex = 0, smoothRepeat = 3, smoothDepth = 1;
     int nbJoints = 0, nbVertices = 0;
-    MIntArray cpIds;  // the ids of the vertices passed as to update skin for
+    MIntArray cpIds; // the ids of the vertices passed as to update skin for
 
     // undo stuff -------
     bool postSetting_timeToStoreUndo =
-        true;  // we store the undo for post setting after mouse release
+        true; // we store the undo for post setting after mouse release
     bool callUndo = false;
     std::vector<MIntArray> undoVertsIndices_;
     std::vector<MDoubleArray> undoVertsValues_;
@@ -100,40 +100,44 @@ class blurSkinDisplay : public MPxNode {
     MDoubleArray skinWeightList, fullUndoSkinWeightList;
 
     MStatus fillArrayValues(bool doColors = false);
-    MStatus querySkinClusterValues(MIntArray& verticesIndices, MDoubleArray& theWeights,
-                                   bool doColors = false);
-    void getConnectedVertices(MObject& outMesh, int nbVertices);
+    MStatus querySkinClusterValues(
+        MIntArray &verticesIndices, MDoubleArray &theWeights, bool doColors = false
+    );
+    void getConnectedVertices(MObject &outMesh, int nbVertices);
     void refreshVertsConnection();
     void getConnectedSkinCluster();
     void connectSkinClusterWL();
     void setInfluenceColorAttr();
-    MStatus getAttributes(MDataBlock& dataBlock);
-    MStatus getMirrorInfos(MDataBlock& dataBlock);
-    MStatus doStoreUndo(MIntArray& undoArray);
-    MStatus applyCommand(MDataBlock& dataBlock, int influence, MIntArray& theEditVerts,
-                         MDoubleArray& verticesWeight, bool storeUndo = true);
-    MStatus applyCommandMirror(MDataBlock& dataBlock, MIntArray& theMirrorVerts,
-                               MDoubleArray& verticesWeight);
-    MStatus refreshColors(MIntArray& editVertsIndices, MColorArray& multiEditColors,
-                          MColorArray& soloEditColors);
-    MStatus editSoloColorSet(MFnMesh& meshFn);
+    MStatus getAttributes(MDataBlock &dataBlock);
+    MStatus getMirrorInfos(MDataBlock &dataBlock);
+    MStatus doStoreUndo(MIntArray &undoArray);
+    MStatus applyCommand(
+        MDataBlock &dataBlock, int influence, MIntArray &theEditVerts, MDoubleArray &verticesWeight,
+        bool storeUndo = true
+    );
+    MStatus applyCommandMirror(
+        MDataBlock &dataBlock, MIntArray &theMirrorVerts, MDoubleArray &verticesWeight
+    );
+    MStatus refreshColors(
+        MIntArray &editVertsIndices, MColorArray &multiEditColors, MColorArray &soloEditColors
+    );
+    MStatus editSoloColorSet(MFnMesh &meshFn);
     MColor getASoloColor(double val);
 
-   public:
+  public:
     blurSkinDisplay();
     virtual ~blurSkinDisplay();
-    virtual MStatus compute(const MPlug& plug, MDataBlock& dataBlock);
-    virtual MStatus setDependentsDirty(const MPlug& plugBeingDirtied, MPlugArray& affectedPlugs);
-    MStatus connectionBroken(const MPlug& plug, const MPlug& otherPlug, bool asSrc);
-    virtual MPlug passThroughToOne(const MPlug& plug) const;
-    // MStatus postEvaluation(const MDGContext & 	context, const MEvaluationNode & 	evaluationNode,
-    // PostEvaluationType 	evalType);
-    // MStatus				shouldSave(const MPlug & plug, bool & ret);
-    // virtual bool        doNotWrite() const;
-    // void				beforeSave();
-    void set_skinning_weights(MDataBlock& block);
-    void replace_weights(MDataBlock& block, MIntArray& theVertices, MDoubleArray& theWeights);
-    static void* creator();
+    virtual MStatus compute(const MPlug &plug, MDataBlock &dataBlock);
+    virtual MStatus setDependentsDirty(const MPlug &plugBeingDirtied, MPlugArray &affectedPlugs);
+    MStatus connectionBroken(const MPlug &plug, const MPlug &otherPlug, bool asSrc);
+    virtual MPlug passThroughToOne(const MPlug &plug) const;
+    // MStatus postEvaluation(const MDGContext & 	context, const MEvaluationNode &
+    // evaluationNode, PostEvaluationType 	evalType); MStatus
+    // shouldSave(const MPlug & plug, bool & ret); virtual bool        doNotWrite() const; void
+    // beforeSave();
+    void set_skinning_weights(MDataBlock &block);
+    void replace_weights(MDataBlock &block, MIntArray &theVertices, MDoubleArray &theWeights);
+    static void *creator();
     static MStatus initialize();
     static MTypeId id;
 

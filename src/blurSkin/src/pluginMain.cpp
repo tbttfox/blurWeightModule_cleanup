@@ -5,24 +5,28 @@
 #include "pointsDisplay.h"
 #include "version.h"
 
-MStatus initializePlugin(MObject obj) {
+MStatus initializePlugin(MObject obj)
+{
     MStatus status;
     MFnPlugin plugin(obj, "Blur Studio", VERSION_STRING, "Any");
 
     status = plugin.registerCommand("blurSkinCmd", blurSkinCmd::creator, blurSkinCmd::newSyntax);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    status = plugin.registerNode("blurSkinDisplay", blurSkinDisplay::id, blurSkinDisplay::creator,
-                                 blurSkinDisplay::initialize);
+    status = plugin.registerNode(
+        "blurSkinDisplay", blurSkinDisplay::id, blurSkinDisplay::creator,
+        blurSkinDisplay::initialize
+    );
 
     if (!status) {
         status.perror("registerNode");
         return (status);
     }
 
-    status = plugin.registerNode("pointsDisplay", pointsDisplay::id, &pointsDisplay::creator,
-                                 &pointsDisplay::initialize, MPxNode::kLocatorNode,
-                                 &pointsDisplay::drawDbClassification);
+    status = plugin.registerNode(
+        "pointsDisplay", pointsDisplay::id, &pointsDisplay::creator, &pointsDisplay::initialize,
+        MPxNode::kLocatorNode, &pointsDisplay::drawDbClassification
+    );
     // sUseLegacyDraw ? NULL : &pointsDisplay::drawDbClassification);
     if (!status) {
         status.perror("registerNode");
@@ -31,7 +35,8 @@ MStatus initializePlugin(MObject obj) {
 
     status = MHWRender::MDrawRegistry::registerDrawOverrideCreator(
         pointsDisplay::drawDbClassification, pointsDisplay::drawRegistrantId,
-        PointsDisplayDrawOverride::Creator);
+        PointsDisplayDrawOverride::Creator
+    );
     if (!status) {
         status.perror("registerDrawOverrideCreator");
         return status;
@@ -40,7 +45,8 @@ MStatus initializePlugin(MObject obj) {
     return (status);
 }
 
-MStatus uninitializePlugin(MObject obj) {
+MStatus uninitializePlugin(MObject obj)
+{
     MStatus status;
     MFnPlugin plugin(obj);
 
@@ -54,7 +60,8 @@ MStatus uninitializePlugin(MObject obj) {
     }
 
     status = MHWRender::MDrawRegistry::deregisterDrawOverrideCreator(
-        pointsDisplay::drawDbClassification, pointsDisplay::drawRegistrantId);
+        pointsDisplay::drawDbClassification, pointsDisplay::drawRegistrantId
+    );
     if (!status) {
         status.perror("deregisterDrawOverrideCreator");
         return status;

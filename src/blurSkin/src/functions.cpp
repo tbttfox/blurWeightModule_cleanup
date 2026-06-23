@@ -1,6 +1,7 @@
 #include "functions.h"
 
-unsigned int getMIntArrayIndex(MIntArray& myArray, int searching) {
+unsigned int getMIntArrayIndex(MIntArray &myArray, int searching)
+{
     unsigned int toReturn = -1;
     for (unsigned int element = 0; element < myArray.length(); ++element) {
         if (myArray[element] == searching) {
@@ -11,59 +12,85 @@ unsigned int getMIntArrayIndex(MIntArray& myArray, int searching) {
     return toReturn;
 }
 
-void CVsAround(int storedU, int storedV, int numCVsInU, int numCVsInV, bool UIsPeriodic,
-               bool VIsPeriodic, MIntArray& vertices) {
+void CVsAround(
+    int storedU, int storedV, int numCVsInU, int numCVsInV, bool UIsPeriodic, bool VIsPeriodic,
+    MIntArray &vertices
+)
+{
     int resCV;
     // plus U
     int UNext = storedU + 1;
     if (UNext < numCVsInU) {
         resCV = numCVsInV * UNext + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
-    } else if (UIsPeriodic) {
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
+    }
+    else if (UIsPeriodic) {
         UNext -= numCVsInU;
         resCV = numCVsInV * UNext + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
     }
     // minus U
     int UPrev = storedU - 1;
     if (UPrev >= 0) {
         resCV = numCVsInV * UPrev + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
-    } else if (UIsPeriodic) {
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
+    }
+    else if (UIsPeriodic) {
         UPrev += numCVsInU;
         resCV = numCVsInV * UPrev + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
     }
     // plus V
     int VNext = storedV + 1;
     if (VNext < numCVsInV) {
         resCV = numCVsInV * storedU + VNext;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
-    } else if (VIsPeriodic) {
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
+    }
+    else if (VIsPeriodic) {
         VNext -= numCVsInV;
         resCV = numCVsInV * storedU + VNext;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
     }
     // minus V
     int VPrev = storedV - 1;
     if (VPrev >= 0) {
         resCV = numCVsInV * storedU + VPrev;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
-    } else if (VIsPeriodic) {
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
+    }
+    else if (VIsPeriodic) {
         VPrev += numCVsInV;
         resCV = numCVsInV * storedU + VPrev;
-        if (getMIntArrayIndex(vertices, resCV) == -1) vertices.append(resCV);
+        if (getMIntArrayIndex(vertices, resCV) == -1) {
+            vertices.append(resCV);
+        }
     }
     // vertInd = numCVsInV * indexU + indexV;
 }
 
 // from the mesh retrieves the skinCluster
-MStatus findSkinCluster(MDagPath MeshPath, MObject& theSkinCluster, int indSkinCluster,
-                        bool verbose) {
-    if (verbose) MGlobal::displayInfo(MString(" ---- findSkinCluster ----"));
+MStatus
+findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster, bool verbose)
+{
+    if (verbose) {
+        MGlobal::displayInfo(MString(" ---- findSkinCluster ----"));
+    }
     MStatus stat;
 
-    MFnDagNode dagNode(MeshPath);  // path to the visible mesh
+    MFnDagNode dagNode(MeshPath); // path to the visible mesh
     // MFnMesh meshFn(MeshPath, &stat);     // this is the visible mesh
     MObject inObj;
     MObject dataObj1;
@@ -72,22 +99,25 @@ MStatus findSkinCluster(MDagPath MeshPath, MObject& theSkinCluster, int indSkinC
     // the deformed mesh comes into the visible mesh
     // through its "inmesh" plug
     MPlug inMeshPlug;
-    if (MeshPath.apiType() == MFn::kMesh)
+    if (MeshPath.apiType() == MFn::kMesh) {
         inMeshPlug = dagNode.findPlug("inMesh", false, &stat);
-    else if (MeshPath.apiType() == MFn::kNurbsSurface)
+    }
+    else if (MeshPath.apiType() == MFn::kNurbsSurface) {
         inMeshPlug = dagNode.findPlug("create", false, &stat);
+    }
 
     if (stat == MS::kSuccess && inMeshPlug.isConnected()) {
         // walk the tree of stuff upstream from this plug
-        MItDependencyGraph dgIt(inMeshPlug, MFn::kInvalid, MItDependencyGraph::kUpstream,
-                                MItDependencyGraph::kDepthFirst, MItDependencyGraph::kPlugLevel,
-                                &stat);
+        MItDependencyGraph dgIt(
+            inMeshPlug, MFn::kInvalid, MItDependencyGraph::kUpstream,
+            MItDependencyGraph::kDepthFirst, MItDependencyGraph::kPlugLevel, &stat
+        );
         if (MS::kSuccess == stat) {
             dgIt.disablePruningOnFilter();
             int count = 0;
 
             for (; !dgIt.isDone(); dgIt.next()) {
-                //MObject thisNode = dgIt.thisNode();
+                // MObject thisNode = dgIt.thisNode();
                 MObject thisNode = dgIt.currentItem();
                 // go until we find a skinCluster
                 if (thisNode.apiType() == MFn::kSkinClusterFilter) {
@@ -97,14 +127,16 @@ MStatus findSkinCluster(MDagPath MeshPath, MObject& theSkinCluster, int indSkinC
             }
         }
         int listSkinClustersLength = listSkinClusters.length();
-        if (verbose)
+        if (verbose) {
             MGlobal::displayInfo(MString("    nb skinClusters is ") + listSkinClustersLength);
+        }
         if (listSkinClustersLength > indSkinCluster) {
             theSkinCluster = listSkinClusters[indSkinCluster];
 
             MFnDependencyNode nodeFn(theSkinCluster);
-            if (verbose)
+            if (verbose) {
                 MGlobal::displayInfo(MString("    returned skinCluster: ") + nodeFn.name());
+            }
 
             return MS::kSuccess;
         }
@@ -113,8 +145,11 @@ MStatus findSkinCluster(MDagPath MeshPath, MObject& theSkinCluster, int indSkinC
     return MS::kFailure;
 }
 
-MStatus findMesh(MObject& skinCluster, MDagPath& theMeshPath, bool verbose) {
-    if (verbose) MGlobal::displayInfo(MString(" ---- findMesh ----"));
+MStatus findMesh(MObject &skinCluster, MDagPath &theMeshPath, bool verbose)
+{
+    if (verbose) {
+        MGlobal::displayInfo(MString(" ---- findMesh ----"));
+    }
     MFnSkinCluster theSkinCluster(skinCluster);
     MObjectArray objectsDeformed;
     theSkinCluster.getOutputGeometry(objectsDeformed);
@@ -123,12 +158,14 @@ MStatus findMesh(MObject& skinCluster, MDagPath& theMeshPath, bool verbose) {
     if (objectsDeformedCount == 0) {
         int j = 0;
         // for (int j = 0; j < objectsDeformedCount; j++) {
-        //theMeshPath.getAPathTo(objectsDeformed[j]); // deprecated
+        // theMeshPath.getAPathTo(objectsDeformed[j]); // deprecated
         MDagPath::getAPathTo(objectsDeformed[j], theMeshPath);
         if (verbose) {
             MFnDependencyNode deformedNameMesh(objectsDeformed[j]);
             MString deformedNameMeshSTR = deformedNameMesh.name();
-            if (verbose) MGlobal::displayInfo("     -> DEFORMING : " + deformedNameMeshSTR + "\n");
+            if (verbose) {
+                MGlobal::displayInfo("     -> DEFORMING : " + deformedNameMeshSTR + "\n");
+            }
         }
         //}
         return MS::kSuccess;
@@ -136,8 +173,11 @@ MStatus findMesh(MObject& skinCluster, MDagPath& theMeshPath, bool verbose) {
     return MS::kFailure;
 }
 
-MStatus findOrigMesh(MObject& skinCluster, MObject& origMesh, bool verbose) {
-    if (verbose) MGlobal::displayInfo(MString(" ---- find Orig Mesh ----"));
+MStatus findOrigMesh(MObject &skinCluster, MObject &origMesh, bool verbose)
+{
+    if (verbose) {
+        MGlobal::displayInfo(MString(" ---- find Orig Mesh ----"));
+    }
     MFnSkinCluster theSkinCluster(skinCluster);
     MObjectArray objectsDeformed;
     theSkinCluster.getInputGeometry(objectsDeformed);
@@ -149,7 +189,8 @@ MStatus findOrigMesh(MObject& skinCluster, MObject& origMesh, bool verbose) {
     return MS::kSuccess;
 }
 
-MStatus getListColorsJoints(MObject& skinCluster, MColorArray& jointsColors) {
+MStatus getListColorsJoints(MObject &skinCluster, MColorArray &jointsColors)
+{
     MStatus stat;
     /*
     MDagPathArray  listOfJoints;
@@ -195,15 +236,22 @@ MStatus getListColorsJoints(MObject& skinCluster, MColorArray& jointsColors) {
             colorPlug.connectedTo(connections, true, false);
             if (connections.length() > 0) {
                 MPlug theConn = connections[0];
-                float element[4] = {theConn.child(0).asFloat(), theConn.child(1).asFloat(),
-                                    theConn.child(2).asFloat(), 1};
+                float element[4] = {
+                    theConn.child(0).asFloat(), theConn.child(1).asFloat(),
+                    theConn.child(2).asFloat(), 1
+                };
                 jointsColors.set(element, logicalInd);
-            } else
+            }
+            else {
                 jointsColors.set(black, logicalInd);
-        } else {
+            }
+        }
+        else {
             // MGlobal::displayInfo(colorPlug.name());
-            float element[4] = {colorPlug.child(0).asFloat(), colorPlug.child(1).asFloat(),
-                                colorPlug.child(2).asFloat(), 1};
+            float element[4] = {
+                colorPlug.child(0).asFloat(), colorPlug.child(1).asFloat(),
+                colorPlug.child(2).asFloat(), 1
+            };
             // MGlobal::displayInfo(colorPlug.name()+ " "+ element[0] + " " + element[1] + " " +
             // element[2]);
             jointsColors.set(element, logicalInd);
@@ -212,7 +260,8 @@ MStatus getListColorsJoints(MObject& skinCluster, MColorArray& jointsColors) {
     return stat;
 }
 
-MStatus getListLockJoints(MObject& skinCluster, MIntArray& jointsLocks) {
+MStatus getListLockJoints(MObject &skinCluster, MIntArray &jointsLocks)
+{
     MStatus stat;
 
     MFnDependencyNode skinClusterDep(skinCluster);
@@ -231,9 +280,12 @@ MStatus getListLockJoints(MObject& skinCluster, MIntArray& jointsLocks) {
             if (connections.length() > 0) {
                 MPlug theConn = connections[0];
                 jointsLocks.set(theConn.asInt(), i);
-            } else
+            }
+            else {
                 jointsLocks.set(0, i);
-        } else {
+            }
+        }
+        else {
             jointsLocks.set(lockPlug.asInt(), i);
         }
         // MGlobal::displayInfo(lockPlug.name() + " " + jointsLocks [i]);
@@ -241,7 +293,8 @@ MStatus getListLockJoints(MObject& skinCluster, MIntArray& jointsLocks) {
     return stat;
 }
 
-MStatus getListLockVertices(MObject& skinCluster, MIntArray& vertsLocks) {
+MStatus getListLockVertices(MObject &skinCluster, MIntArray &vertsLocks)
+{
     MStatus stat;
 
     MFnSkinCluster theSkinCluster(skinCluster);
@@ -261,19 +314,22 @@ MStatus getListLockVertices(MObject& skinCluster, MIntArray& vertsLocks) {
 
     // vertsLocks.clear();
     MObject Data;
-    stat = lockedVerticesPlug.getValue(Data);  // to get the attribute
+    stat = lockedVerticesPlug.getValue(Data); // to get the attribute
 
     MFnIntArrayData intData(Data);
     MIntArray vertsLocksIndices = intData.array(&stat);
     vertsLocks.clear();
     vertsLocks = MIntArray(nbVertices, 0);
-    for (int i = 0; i < vertsLocksIndices.length(); ++i) vertsLocks[vertsLocksIndices[i]] = 1;
+    for (int i = 0; i < vertsLocksIndices.length(); ++i) {
+        vertsLocks[vertsLocksIndices[i]] = 1;
+    }
     // MGlobal::displayInfo(MString(" getListLockVertices | ") + currentColorSet.name () + MString("
     // ") + vertsLocks.length());
     return stat;
 }
 
-MStatus getSymetryAttributes(MObject& skinCluster, MIntArray& symetryList) {
+MStatus getSymetryAttributes(MObject &skinCluster, MIntArray &symetryList)
+{
     MStatus stat;
 
     MFnSkinCluster theSkinCluster(skinCluster);
@@ -291,17 +347,19 @@ MStatus getSymetryAttributes(MObject& skinCluster, MIntArray& symetryList) {
     }
 
     MObject Data;
-    stat = symVerticesPlug.getValue(Data);  // to get the attribute
+    stat = symVerticesPlug.getValue(Data); // to get the attribute
 
     MFnIntArrayData intData(Data);
     symetryList = intData.array(&stat);
     return stat;
 }
 
-MStatus getMirrorVertices(MIntArray mirrorVertices, MIntArray& theEditVerts,
-                          MIntArray& theMirrorVerts, MIntArray& editAndMirrorVerts,
-                          MDoubleArray& editVertsWeights, MDoubleArray& mirrorVertsWeights,
-                          MDoubleArray& editAndMirrorWeights, bool doMerge) {
+MStatus getMirrorVertices(
+    MIntArray mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
+    MIntArray &editAndMirrorVerts, MDoubleArray &editVertsWeights, MDoubleArray &mirrorVertsWeights,
+    MDoubleArray &editAndMirrorWeights, bool doMerge
+)
+{
     // doMerge do we merge the weights ? if painting the same influence or smooth
     MStatus status;
 
@@ -309,33 +367,38 @@ MStatus getMirrorVertices(MIntArray mirrorVertices, MIntArray& theEditVerts,
 
     editAndMirrorVerts.copy(theEditVerts);
     editAndMirrorWeights.copy(editVertsWeights);
-    if (!doMerge) {  // mirror verts same length and weights
+    if (!doMerge) { // mirror verts same length and weights
         mirrorVertsWeights.copy(editVertsWeights);
         theMirrorVerts.setLength(theEditVerts.length());
     }
 
-    for (int i = 0; i < theEditVerts.length(); ++i) vertExists[theEditVerts[i]] = i;
+    for (int i = 0; i < theEditVerts.length(); ++i) {
+        vertExists[theEditVerts[i]] = i;
+    }
     for (int i = 0; i < theEditVerts.length(); ++i) {
         int theVert = theEditVerts[i];
         int theMirroredVert = mirrorVertices[theVert];
 
-        if (!doMerge) theMirrorVerts[i] = theMirroredVert;  // to
+        if (!doMerge) {
+            theMirrorVerts[i] = theMirroredVert; // to
+        }
         double theWeight = editVertsWeights[i];
         int indVertExists = vertExists[theMirroredVert];
-        if (indVertExists == -1) {  // not in first array
+        if (indVertExists == -1) { // not in first array
             if (doMerge) {
                 theMirrorVerts.append(theMirroredVert);
                 mirrorVertsWeights.append(theWeight);
             }
             editAndMirrorVerts.append(theMirroredVert);
             editAndMirrorWeights.append(theWeight);
-        } else if (doMerge && theWeight < 1.0) {  // clip weight at 1
+        }
+        else if (doMerge && theWeight < 1.0) { // clip weight at 1
             double prevWeight = editVertsWeights[indVertExists];
             if (theWeight >
-                prevWeight) {  // add the remaining if existing weight is less than this new weight
+                prevWeight) { // add the remaining if existing weight is less than this new weight
                 theMirrorVerts.append(theMirroredVert);
                 mirrorVertsWeights.append(theWeight - prevWeight);
-                editAndMirrorWeights[indVertExists] = theWeight;  // edit weight
+                editAndMirrorWeights[indVertExists] = theWeight; // edit weight
             }
         }
     }
@@ -346,8 +409,9 @@ MStatus getMirrorVertices(MIntArray mirrorVertices, MIntArray& theEditVerts,
     return status;
 }
 
-MStatus editLocks(MObject& skinCluster, MIntArray& inputVertsToLock, bool addToLock,
-                  MIntArray& vertsLocks) {
+MStatus
+editLocks(MObject &skinCluster, MIntArray &inputVertsToLock, bool addToLock, MIntArray &vertsLocks)
+{
     MStatus stat;
 
     MFnSkinCluster theSkinCluster(skinCluster);
@@ -362,7 +426,9 @@ MStatus editLocks(MObject& skinCluster, MIntArray& inputVertsToLock, bool addToL
 
     // now expand the array -----------------------
     int val = 0;
-    if (addToLock) val = 1;
+    if (addToLock) {
+        val = 1;
+    }
     for (unsigned int i = 0; i < inputVertsToLock.length(); ++i) {
         int vtx = inputVertsToLock[i];
         vertsLocks[vtx] = val;
@@ -370,18 +436,20 @@ MStatus editLocks(MObject& skinCluster, MIntArray& inputVertsToLock, bool addToL
 
     MIntArray theArrayValues;
     for (unsigned int vtx = 0; vtx < vertsLocks.length(); ++vtx) {
-        if (vertsLocks[vtx] == 1) theArrayValues.append(vtx);
+        if (vertsLocks[vtx] == 1) {
+            theArrayValues.append(vtx);
+        }
     }
     // now set the value ---------------------------
     MFnIntArrayData tmpIntArray;
 
     auto tmpAttrSetter = tmpIntArray.create(theArrayValues);
-    stat = lockedVerticesPlug.setValue(tmpAttrSetter);  // to set the attribute
+    stat = lockedVerticesPlug.setValue(tmpAttrSetter); // to set the attribute
     return stat;
 }
 
-MStatus getListColors(MObject& skinCluster, int nbVertices, MColorArray& currColors,
-                      bool useMPlug) {
+MStatus getListColors(MObject &skinCluster, int nbVertices, MColorArray &currColors, bool useMPlug)
+{
     MStatus stat;
     MFnDagNode skinClusterDag(skinCluster);
     MFnDependencyNode skinClusterDep(skinCluster);
@@ -426,7 +494,8 @@ MStatus getListColors(MObject& skinCluster, int nbVertices, MColorArray& currCol
                 currColors[i] = theColor;
             }
         }
-    } else {
+    }
+    else {
         MPlug weight_list_plug = skinClusterDep.findPlug("weightList", false);
         // MGlobal::displayInfo(weight_list_plug.name());
         int nbElements = weight_list_plug.numElements();
@@ -441,11 +510,11 @@ MStatus getListColors(MObject& skinCluster, int nbVertices, MColorArray& currCol
             // MGlobal::displayInfo(ith_weights_plug.name());
 
             // weightList[i].weight
-            MPlug plug_weights = ith_weights_plug.child(0);  // access first compound child
+            MPlug plug_weights = ith_weights_plug.child(0); // access first compound child
             int nb_weights = plug_weights.numElements();
             // MGlobal::displayInfo(plug_weights.name() + nb_weights);
             MColor theColor;
-            for (int j = 0; j < nb_weights; j++) {  // for each joint
+            for (int j = 0; j < nb_weights; j++) { // for each joint
                 MPlug weight_plug = plug_weights.elementByPhysicalIndex(j);
                 // weightList[i].weight[j]
                 int indexInfluence = weight_plug.logicalIndex();
@@ -463,14 +532,16 @@ MStatus getListColors(MObject& skinCluster, int nbVertices, MColorArray& currCol
     return MS::kSuccess;
 }
 
-MStatus editArray(int command, int influence, int nbJoints, MIntArray& lockJoints,
-                  MDoubleArray& fullWeightArray, MIntArray& vertices, MDoubleArray& verticesWeight,
-                  MDoubleArray& theWeights, bool normalize) {
+MStatus editArray(
+    int command, int influence, int nbJoints, MIntArray &lockJoints, MDoubleArray &fullWeightArray,
+    MIntArray &vertices, MDoubleArray &verticesWeight, MDoubleArray &theWeights, bool normalize
+)
+{
     MStatus stat;
     // 0 Add - 1 Remove - 2 AddPercent - 3 Absolute - 4 Smooth - 5 Sharpen - 6 LockVertices - 7
     // UnLockVertices
     //
-    if (command == 5) {  // sharpen  -----------------------
+    if (command == 5) { // sharpen  -----------------------
         for (int i = 0; i < vertices.length(); ++i) {
             int theVert = vertices[i];
             double theVal = verticesWeight[i] + 1.0;
@@ -479,15 +550,21 @@ MStatus editArray(int command, int influence, int nbJoints, MIntArray& lockJoint
             for (int j = 0; j < nbJoints; ++j) {
                 // check the zero val ----------
                 double jntVal = (fullWeightArray[theVert * nbJoints + j] * theVal) - substract;
-                jntVal = std::max(0.0, std::min(jntVal, 1.0));  // clamp
+                jntVal = std::max(0.0, std::min(jntVal, 1.0)); // clamp
                 theWeights[i * nbJoints + j] = jntVal;
-                if (normalize) sum += jntVal;
+                if (normalize) {
+                    sum += jntVal;
+                }
             }
             // now normalize
-            if ((normalize) && (sum != 1.0))
-                for (int j = 0; j < nbJoints; ++j) theWeights[i * nbJoints + j] /= sum;
+            if ((normalize) && (sum != 1.0)) {
+                for (int j = 0; j < nbJoints; ++j) {
+                    theWeights[i * nbJoints + j] /= sum;
+                }
+            }
         }
-    } else {
+    }
+    else {
         // do the command --------------------------
         for (int i = 0; i < vertices.length(); ++i) {
             int theVert = vertices[i];
@@ -495,22 +572,27 @@ MStatus editArray(int command, int influence, int nbJoints, MIntArray& lockJoint
 
             double currentW = fullWeightArray[theVert * nbJoints + influence];
             if (((command == 1) || (command == 3)) &&
-                (currentW > 0.99999)) {  // value is 1 we cant do anything
-                for (int j = 0; j < nbJoints; ++j)
+                (currentW > 0.99999)) { // value is 1 we cant do anything
+                for (int j = 0; j < nbJoints; ++j) {
                     theWeights[i * nbJoints + j] = fullWeightArray[theVert * nbJoints + j];
+                }
                 continue;
             }
             double newW = currentW;
-            if (command == 0)
-                newW += theVal;  // ADD
-            else if (command == 1)
-                newW -= theVal;  // Remove
-            else if (command == 2)
-                newW += theVal * newW;  // AddPercent
-            else if (command == 3)
-                newW = theVal;  // Absolute
+            if (command == 0) {
+                newW += theVal; // ADD
+            }
+            else if (command == 1) {
+                newW -= theVal; // Remove
+            }
+            else if (command == 2) {
+                newW += theVal * newW; // AddPercent
+            }
+            else if (command == 3) {
+                newW = theVal; // Absolute
+            }
 
-            newW = std::max(0.0, std::min(newW, 1.0));  // clamp
+            newW = std::max(0.0, std::min(newW, 1.0)); // clamp
             double newRest = 1.0 - newW;
             double oldRest = 1.0 - currentW;
             double div = oldRest / newRest;
@@ -519,32 +601,44 @@ MStatus editArray(int command, int influence, int nbJoints, MIntArray& lockJoint
             for (int j = 0; j < nbJoints; ++j) {
                 // check the zero val ----------
                 if (j != influence) {
-                    if (newW == 1.0)
+                    if (newW == 1.0) {
                         theWeights[i * nbJoints + j] = 0.0;
-                    else
+                    }
+                    else {
                         theWeights[i * nbJoints + j] =
                             fullWeightArray[theVert * nbJoints + j] / div;
-                } else
+                    }
+                }
+                else {
                     theWeights[i * nbJoints + j] = newW;
+                }
 
-                if (normalize)
+                if (normalize) {
                     theWeights[i * nbJoints + j] =
-                        std::max(0.0, std::min(theWeights[i * nbJoints + j], 1.0));  // clamp
+                        std::max(0.0, std::min(theWeights[i * nbJoints + j], 1.0)); // clamp
+                }
                 sum += theWeights[i * nbJoints + j];
             }
-            if (sum < .01)  // zero problem revert weights ----------------------
-                for (int j = 0; j < nbJoints; ++j)
+            if (sum < .01) { // zero problem revert weights ----------------------
+                for (int j = 0; j < nbJoints; ++j) {
                     theWeights[i * nbJoints + j] = fullWeightArray[theVert * nbJoints + j];
-            else if (normalize && (sum != 1.0))  // normalize ---------------
-                for (int j = 0; j < nbJoints; ++j) theWeights[i * nbJoints + j] /= sum;
+                }
+            }
+            else if (normalize && (sum != 1.0)) { // normalize ---------------
+                for (int j = 0; j < nbJoints; ++j) {
+                    theWeights[i * nbJoints + j] /= sum;
+                }
+            }
         }
     }
     return stat;
 }
 
-MStatus setAverageWeight(MIntArray& verticesAround, int currentVertex, int indexCurrVert,
-                         int nbJoints, MIntArray& lockJoints, MDoubleArray& fullWeightArray,
-                         MDoubleArray& theWeights) {
+MStatus setAverageWeight(
+    MIntArray &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
+    MIntArray &lockJoints, MDoubleArray &fullWeightArray, MDoubleArray &theWeights
+)
+{
     MStatus stat;
     int sizeVertices = verticesAround.length();
     int i, j, posi;
@@ -572,14 +666,15 @@ MStatus setAverageWeight(MIntArray& verticesAround, int currentVertex, int index
         double mult = totalBaseVtx / total;
         for (j = 0; j < nbJoints; j++) {
             int posiToSet = indexCurrVert * nbJoints + j;
-            sumWeigths[j] *= mult;  // normalement divide par 1
+            sumWeigths[j] *= mult; // normalement divide par 1
             theWeights[posiToSet] = sumWeigths[j];
         }
     }
     return MS::kSuccess;
 }
 
-MStatus doPruneWeight(MDoubleArray& theWeights, int nbJoints, double pruneCutWeight) {
+MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWeight)
+{
     MStatus stat;
 
     int vertIndex, jnt, posiInArray;
@@ -595,7 +690,8 @@ MStatus doPruneWeight(MDoubleArray& theWeights, int nbJoints, double pruneCutWei
             val = theWeights[posiInArray];
             if (val > pruneCutWeight) {
                 total += val;
-            } else {
+            }
+            else {
                 theWeights[posiInArray] = 0.0;
             }
         }
@@ -603,7 +699,7 @@ MStatus doPruneWeight(MDoubleArray& theWeights, int nbJoints, double pruneCutWei
         if (total != 1.0) {
             for (jnt = 0; jnt < nbJoints; jnt++) {
                 posiInArray = vertIndex * nbJoints + jnt;
-                theWeights[posiInArray] /= total;  // that should normalize
+                theWeights[posiInArray] /= total; // that should normalize
             }
         }
     }

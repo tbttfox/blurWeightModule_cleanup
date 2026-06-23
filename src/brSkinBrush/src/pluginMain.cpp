@@ -12,9 +12,7 @@
 #include <string>
 
 #include <maya/MFnPlugin.h>
-#include <maya/MFnPlugin.h>
 #include <maya/MUserEventMessage.h>
-
 
 #include "functions.h"
 #include "skinBrushTool.h"
@@ -24,12 +22,14 @@
 // initialization
 // ---------------------------------------------------------------------
 
-MStatus initializePlugin(MObject obj) {
+MStatus initializePlugin(MObject obj)
+{
     MStatus status;
     MFnPlugin plugin(obj, "Blur Studio", VERSION_STRING, "Any");
 
-    status = plugin.registerContextCommand("brSkinBrushContext", SkinBrushContextCmd::creator,
-                                           "brSkinBrushCmd", skinBrushTool::creator);
+    status = plugin.registerContextCommand(
+        "brSkinBrushContext", SkinBrushContextCmd::creator, "brSkinBrushCmd", skinBrushTool::creator
+    );
     if (status != MStatus::kSuccess) {
         status.perror("Register brSkinBrushContext failed.");
     }
@@ -49,7 +49,8 @@ MStatus initializePlugin(MObject obj) {
     return status;
 }
 
-MStatus uninitializePlugin(MObject obj) {
+MStatus uninitializePlugin(MObject obj)
+{
     MStatus status;
     MFnPlugin plugin(obj, "Blur Studio", VERSION_STRING, "Any");
 

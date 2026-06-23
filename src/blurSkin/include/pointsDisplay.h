@@ -82,12 +82,13 @@
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 class PointsDisplayData : public MUserData {
-   public:
+  public:
     PointsDisplayData()
 #if MAYA_API_VERSION < 20230000
-      : MUserData(false) // don't delete after draw
+        : MUserData(false) // don't delete after draw
 #endif
-    {}
+    {
+    }
     ~PointsDisplayData() override {}
 
     MColor fColor;
@@ -95,7 +96,7 @@ class PointsDisplayData : public MUserData {
     MPointArray fLineList;
     MPointArray fTriangleList;
 
-    virtual void getData(const MObject&);
+    virtual void getData(const MObject &);
     float pointWidth = 1;
     bool enableSmooth = true;
     float color[4] = {1.0f, 0.0f, 0.0f, 0.1f};
@@ -104,27 +105,29 @@ class PointsDisplayData : public MUserData {
 };
 
 class pointsDisplay : public MPxLocatorNode {
-   public:
+  public:
     pointsDisplay();
     ~pointsDisplay() override;
 
-    MStatus compute(const MPlug& plug, MDataBlock& data) override;
+    MStatus compute(const MPlug &plug, MDataBlock &data) override;
     virtual void postConstructor();
 #ifdef MAYA_LEGACY_DISPLAY
-    void draw(M3dView& view, const MDagPath& path, M3dView::DisplayStyle style,
-              M3dView::DisplayStatus status) override;
+    void draw(
+        M3dView &view, const MDagPath &path, M3dView::DisplayStyle style,
+        M3dView::DisplayStatus status
+    ) override;
 #endif
 
     bool isBounded() const override;
     MBoundingBox boundingBox() const override;
 
-    MStatus preEvaluation(const MDGContext& context,
-                          const MEvaluationNode& evaluationNode) override;
+    MStatus
+    preEvaluation(const MDGContext &context, const MEvaluationNode &evaluationNode) override;
 
-    static void* creator();
+    static void *creator();
     static MStatus initialize();
 
-    static MObject size;  // The size of the foot
+    static MObject size; // The size of the foot
     // static  MObject         _inMesh;
     static MObject _inGeometry;
     static MObject _inputColor;
@@ -133,20 +136,21 @@ class pointsDisplay : public MPxLocatorNode {
     static MObject _cpList;
     static MObject _enableSmooth;
 
-   public:
+  public:
     static MTypeId id;
     static MString drawDbClassification;
     static MString drawRegistrantId;
 
     static MObject worldS;
 
-   private:
+  private:
     MObject _self;
 };
 
 class PointsDisplayDrawOverride : public MHWRender::MPxDrawOverride {
-   public:
-    static MHWRender::MPxDrawOverride* Creator(const MObject& obj) {
+  public:
+    static MHWRender::MPxDrawOverride *Creator(const MObject &obj)
+    {
         return new PointsDisplayDrawOverride(obj);
     }
 
@@ -154,25 +158,29 @@ class PointsDisplayDrawOverride : public MHWRender::MPxDrawOverride {
 
     MHWRender::DrawAPI supportedDrawAPIs() const override;
 
-    bool isBounded(const MDagPath& objPath, const MDagPath& cameraPath) const override;
+    bool isBounded(const MDagPath &objPath, const MDagPath &cameraPath) const override;
 
-    MBoundingBox boundingBox(const MDagPath& objPath, const MDagPath& cameraPath) const override;
+    MBoundingBox boundingBox(const MDagPath &objPath, const MDagPath &cameraPath) const override;
 
-    MUserData* prepareForDraw(const MDagPath& objPath, const MDagPath& cameraPath,
-                              const MHWRender::MFrameContext& frameContext,
-                              MUserData* oldData) override;
+    MUserData *prepareForDraw(
+        const MDagPath &objPath, const MDagPath &cameraPath,
+        const MHWRender::MFrameContext &frameContext, MUserData *oldData
+    ) override;
 
     bool hasUIDrawables() const override { return true; }
 
-    void addUIDrawables(const MDagPath& objPath, MHWRender::MUIDrawManager& drawManager,
-                        const MHWRender::MFrameContext& frameContext,
-                        const MUserData* data) override;
+    void addUIDrawables(
+        const MDagPath &objPath, MHWRender::MUIDrawManager &drawManager,
+        const MHWRender::MFrameContext &frameContext, const MUserData *data
+    ) override;
 
-    bool traceCallSequence() const override {
+    bool traceCallSequence() const override
+    {
         // Return true if internal tracing is desired.
         return false;
     }
-    void handleTraceMessage(const MString& message) const override {
+    void handleTraceMessage(const MString &message) const override
+    {
         MGlobal::displayInfo("pointsDisplayDrawOverride: " + message);
 
         // Some simple custom message formatting.
@@ -181,12 +189,12 @@ class PointsDisplayDrawOverride : public MHWRender::MPxDrawOverride {
         fputs("\n", stderr);
     }
 
-   private:
-    PointsDisplayDrawOverride(const MObject& obj);
-    float getMultiplier(const MDagPath& objPath) const;
+  private:
+    PointsDisplayDrawOverride(const MObject &obj);
+    float getMultiplier(const MDagPath &objPath) const;
 
-    static void OnModelEditorChanged(void* clientData);
+    static void OnModelEditorChanged(void *clientData);
 
-    pointsDisplay* fPointsDisplay;
+    pointsDisplay *fPointsDisplay;
     MCallbackId fModelEditorChangedCbId;
 };

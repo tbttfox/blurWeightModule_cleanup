@@ -28,30 +28,36 @@
 #include <vector>
 
 // FUNCTION DECLARATION:
-unsigned int getMIntArrayIndex(MIntArray& myArray, int searching);
-void CVsAround(int storedU, int storedV, int numCVsInU, int numCVsInV, bool UIsPeriodic,
-               bool VIsPeriodic, MIntArray& vertices);
-MStatus findSkinCluster(MDagPath MeshPath, MObject& theSkinCluster, int indSkinCluster,
-                        bool verbose);
-MStatus findMesh(MObject& theSkinCluster, MDagPath& theMeshPath, bool verbose);
-MStatus findOrigMesh(MObject& theSkinCluster, MObject& origMesh, bool verbose);
-MStatus getListColors(MObject& skinCluster, int nbVertices, MColorArray& currColors,
-                      bool useMPlug = false);
-MStatus getListColorsJoints(MObject& skinCluster, MColorArray& jointsColors);
-MStatus getListLockJoints(MObject& skinCluster, MIntArray& jointsLocks);
-MStatus getListLockVertices(MObject& skinCluster, MIntArray& vertsLocks);
-MStatus getSymetryAttributes(MObject& skinCluster, MIntArray& symetryList);
-MStatus getMirrorVertices(MIntArray mirrorVertices, MIntArray& theEditVerts,
-                          MIntArray& theMirrorVerts, MIntArray& editAndMirrorVerts,
-                          MDoubleArray& editVertsWeights, MDoubleArray& mirrorVertsWeights,
-                          MDoubleArray& editAndMirrorWeights, bool doMerge = true);
-MStatus editLocks(MObject& skinCluster, MIntArray& vertsToLock, bool addToLock,
-                  MIntArray& vertsLocks);
-MStatus editArray(int command, int influence, int nbJoints, MIntArray& lockJoints,
-                  MDoubleArray& fullWeightArray, MIntArray& vertices, MDoubleArray& verticesWeight,
-                  MDoubleArray& theWeights, bool normalize = true);
-MStatus setAverageWeight(MIntArray& verticesAround, int currentVertex, int indexCurrVert,
-                         int nbJoints, MIntArray& lockJoints, MDoubleArray& fullWeightArray,
-                         MDoubleArray& theWeights);
-MStatus doPruneWeight(MDoubleArray& theWeights, int nbJoints, double pruneCutWeight);
+unsigned int getMIntArrayIndex(MIntArray &myArray, int searching);
+void CVsAround(
+    int storedU, int storedV, int numCVsInU, int numCVsInV, bool UIsPeriodic, bool VIsPeriodic,
+    MIntArray &vertices
+);
+MStatus
+findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster, bool verbose);
+MStatus findMesh(MObject &theSkinCluster, MDagPath &theMeshPath, bool verbose);
+MStatus findOrigMesh(MObject &theSkinCluster, MObject &origMesh, bool verbose);
+MStatus
+getListColors(MObject &skinCluster, int nbVertices, MColorArray &currColors, bool useMPlug = false);
+MStatus getListColorsJoints(MObject &skinCluster, MColorArray &jointsColors);
+MStatus getListLockJoints(MObject &skinCluster, MIntArray &jointsLocks);
+MStatus getListLockVertices(MObject &skinCluster, MIntArray &vertsLocks);
+MStatus getSymetryAttributes(MObject &skinCluster, MIntArray &symetryList);
+MStatus getMirrorVertices(
+    MIntArray mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
+    MIntArray &editAndMirrorVerts, MDoubleArray &editVertsWeights, MDoubleArray &mirrorVertsWeights,
+    MDoubleArray &editAndMirrorWeights, bool doMerge = true
+);
+MStatus
+editLocks(MObject &skinCluster, MIntArray &vertsToLock, bool addToLock, MIntArray &vertsLocks);
+MStatus editArray(
+    int command, int influence, int nbJoints, MIntArray &lockJoints, MDoubleArray &fullWeightArray,
+    MIntArray &vertices, MDoubleArray &verticesWeight, MDoubleArray &theWeights,
+    bool normalize = true
+);
+MStatus setAverageWeight(
+    MIntArray &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
+    MIntArray &lockJoints, MDoubleArray &fullWeightArray, MDoubleArray &theWeights
+);
+MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWeight);
 #endif

@@ -17,7 +17,8 @@ MObject pointsDisplay::worldS;
 pointsDisplay::pointsDisplay() {}
 pointsDisplay::~pointsDisplay() {}
 
-void pointsDisplay::postConstructor() {
+void pointsDisplay::postConstructor()
+{
     MObject self = thisMObject();
     MFnDependencyNode fn_node(self);
     fn_node.setName("pointsDisplayShape#");
@@ -25,7 +26,8 @@ void pointsDisplay::postConstructor() {
     _self = self;
 }
 
-MStatus pointsDisplay::compute(const MPlug& plug /*plug*/, MDataBlock& dataBlock /*data*/) {
+MStatus pointsDisplay::compute(const MPlug &plug /*plug*/, MDataBlock &dataBlock /*data*/)
+{
     MStatus s;
 
     if (plug == worldS) {
@@ -43,8 +45,11 @@ MStatus pointsDisplay::compute(const MPlug& plug /*plug*/, MDataBlock& dataBlock
 
 // called by legacy default viewport
 #ifdef MAYA_LEGACY_DISPLAY
-void pointsDisplay::draw(M3dView& view, const MDagPath& /*path*/, M3dView::DisplayStyle style,
-                         M3dView::DisplayStatus status) {
+void pointsDisplay::draw(
+    M3dView &view, const MDagPath & /*path*/, M3dView::DisplayStyle style,
+    M3dView::DisplayStatus status
+)
+{
     PointsDisplayData data;
     data.getData(_self);
 
@@ -72,7 +77,8 @@ void pointsDisplay::draw(M3dView& view, const MDagPath& /*path*/, M3dView::Displ
 
 bool pointsDisplay::isBounded() const { return true; }
 
-MBoundingBox pointsDisplay::boundingBox() const {
+MBoundingBox pointsDisplay::boundingBox() const
+{
     // Get the size
     //
     PointsDisplayData data;
@@ -81,8 +87,9 @@ MBoundingBox pointsDisplay::boundingBox() const {
 }
 
 // Called before this node is evaluated by Evaluation Manager
-MStatus pointsDisplay::preEvaluation(const MDGContext& context,
-                                     const MEvaluationNode& evaluationNode) {
+MStatus
+pointsDisplay::preEvaluation(const MDGContext &context, const MEvaluationNode &evaluationNode)
+{
     if (context.isNormal()) {
         MStatus status;
         if ((evaluationNode.dirtyPlugExists(_cpList, &status) && status) ||
@@ -93,7 +100,7 @@ MStatus pointsDisplay::preEvaluation(const MDGContext& context,
     return MStatus::kSuccess;
 }
 
-void* pointsDisplay::creator() { return new pointsDisplay(); }
+void *pointsDisplay::creator() { return new pointsDisplay(); }
 
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
@@ -101,7 +108,8 @@ void* pointsDisplay::creator() { return new pointsDisplay(); }
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 
-void PointsDisplayData::getData(const MObject& node) {
+void PointsDisplayData::getData(const MObject &node)
+{
     MStatus status;
 
     this->pointWidth = MPlug(node, pointsDisplay::_pointWidth).asFloat();
@@ -123,7 +131,8 @@ void PointsDisplayData::getData(const MObject& node) {
 
     if (plugs.length() == 0) {
         this->theBoundingBox = MBoundingBox();
-    } else {
+    }
+    else {
         MPlug cpListPlug = MPlug(node, pointsDisplay::_cpList);
         MObject compList = cpListPlug.asMObject();
         MFnComponentListData compListFn(compList);
@@ -150,8 +159,9 @@ void PointsDisplayData::getData(const MObject& node) {
             tmpMesh.getSmoothMeshDisplayOptions(options);
             this->theBoundingBox = tmpMesh.boundingBox(&status);
             int smoothLevel = 0;
-            if (this->enableSmooth)
+            if (this->enableSmooth) {
                 smoothLevel = tmpMesh.findPlug("displaySmoothMesh", false, &status).asInt();
+            }
 
             if (smoothLevel > 0) {
                 // options.setDivisions(smoothLevel);
@@ -163,7 +173,8 @@ void PointsDisplayData::getData(const MObject& node) {
                 MObject smoothedObj = tmpMesh.generateSmoothMesh(dataObject, &options, &status);
                 MFnMesh smoothMesh(smoothedObj, &status);
                 smoothMesh.getPoints(pointsVerticesAll);
-            } else {
+            }
+            else {
                 tmpMesh.getPoints(pointsVerticesAll);
             }
 
@@ -172,12 +183,15 @@ void PointsDisplayData::getData(const MObject& node) {
                 MObject comp = compListFn[i];
                 if (comp.apiType() == componentType) {
                     MFnSingleIndexedComponent siComp(comp);
-                    for (int j = 0; j < siComp.elementCount(); j++)
-                        this->pointsVertices.append(pointsVerticesAll[siComp.element(j)] *
-                                                    worldMatrix);  //);
+                    for (int j = 0; j < siComp.elementCount(); j++) {
+                        this->pointsVertices.append(
+                            pointsVerticesAll[siComp.element(j)] * worldMatrix
+                        ); //);
+                    }
                 }
             }
-        } else if (theNode.hasFn(MFn::kNurbsSurface)) {
+        }
+        else if (theNode.hasFn(MFn::kNurbsSurface)) {
             MFnNurbsSurface surfaceFn(theNode);
             this->theBoundingBox = surfaceFn.boundingBox(&status);
 
@@ -199,7 +213,8 @@ void PointsDisplayData::getData(const MObject& node) {
                     }
                 }
             }
-        } else if (theNode.hasFn(MFn::kNurbsCurve)) {
+        }
+        else if (theNode.hasFn(MFn::kNurbsCurve)) {
             MFnNurbsCurve curveFn(theNode);
             this->theBoundingBox = curveFn.boundingBox(&status);
 
@@ -211,11 +226,13 @@ void PointsDisplayData::getData(const MObject& node) {
                 MObject comp = compListFn[i];
                 if (comp.apiType() == componentType) {
                     MFnSingleIndexedComponent siComp(comp);
-                    for (int j = 0; j < siComp.elementCount(); j++)
+                    for (int j = 0; j < siComp.elementCount(); j++) {
                         this->pointsVertices.append(cvPoints[siComp.element(j)] * worldMatrix);
+                    }
                 }
             }
-        } else if (theNode.hasFn(MFn::kLattice)) {  // lattice and everything else
+        }
+        else if (theNode.hasFn(MFn::kLattice)) { // lattice and everything else
             MFnLattice latticeFn(theNode);
             this->theBoundingBox = latticeFn.boundingBox(&status);
 
@@ -244,17 +261,19 @@ void PointsDisplayData::getData(const MObject& node) {
 // MRenderer::setGeometryDrawDirty()) for certain circumstances. Note that
 // the draw callback in MPxDrawOverride constructor is set to NULL in order
 // to achieve better performance.
-PointsDisplayDrawOverride::PointsDisplayDrawOverride(const MObject& obj)
-    : MHWRender::MPxDrawOverride(obj, NULL, false) {
+PointsDisplayDrawOverride::PointsDisplayDrawOverride(const MObject &obj)
+    : MHWRender::MPxDrawOverride(obj, NULL, false)
+{
     fModelEditorChangedCbId =
         MEventMessage::addEventCallback("modelEditorChanged", OnModelEditorChanged, this);
 
     MStatus status;
     MFnDependencyNode node(obj, &status);
-    fPointsDisplay = status ? dynamic_cast<pointsDisplay*>(node.userNode()) : NULL;
+    fPointsDisplay = status ? dynamic_cast<pointsDisplay *>(node.userNode()) : NULL;
 }
 
-PointsDisplayDrawOverride::~PointsDisplayDrawOverride() {
+PointsDisplayDrawOverride::~PointsDisplayDrawOverride()
+{
     fPointsDisplay = NULL;
 
     if (fModelEditorChangedCbId != 0) {
@@ -263,21 +282,24 @@ PointsDisplayDrawOverride::~PointsDisplayDrawOverride() {
     }
 }
 
-void PointsDisplayDrawOverride::OnModelEditorChanged(void* clientData) {
+void PointsDisplayDrawOverride::OnModelEditorChanged(void *clientData)
+{
     // Mark the node as being dirty so that it can update on display appearance
     // switch among wireframe and shaded.
-    PointsDisplayDrawOverride* ovr = static_cast<PointsDisplayDrawOverride*>(clientData);
+    PointsDisplayDrawOverride *ovr = static_cast<PointsDisplayDrawOverride *>(clientData);
     if (ovr && ovr->fPointsDisplay) {
         MHWRender::MRenderer::setGeometryDrawDirty(ovr->fPointsDisplay->thisMObject());
     }
 }
 
-MHWRender::DrawAPI PointsDisplayDrawOverride::supportedDrawAPIs() const {
+MHWRender::DrawAPI PointsDisplayDrawOverride::supportedDrawAPIs() const
+{
     // this plugin supports both GL and DX
     return (MHWRender::kOpenGL | MHWRender::kDirectX11 | MHWRender::kOpenGLCoreProfile);
 }
 
-float PointsDisplayDrawOverride::getMultiplier(const MDagPath& objPath) const {
+float PointsDisplayDrawOverride::getMultiplier(const MDagPath &objPath) const
+{
     // Retrieve value of the size attribute from the node
     MStatus status;
     MObject pointsdisplayNode = objPath.node(&status);
@@ -294,13 +316,15 @@ float PointsDisplayDrawOverride::getMultiplier(const MDagPath& objPath) const {
     return 1.0f;
 }
 
-bool PointsDisplayDrawOverride::isBounded(const MDagPath& /*objPath*/,
-                                          const MDagPath& /*cameraPath*/) const {
+bool PointsDisplayDrawOverride::
+    isBounded(const MDagPath & /*objPath*/, const MDagPath & /*cameraPath*/) const
+{
     return true;
 }
 
-MBoundingBox PointsDisplayDrawOverride::boundingBox(const MDagPath& objPath,
-                                                    const MDagPath& cameraPath) const {
+MBoundingBox
+PointsDisplayDrawOverride::boundingBox(const MDagPath &objPath, const MDagPath &cameraPath) const
+{
     PointsDisplayData data;
     MObject node = objPath.node();
     data.getData(node);
@@ -308,16 +332,17 @@ MBoundingBox PointsDisplayDrawOverride::boundingBox(const MDagPath& objPath,
 }
 
 // Called by Maya each time the object needs to be drawn.
-MUserData* PointsDisplayDrawOverride::prepareForDraw(const MDagPath& objPath,
-                                                     const MDagPath& cameraPath,
-                                                     const MHWRender::MFrameContext& frameContext,
-                                                     MUserData* oldData) {
+MUserData *PointsDisplayDrawOverride::prepareForDraw(
+    const MDagPath &objPath, const MDagPath &cameraPath,
+    const MHWRender::MFrameContext &frameContext, MUserData *oldData
+)
+{
     // Any data needed from the Maya dependency graph must be retrieved and cached in this stage.
     // There is one cache data for each drawable instance, if it is not desirable to allow Maya to
     // handle data caching, simply return null in this method and ignore user data parameter in draw
     // callback method. e.g. in this sample, we compute and cache the data for usage later when we
     // create the MUIDrawManager to draw pointsdisplay in method addUIDrawables().
-    PointsDisplayData* data = dynamic_cast<PointsDisplayData*>(oldData);
+    PointsDisplayData *data = dynamic_cast<PointsDisplayData *>(oldData);
     if (!data) {
         data = new PointsDisplayData();
     }
@@ -329,15 +354,15 @@ MUserData* PointsDisplayDrawOverride::prepareForDraw(const MDagPath& objPath,
 
     // data->fColor = MHWRender::MGeometryUtilities::wireframeColor(objPath);
     switch (MHWRender::MGeometryUtilities::displayStatus(objPath)) {
-        case MHWRender::kLead:
-        case MHWRender::kActive:
-        case MHWRender::kHilite:
-        case MHWRender::kActiveComponent:
-            data->fDepthPriority = MHWRender::MRenderItem::sActiveWireDepthPriority;
-            break;
-        default:
-            data->fDepthPriority = MHWRender::MRenderItem::sDormantFilledDepthPriority;
-            break;
+    case MHWRender::kLead:
+    case MHWRender::kActive:
+    case MHWRender::kHilite:
+    case MHWRender::kActiveComponent:
+        data->fDepthPriority = MHWRender::MRenderItem::sActiveWireDepthPriority;
+        break;
+    default:
+        data->fDepthPriority = MHWRender::MRenderItem::sDormantFilledDepthPriority;
+        break;
     }
     return data;
 }
@@ -345,13 +370,14 @@ MUserData* PointsDisplayDrawOverride::prepareForDraw(const MDagPath& objPath,
 // addUIDrawables() provides access to the MUIDrawManager, which can be used
 // to queue up operations for drawing simple UI elements such as lines, circles and
 // text. To enable addUIDrawables(), override hasUIDrawables() and make it return true.
-void PointsDisplayDrawOverride::addUIDrawables(const MDagPath& objPath,
-                                               MHWRender::MUIDrawManager& drawManager,
-                                               const MHWRender::MFrameContext& frameContext,
-                                               const MUserData* data) {
+void PointsDisplayDrawOverride::addUIDrawables(
+    const MDagPath &objPath, MHWRender::MUIDrawManager &drawManager,
+    const MHWRender::MFrameContext &frameContext, const MUserData *data
+)
+{
     // Get data cached by prepareForDraw() for each drawable instance, then MUIDrawManager
     // can draw simple UI by these data.
-    PointsDisplayData* pLocatorData = (PointsDisplayData*)data;
+    PointsDisplayData *pLocatorData = (PointsDisplayData *)data;
     if (!pLocatorData) {
         return;
     }
@@ -380,7 +406,8 @@ void PointsDisplayDrawOverride::addUIDrawables(const MDagPath& objPath,
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
 
-MStatus pointsDisplay::initialize() {
+MStatus pointsDisplay::initialize()
+{
     MFnUnitAttribute unitFn;
     MStatus stat;
 
@@ -444,7 +471,7 @@ MStatus pointsDisplay::initialize() {
 
     MFnTypedAttribute attrFn;
     _cpList = attrFn.create("inputComponents", "ics", MFnComponentListData::kComponentList);
-    attrFn.setStorable(true);  // To be stored during file-save
+    attrFn.setStorable(true); // To be stored during file-save
     addAttribute(_cpList);
 
     _enableSmooth = nAttr.create("enableSmooth", "es", MFnNumericData::kBoolean, false);

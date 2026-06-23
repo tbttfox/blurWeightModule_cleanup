@@ -49,7 +49,7 @@
 #include <vector>
 
 class blurSkinCmd : public MPxCommand {
-   public:
+  public:
     blurSkinCmd();
     virtual ~blurSkinCmd();
     enum CommandMode {
@@ -65,7 +65,7 @@ class blurSkinCmd : public MPxCommand {
         kCommandPruneWeights
     };
 
-    MStatus doIt(const MArgList&);
+    MStatus doIt(const MArgList &);
     MStatus undoIt();
     MStatus redoIt();
     MStatus getAverageWeight(MIntArray vertices, int currentVertex);
@@ -81,73 +81,73 @@ class blurSkinCmd : public MPxCommand {
     MStatus printWeight(int vertex, int u = 0, int v = 0);
     MStatus getSoftSelection(bool getSoft = true);
     bool isUndoable() const;
-    static void* creator();
+    static void *creator();
     static MSyntax newSyntax();
 
-    const static char* kQueryFlagShort;
-    const static char* kQueryFlagLong;
+    const static char *kQueryFlagShort;
+    const static char *kQueryFlagLong;
 
-    const static char* kSkinClusterNameFlagShort;
-    const static char* kSkinClusterNameFlagLong;
+    const static char *kSkinClusterNameFlagShort;
+    const static char *kSkinClusterNameFlagLong;
 
-    const static char* kMeshNameFlagShort;
-    const static char* kMeshNameFlagLong;
+    const static char *kMeshNameFlagShort;
+    const static char *kMeshNameFlagLong;
 
-    const static char* kIndexSkinClusterFlagShort;
-    const static char* kIndexSkinClusterFlagLong;
+    const static char *kIndexSkinClusterFlagShort;
+    const static char *kIndexSkinClusterFlagLong;
 
-    const static char* kPercentMovementFlagShort;
-    const static char* kPercentMovementFlagLong;
+    const static char *kPercentMovementFlagShort;
+    const static char *kPercentMovementFlagLong;
 
-    const static char* kVerboseFlagShort;
-    const static char* kVerboseFlagLong;
+    const static char *kVerboseFlagShort;
+    const static char *kVerboseFlagLong;
 
-    const static char* kListCVsIndicesFlagShort;
-    const static char* kListCVsIndicesFlagLong;
+    const static char *kListCVsIndicesFlagShort;
+    const static char *kListCVsIndicesFlagLong;
 
-    const static char* kListVerticesIndicesFlagShort;
-    const static char* kListVerticesIndicesFlagLong;
+    const static char *kListVerticesIndicesFlagShort;
+    const static char *kListVerticesIndicesFlagLong;
 
-    const static char* kListVerticesWeightFlagShort;
-    const static char* kListVerticesWeightFlagLong;
+    const static char *kListVerticesWeightFlagShort;
+    const static char *kListVerticesWeightFlagLong;
 
-    const static char* kListJointsFlagShort;
-    const static char* kListJointsFlagLong;
+    const static char *kListJointsFlagShort;
+    const static char *kListJointsFlagLong;
 
-    const static char* kListJointsValuesFlagShort;
-    const static char* kListJointsValuesFlagLong;
+    const static char *kListJointsValuesFlagShort;
+    const static char *kListJointsValuesFlagLong;
 
-    const static char* kRepeatFlagShort;
-    const static char* kRepeatFlagLong;
+    const static char *kRepeatFlagShort;
+    const static char *kRepeatFlagLong;
 
-    const static char* kDepthFlagShort;
-    const static char* kDepthFlagLong;
+    const static char *kDepthFlagShort;
+    const static char *kDepthFlagLong;
 
-    const static char* kRespectLocksFlagShort;
-    const static char* kRespectLocksFlagLong;
+    const static char *kRespectLocksFlagShort;
+    const static char *kRespectLocksFlagLong;
 
-    const static char* kThresholdFlagShort;
-    const static char* kThresholdFlagLong;
+    const static char *kThresholdFlagShort;
+    const static char *kThresholdFlagLong;
 
-    const static char* kZeroInfluencesFlagShort;
-    const static char* kZeroInfluencesFlagLong;
+    const static char *kZeroInfluencesFlagShort;
+    const static char *kZeroInfluencesFlagLong;
 
-    const static char* kCommandFlagShort;
-    const static char* kCommandFlagLong;
+    const static char *kCommandFlagShort;
+    const static char *kCommandFlagLong;
 
     /**
     Displays help.
     */
-    const static char* kHelpFlagShort;
-    const static char* kHelpFlagLong;
+    const static char *kHelpFlagShort;
+    const static char *kHelpFlagLong;
 
-   private:
-    MStatus GatherCommandArguments(const MArgList& args);
+  private:
+    MStatus GatherCommandArguments(const MArgList &args);
 
     // MFnMesh meshFn; // the mesh
-    MDagPath meshPath_;    // the mesh
-    MObject skinCluster_;  // the skinCluster
-    MObject component;     // the components vertices
+    MDagPath meshPath_;   // the mesh
+    MObject skinCluster_; // the skinCluster
+    MObject component;    // the components vertices
     int nbJoints;
 
     MDoubleArray fullOrigWeights, weigthsForUndo, currentWeights, newWeights, weightsForSetting;
