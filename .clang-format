@@ -1,0 +1,6 @@
+BasedOnStyle: llvm
+IndentWidth: 4
+AlignAfterOpenBracket: BlockIndent
+BreakBeforeBraces: Stroustrup
+ColumnLimit: 100
+InsertBraces: true
