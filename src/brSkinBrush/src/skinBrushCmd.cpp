@@ -74,8 +74,10 @@ MStatus SkinBrushContextCmd::appendSyntax()
     syn.addFlag(kRefreshDfmColorFlag, kRefreshDfmColorFlagLong, MSyntax::kLong);
     syn.addFlag(kSmoothRepeatFlag, kSmoothRepeatFlagLong, MSyntax::kLong);
 
+    syn.addFlag(kSwapSkinClusterFlag, kSwapSkinClusterFlagLong, MSyntax::kString);
     syn.addFlag(kSkinClusterNameFlag, kSkinClusterNameFlagLong, MSyntax::kString);
     syn.addFlag(kMeshNameFlag, kMeshNameFlagLong, MSyntax::kString);
+    syn.addFlag(kUiOptionVarFlag, kUiOptionVarFlagLong, MSyntax::kString);
 
     syn.addFlag(kPaintMirrorToleranceFlag, kPaintMirrorToleranceFlagLong, MSyntax::kDouble);
     syn.addFlag(kPaintMirrorFlag, kPaintMirrorFlagLong, MSyntax::kLong);
@@ -93,6 +95,12 @@ MStatus SkinBrushContextCmd::appendSyntax()
 
     syn.addFlag(kMinColorFlag, kMinColorFlagLong, MSyntax::kDouble);
     syn.addFlag(kMaxColorFlag, kMaxColorFlagLong, MSyntax::kDouble);
+
+    syn.addFlag(kSewVerticesFlag, kSewVerticesFlagLong, MSyntax::kBoolean);
+    syn.addFlag(kSewVerticesOffsetFlag, kSewVerticesOffsetFlagLong, MSyntax::kDouble);
+
+    syn.addFlag(kFastReEnterFlag, kFastReEnterFlagLong, MSyntax::kLong);
+    syn.addFlag(kSkipSkinValuesFlag, kSkipSkinValuesFlagLong, MSyntax::kBoolean);
 
     syn.addFlag(kListVerticesIndicesFlag, kListVerticesIndicesFlagLong, MSyntax::kLong);
     syn.makeFlagMultiUse(kListVerticesIndicesFlag);
@@ -113,6 +121,19 @@ MStatus SkinBrushContextCmd::doEditFlags()
     MStatus status = MStatus::kSuccess;
 
     MArgParser argData = parser();
+
+    if (argData.isFlagSet(kSwapSkinClusterFlag)) {
+        MString value;
+        status = argData.getFlagArgument(kSwapSkinClusterFlag, 0, value);
+        // MGlobal::displayInfo(MString("kSwapSkinClusterFlag passed ") + value);
+        smoothContext->setSkinClusterByName(value);
+        smoothContext->swapSkinCluster();
+    }
+    if (argData.isFlagSet(kUiOptionVarFlag)) {
+        MString value;
+        status = argData.getFlagArgument(kUiOptionVarFlag, 0, value);
+        smoothContext->storeValuesInOptionVar(value);
+    }
 
     if (argData.isFlagSet(kColorRFlag)) {
         double value;
@@ -179,6 +200,7 @@ MStatus SkinBrushContextCmd::doEditFlags()
 
     if (argData.isFlagSet(kRefreshFlag)) {
         smoothContext->refresh();
+        // smoothContext->maya2019RefreshColors();
     }
 
     if (argData.isFlagSet(kRefreshDfmColorFlag)) {
@@ -250,10 +272,27 @@ MStatus SkinBrushContextCmd::doEditFlags()
         status = argData.getFlagArgument(kInfluenceNameFlag, 0, value);
         smoothContext->setInfluenceByName(value); // not reselect in UI
     }
+    if (argData.isFlagSet(kSkinClusterNameFlag)) {
+        MString value;
+        status = argData.getFlagArgument(kSkinClusterNameFlag, 0, value);
+        MGlobal::displayInfo(MString("kSkinClusterNameFlag passed ") + value);
+        smoothContext->setSkinClusterByName(value); // not reselect in UI
+    }
+    if (argData.isFlagSet(kMeshNameFlag)) {
+        MString value;
+        status = argData.getFlagArgument(kMeshNameFlag, 0, value);
+        MGlobal::displayInfo(MString("kMeshNameFlag passed ") + value);
+        smoothContext->setMeshByName(value); // not reselect in UI
+    }
     if (argData.isFlagSet(kPostSettingFlag)) {
         bool value;
         status = argData.getFlagArgument(kPostSettingFlag, 0, value);
         smoothContext->setPostSetting(value);
+    }
+    if (argData.isFlagSet(kFastReEnterFlag)) {
+        int value;
+        status = argData.getFlagArgument(kFastReEnterFlag, 0, value);
+        smoothContext->setFastReenter(value);
     }
 
     if (argData.isFlagSet(kFractionOversamplingFlag)) {
@@ -378,6 +417,18 @@ MStatus SkinBrushContextCmd::doEditFlags()
         smoothContext->setPaintMirror(value);
     }
 
+    if (argData.isFlagSet(kSewVerticesOffsetFlag)) {
+        double value;
+        status = argData.getFlagArgument(kSewVerticesOffsetFlag, 0, value);
+        smoothContext->setSewTolerance(value);
+    }
+
+    if (argData.isFlagSet(kSewVerticesFlag)) {
+        bool value;
+        status = argData.getFlagArgument(kSewVerticesFlag, 0, value);
+        smoothContext->setSewVertices(value);
+    }
+
     if (argData.isFlagSet(kUseColorSetWhilePaintingFlag)) {
         bool value;
         status = argData.getFlagArgument(kUseColorSetWhilePaintingFlag, 0, value);
@@ -426,6 +477,10 @@ MStatus SkinBrushContextCmd::doEditFlags()
 MStatus SkinBrushContextCmd::doQueryFlags()
 {
     MArgParser argData = parser();
+
+    if (argData.isFlagSet(kSkipSkinValuesFlag)) {
+        setResult(smoothContext->getSkipSkinValues());
+    }
 
     if (argData.isFlagSet(kColorRFlag)) {
         setResult(smoothContext->getColorR());
@@ -561,6 +616,14 @@ MStatus SkinBrushContextCmd::doQueryFlags()
         setResult(smoothContext->getPaintMirror());
     }
 
+    if (argData.isFlagSet(kSewVerticesOffsetFlag)) {
+        setResult(smoothContext->getSewVerticesOffset());
+    }
+
+    if (argData.isFlagSet(kSewVerticesFlag)) {
+        setResult(smoothContext->getSewVertices());
+    }
+
     if (argData.isFlagSet(kUseColorSetWhilePaintingFlag)) {
         setResult(smoothContext->getUseColorSetsWhilePainting());
     }
@@ -591,6 +654,13 @@ MStatus SkinBrushContextCmd::doQueryFlags()
 
     if (argData.isFlagSet(kMaxColorFlag)) {
         setResult(smoothContext->getMaxColor());
+    }
+    if (argData.isFlagSet(kFastReEnterFlag)) {
+        setResult(smoothContext->getFastReenter());
+    }
+
+    if (argData.isFlagSet(kUiOptionVarFlag)) {
+        setResult(smoothContext->getValuesForOptionVar());
     }
 
     if (argData.isFlagSet(kWeightOrderedIndicesFlag)) {

@@ -15,6 +15,7 @@
 #include "setOverloads.h"
 #include "skinBrushStructured.h"
 
+
 #include <math.h>
 
 #include <maya/M3dView.h>
@@ -46,6 +47,7 @@
 #include <maya/MItSelectionList.h>
 #include <maya/MMatrix.h>
 #include <maya/MMeshIntersector.h>
+#include <maya/MPoint.h>
 #include <maya/MPointArray.h>
 #include <maya/MPxContext.h>
 #include <maya/MPxContextCommand.h>
@@ -79,6 +81,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <chrono>
+
 // Macro for the press/drag/release methods in case there is nothing
 // selected or the tool gets applied outside any geometry. If the actual
 // MStatus would get returned an error can get listed in terminal on
@@ -110,7 +114,6 @@ class skinBrushTool : public MPxToolCommand {
     MStatus setWeightsForDoit(bool isUndo);
     MStatus callBrushRefresh();
     MStatus finalize();
-
     bool isUndoable() const;
 
     // setting the attributes
@@ -138,6 +141,7 @@ class skinBrushTool : public MPxToolCommand {
     void setSoloColorType(int value);
     void setCoverage(bool value);
     void setPostSetting(bool value);
+    void setFastReenter(int value);
 
     void setInfluenceIndices(MIntArray &indices);
     void setInfluenceName(MString &name);
@@ -159,6 +163,8 @@ class skinBrushTool : public MPxToolCommand {
 
     void setMirrorTolerance(double value);
     void setPaintMirror(int value);
+    void setSewTolerance(double value);
+    void setSewVertices(bool value);
     void setUseColorSetsWhilePainting(bool value);
     void setDrawTriangles(bool value);
     void setDrawEdges(bool value);
@@ -181,6 +187,9 @@ class skinBrushTool : public MPxToolCommand {
 
     double rangeVal;
     bool coverageVal;
+    int fastReenter = 0;
+    bool sewVertices = false;
+    double sewVerticesMinDist = 0.1;
     bool normalize;
     MString influenceName;
     MString skinName;
@@ -239,14 +248,22 @@ class SkinBrushContext : public MPxContext {
     MStatus doReleaseCommon(MEvent &event);
     void doTheAction();
     ModifierCommands getCommandIndexModifiers() const;
+    MStatus getDagMesh();
+    MStatus getObjSkinCluster();
     MStatus getMesh();
+    void secondPartSkincluster();
+    MStatus swapSkinCluster();
     MStatus getTheOrigMeshForMirror();
 
+    void getConnectedBorderVertices();
     void getConnectedVertices();
     void getDerivedConnectivity();
 
     std::vector<int> getSurroundingVerticesPerVert(int vertexIndex) const;
     std::vector<int> getSurroundingVerticesPerFace(int vertexIndex) const;
+
+    MString getValuesForOptionVar();
+    void storeValuesInOptionVar(MString nameOptionVar);
 
     void getFromMeshNormals();
     MStatus getSelection(MDagPath &dagPath);
@@ -347,6 +364,8 @@ class SkinBrushContext : public MPxContext {
     void setVolume(bool value);
     void setMirrorTolerance(double value);
     void setPaintMirror(int value);
+    void setSewTolerance(double value);
+    void setSewVertices(bool value);
     void setUseColorSetsWhilePainting(bool value);
     void setDrawTriangles(bool value);
     void setDrawEdges(bool value);
@@ -362,6 +381,10 @@ class SkinBrushContext : public MPxContext {
     void setSoloColorType(int value);
     void setInfluenceByName(MString &value);
     void setPostSetting(bool value);
+    void setFastReenter(int value);
+
+    void setSkinClusterByName(MString &value);
+    void setMeshByName(MString &value);
 
     void setMinColor(double value);
     void setMaxColor(double value);
@@ -399,9 +422,15 @@ class SkinBrushContext : public MPxContext {
     ModifierCommands getCommandIndex();
     int getSmoothRepeat();
     int getSoloColor();
+    int getFastReenter();
+    bool getSkipSkinValues();
 
     double getMirrorTolerance();
     int getPaintMirror();
+
+    double getSewVerticesOffset();
+    bool getSewVertices();
+
     bool getUseColorSetsWhilePainting();
     bool getDrawTriangles();
     bool getDrawEdges();
@@ -411,10 +440,15 @@ class SkinBrushContext : public MPxContext {
     bool getPostSetting();
     double getMinColor();
     double getMaxColor();
+    void catchTimeStamp();
+    void endTimeStamp(MString infos);
 
     MIntArray getWeightOrderedIndices();
     double getAdjustValue();
     MString getPickedInfluence();
+
+  private:
+    std::chrono::high_resolution_clock::time_point startTimeStamp;
 
   private:
     bool verbose = false;
@@ -423,9 +457,19 @@ class SkinBrushContext : public MPxContext {
     double interactiveValue2 = 1.0; // for whateverUse in the code
 
     skinBrushTool *cmd;
+    bool getSkinFromName = false;
+    bool getMeshFromName = false;
+    MString passedSkinName, passedMeshName;
+    MString UiOptionVarNameName;
 
     int performRefreshViewPort;
     int maxRefreshValue = 2;
+    int fastReenter = 0;
+    bool reenterMesh = false;
+    bool reenterSkin = false;
+    bool skipSkinValues = true;
+    bool sewVertices = false;
+    double sewVerticesMinDist = 0.1;
 
     // Hard-coded values not stored in structs
     double rangeVal = 0.5;
@@ -447,6 +491,8 @@ class SkinBrushContext : public MPxContext {
     unsigned int maxInfluences;
     bool maintainMaxInfluences;
     bool normalize;
+    MDagPath previousBrushDagPath;
+    MObject previousSkinMObject;
     MDagPath origMeshDag;
     MFnMesh meshOrigFn;
     unsigned int numElements = 0;
@@ -455,6 +501,7 @@ class SkinBrushContext : public MPxContext {
     MIntArray vtxSelection; // currently selected vertices (flooding)
     MDoubleArray valuesForAttribute, paintArrayValues;
     MObject allVtxCompObj;
+    std::pair<unsigned int, unsigned int> storedPlugCountSkinObj;
     std::vector<bool> influenceLocks;
     MDGModifier colorSetMod;
     bool toggleColorState = false;
@@ -463,6 +510,8 @@ class SkinBrushContext : public MPxContext {
     M3dView view;
     unsigned int width;
     unsigned int height;
+    std::vector<int> borderVertices;
+    std::vector<int> vertToVertBorder;
 
     // -- Structured state ----------------------------------------------------
     MeshState mesh;                         // Mesh geometry, topology, and raw-pointer caches

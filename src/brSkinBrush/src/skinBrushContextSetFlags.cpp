@@ -199,6 +199,21 @@ void SkinBrushContext::setPaintMirror(int value)
     MToolsInfo::setDirtyFlag(*this);
 }
 
+void SkinBrushContext::setSewTolerance(double value)
+{
+    sewVerticesMinDist = value;
+    MToolsInfo::setDirtyFlag(*this);
+}
+
+void SkinBrushContext::setSewVertices(bool value)
+{
+    sewVertices = value;
+    if (value) {
+        getConnectedBorderVertices();
+    }
+    MToolsInfo::setDirtyFlag(*this);
+}
+
 void SkinBrushContext::setUseColorSetsWhilePainting(bool value)
 {
     input.useColorSetsWhilePainting = value;
@@ -350,6 +365,25 @@ void SkinBrushContext::setShiftSmooths(bool value)
     }
 }
 
+void SkinBrushContext::setFastReenter(int value)
+{
+    MGlobal::displayInfo(MString("setFastReenter CALLED ") + value);
+    if (value <= 0) {
+        reenterMesh = false;
+        reenterSkin = false;
+    }
+    else if (value == 1) {
+        reenterMesh = true;
+        reenterSkin = false;
+    }
+    else {
+        reenterMesh = true;
+        reenterSkin = true;
+    }
+    fastReenter = value;
+    MToolsInfo::setDirtyFlag(*this);
+}
+
 void SkinBrushContext::setInfluenceIndex(int value, bool selectInUI)
 {
     if (value == this->input.influenceIndex) {
@@ -389,6 +423,22 @@ void SkinBrushContext::setInfluenceByName(MString &value)
     }
 
     setInfluenceIndex(indexInfluence, false);
+}
+void SkinBrushContext::setSkinClusterByName(MString &value)
+{
+    if (verbose) {
+        MGlobal::displayInfo("setSkinClusterByName CALLED \"" + value + "\"\n");
+    }
+    getSkinFromName = true;
+    passedSkinName = value;
+}
+void SkinBrushContext::setMeshByName(MString &value)
+{
+    if (verbose) {
+        MGlobal::displayInfo("setMeshByName CALLED \"" + value + "\"\n");
+    }
+    getMeshFromName = true;
+    passedMeshName = value;
 }
 
 // ---------------------------------------------------------------------
@@ -433,9 +483,15 @@ bool SkinBrushContext::getVolume() { return input.volumeVal; }
 ModifierCommands SkinBrushContext::getCommandIndex() { return input.commandIndex; }
 int SkinBrushContext::getSmoothRepeat() { return input.smoothRepeat; }
 int SkinBrushContext::getSoloColor() { return input.soloColorVal; }
+int SkinBrushContext::getFastReenter() { return fastReenter; }
 
 double SkinBrushContext::getMirrorTolerance() { return input.mirrorMinDist; }
 int SkinBrushContext::getPaintMirror() { return input.paintMirror; }
+bool SkinBrushContext::getSkipSkinValues() { return skipSkinValues; }
+
+double SkinBrushContext::getSewVerticesOffset() { return sewVerticesMinDist; }
+bool SkinBrushContext::getSewVertices() { return sewVertices; }
+
 bool SkinBrushContext::getUseColorSetsWhilePainting() { return input.useColorSetsWhilePainting; }
 bool SkinBrushContext::getDrawTriangles() { return input.drawTriangles; }
 bool SkinBrushContext::getDrawEdges() { return input.drawEdges; }
@@ -477,3 +533,14 @@ MIntArray SkinBrushContext::getWeightOrderedIndices()
 }
 double SkinBrushContext::getAdjustValue() { return interPersist.adjustValue; }
 MString SkinBrushContext::getPickedInfluence() { return interPersist.pickedInfluence; }
+
+using namespace std::chrono;
+
+void SkinBrushContext::catchTimeStamp() { startTimeStamp = high_resolution_clock::now(); }
+void SkinBrushContext::endTimeStamp(MString infos)
+{
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<microseconds>(stop - startTimeStamp);
+    float dura = float(duration.count() / 10000) * 0.01f;
+    MGlobal::displayInfo(infos + MString(" executed in ") + dura + MString(" seconds"));
+}

@@ -375,8 +375,8 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
                 theArrayValues.append(vtx);
             }
         }
-        status =
-            lockedVerticesPlug.setValue(tmpIntArray.create(theArrayValues)); // to set the attribute
+        status = lockedVerticesPlug.setValue(tmpIntArray.create(theArrayValues)); // to set the
+                                                                                  // attribute
         // we need a hard refresh of invalidate for the undo / redo ---
     }
     if ((this->input.commandIndex == ModifierCommands::LockVertices ||
@@ -542,6 +542,15 @@ MStatus skinBrushTool::finalize()
     writer.Key(kVolumeFlag);
     writer.Bool(input.volumeVal);
 
+    writer.Key(kSewVerticesFlag);
+    writer.Bool(sewVertices);
+
+    writer.Key(kSewVerticesOffsetFlag);
+    writer.Double(sewVerticesMinDist);
+
+    writer.Key(kFastReEnterFlag);
+    writer.Int(fastReenter);
+
     writer.EndObject();
     MGlobal::setOptionVarValue("brSkinBrushContextOptions", s.GetString());
 
@@ -605,6 +614,10 @@ void skinBrushTool::setMirrorTolerance(double value) { input.mirrorMinDist = val
 
 void skinBrushTool::setPaintMirror(int value) { input.paintMirror = value; }
 
+void skinBrushTool::setSewTolerance(double value) { sewVerticesMinDist = value; }
+
+void skinBrushTool::setSewVertices(bool value) { sewVertices = value; }
+
 void skinBrushTool::setUseColorSetsWhilePainting(bool value)
 {
     input.useColorSetsWhilePainting = value;
@@ -625,6 +638,7 @@ void skinBrushTool::setSoloColor(int value) { input.soloColorVal = value; }
 void skinBrushTool::setCoverage(bool value) { coverageVal = value; }
 
 void skinBrushTool::setPostSetting(bool value) { input.postSetting = value; }
+void skinBrushTool::setFastReenter(int value) { fastReenter = value; }
 
 // ---------------------------------------------------------------------
 // public methods for setting the undo/redo variables

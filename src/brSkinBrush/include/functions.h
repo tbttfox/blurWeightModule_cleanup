@@ -21,6 +21,7 @@
 #include <maya/MObjectArray.h>
 #include <maya/MPlug.h>
 #include <maya/MPointArray.h>
+#include <maya/MSelectionList.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -87,6 +88,9 @@ MStatus setAverageWeight(
 MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWeight);
 MStatus transferPointNurbsToMesh(MFnMesh &msh, MFnNurbsSurface &nrbs);
 
+MStatus getDagPath(MString nodeName, MDagPath &dagPath);
+MStatus getMObject(MString nodeName, MObject &nodeObj);
+
 bool RayIntersectsBBox(MPoint minPt, MPoint maxPt, MPoint Orig, MVector dest);
 
 bool bboxIntersection(
@@ -95,3 +99,22 @@ bool bboxIntersection(
 );
 
 void lineC(short x0, short y0, short x1, short y1, std::vector<std::pair<short, short>> &posi);
+
+void getRawNeighbors(
+    const MIntArray &counts, const MIntArray &indices, int numVerts,
+    std::vector<int> &faceNeighborsFLAT, std::vector<int> &faceNeighborsINDEX,
+    std::vector<int> &edgeNeighborsFLAT, std::vector<int> &edgeNeighborsINDEX
+);
+void convertToCountIndex(
+    const std::vector<std::unordered_set<int>> &input, std::vector<int> &counts,
+    std::vector<int> &indices
+);
+
+std::vector<int> findClosestWithinThreshold(
+    const std::vector<int> &indices, const float *pos,
+    const std::vector<int> &connVertFLAT, const std::vector<int> &connVertINDEX,
+    float threshold, int nbVertices, int mirrorVal
+);
+
+std::pair<unsigned int, unsigned int> infosSkinClusterPlugs(MObject skinCluster);
+bool areDagPathArraysEqual(const MDagPathArray &a, const MDagPathArray &b);

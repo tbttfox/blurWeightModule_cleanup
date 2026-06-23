@@ -1,9 +1,10 @@
 #include "functions.h"
-#include "enums.h"
-
-#include <math.h>
 
 #include <limits>
+#include <math.h>
+#include <vector>
+
+#include "enums.h"
 
 coord_t distance_sq(const point_t &a, const point_t &b)
 {
@@ -180,6 +181,32 @@ MStatus findNurbsTesselate(MDagPath NurbsPath, MObject &MeshObj)
     }
     return MS::kFailure;
 }
+// find a dag from name
+MStatus getDagPath(MString nodeName, MDagPath &dagPath)
+{
+    MStatus status = MS::kSuccess;
+
+    MSelectionList selList;
+    status = MGlobal::getSelectionListByName(nodeName, selList);
+    if (status != MStatus::kSuccess) {
+        return status;
+    }
+    status = selList.getDagPath(0, dagPath);
+    return status;
+}
+
+MStatus getMObject(MString nodeName, MObject &nodeObj)
+{
+    MStatus status = MS::kSuccess;
+
+    MSelectionList selList;
+    status = MGlobal::getSelectionListByName(nodeName, selList);
+    if (status != MStatus::kSuccess) {
+        return status;
+    }
+    status = selList.getDependNode(0, nodeObj);
+    return status;
+}
 
 // from the mesh retrieves the skinCluster
 MStatus findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinCluster)
@@ -213,7 +240,6 @@ MStatus findSkinCluster(MDagPath MeshPath, MObject &theSkinCluster, int indSkinC
             int count = 0;
 
             for (; !dgIt.isDone(); dgIt.next()) {
-                // MObject thisNode = dgIt.thisNode();
                 MObject thisNode = dgIt.currentItem();
                 // go until we find a skinCluster
                 if (thisNode.apiType() == MFn::kSkinClusterFilter) {
@@ -461,8 +487,8 @@ MStatus getMirrorVertices(
         }
         else if (doMerge && theWeight < 1.0) { // clip weight at 1
             double prevWeight = editVertsWeights[indVertExists];
-            if (theWeight >
-                prevWeight) { // add the remaining if existing weight is less than this new weight
+            if (theWeight > prevWeight) { // add the remaining if existing weight is less than this
+                                          // new weight
                 theMirrorVerts.append(theMirroredVert);
                 mirrorVertsWeights.append(theWeight - prevWeight);
                 editAndMirrorWeights[indVertExists] = theWeight; // edit weight
@@ -581,16 +607,15 @@ MStatus editArray(
         for (const auto &elem : valuesToSet) {
             int theVert = elem.first;
             double theVal = multiplier * elem.second + 1.0;
-            double substract = theVal / nbJoints;
             MDoubleArray producedWeigths(nbJoints, 0.0);
             double totalBaseVtxUnlock = 0.0, totalBaseVtxLock = 0.0;
             ;
             double totalVtxUnlock = 0.0, totalVtxLock = 0.0;
             for (int j = 0; j < nbJoints; ++j) {
                 // check the zero val ----------
-                double currentW = fullWeightArray[theVert * nbJoints + j];
-                double targetW = (currentW * theVal) - substract;
-                targetW = std::max(0.0, std::min(targetW, 1.0)); // clamp
+                double currentW = std::max(0.0, fullWeightArray[theVert * nbJoints + j]);
+                double targetW = std::pow(currentW, theVal);
+                targetW = std::max(0.0, std::min(1.0, targetW)); // clamp
                 producedWeigths.set(targetW, j);
 
                 if (lockJoints[j] == 0) { // unlock
@@ -1145,3 +1170,232 @@ bool bboxIntersection(
 
     return found;
 }
+
+// Tyler find Functions
+void getRawNeighbors(
+    const MIntArray &counts, const MIntArray &indices, int numVerts,
+    std::vector<int> &faceNeighborsFLAT, std::vector<int> &faceNeighborsINDEX,
+    std::vector<int> &edgeNeighborsFLAT, std::vector<int> &edgeNeighborsINDEX
+)
+{
+    std::vector<std::unordered_set<int>> faceNeighbors(numVerts);
+    std::vector<std::unordered_set<int>> edgeNeigbors(numVerts);
+    size_t ptr = 0;
+    for (const int &c : counts) {
+        for (int i = 0; i < c; ++i) {
+            int j = (i + 1) % c;
+            int rgt = indices[ptr + i];
+            int lft = indices[ptr + j];
+            edgeNeigbors[rgt].insert(lft);
+            edgeNeigbors[lft].insert(rgt);
+            for (int x = 0; x < c; ++x) {
+                if (x == i) {
+                    continue;
+                }
+                faceNeighbors[lft].insert(indices[ptr + x]);
+            }
+        }
+        ptr += c;
+    }
+    faceNeighborsFLAT.clear();
+    faceNeighborsINDEX.resize(numVerts + 1, 0);
+    edgeNeighborsFLAT.clear();
+    edgeNeighborsINDEX.resize(numVerts + 1, 0);
+    for (int v = 0; v < numVerts; ++v) {
+        faceNeighborsINDEX[v + 1] = faceNeighborsINDEX[v] + (int)faceNeighbors[v].size();
+        faceNeighborsFLAT.insert(faceNeighborsFLAT.end(), faceNeighbors[v].begin(), faceNeighbors[v].end());
+        edgeNeighborsINDEX[v + 1] = edgeNeighborsINDEX[v] + (int)edgeNeigbors[v].size();
+        edgeNeighborsFLAT.insert(edgeNeighborsFLAT.end(), edgeNeigbors[v].begin(), edgeNeigbors[v].end());
+    }
+}
+
+void convertToCountIndex(
+    const std::vector<std::unordered_set<int>> &input, std::vector<int> &counts,
+    std::vector<int> &indices
+)
+{
+    // Convert to the flattened vector/vector for usage.
+    // This can have faster access later because it uses contiguous memory
+    counts.push_back(0);
+    for (auto &uSet : input) {
+        counts.push_back(counts.back() + uSet.size());
+        indices.insert(indices.end(), uSet.begin(), uSet.end());
+    }
+}
+
+std::pair<unsigned int, unsigned int> infosSkinClusterPlugs(MObject skinCluster)
+{
+
+    MFnDependencyNode skinClusterDep(skinCluster);
+
+    MPlug weight_list_plug = skinClusterDep.findPlug("weightList", false);
+    MPlug matrix_plug = skinClusterDep.findPlug("matrix", false);
+    unsigned int weightList_count = weight_list_plug.numElements();
+    unsigned int matrix_count = matrix_plug.numElements();
+
+    return std::make_pair(matrix_count, weightList_count);
+}
+
+bool areDagPathArraysEqual(const MDagPathArray &a, const MDagPathArray &b)
+{
+    // 1. Quick length check
+    if (a.length() != b.length()) {
+        return false;
+    }
+    // 2. Element-wise comparison
+    for (unsigned int i = 0; i < a.length(); ++i) {
+        // MDagPath has a built-in operator== that checks if paths are identical
+        if (!(a[i] == b[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+std::vector<int> findClosestWithinThreshold(
+    const std::vector<int> &indices, const float *pos,
+    const std::vector<int> &connVertFLAT, const std::vector<int> &connVertINDEX,
+    float threshold, int nbVertices, int mirrorVal
+)
+{
+    std::vector<int> results(nbVertices, -1);        // Initialize with -1 (no neighbor found)
+    const float thresholdSq = threshold * threshold; // Compare squared values
+    float XMult = 1.0f;
+    float YMult = 1.0f;
+    float ZMult = 1.0f;
+    if (mirrorVal == 1) {
+        XMult = -1.0f;
+    }
+    else if (mirrorVal == 2) {
+        YMult = -1.0f;
+    }
+    else if (mirrorVal == 3) {
+        ZMult = -1.0f;
+    }
+
+    for (size_t i = 0; i < indices.size(); ++i) {
+        int idxA = indices[i];
+        if (results[idxA] != -1) {
+            continue;
+        }
+        float ax = pos[idxA * 3], ay = pos[idxA * 3 + 1], az = pos[idxA * 3 + 2];
+
+        float min_dist_sq = thresholdSq;
+        int best_neighbor = -1;
+
+        int csrStart = connVertINDEX[idxA];
+        int csrEnd = connVertINDEX[idxA + 1];
+        // for (size_t j = 0; j < indices.size(); ++j) {
+        for (size_t j = i; j < indices.size(); ++j) {
+            if (i == j) {
+                continue;
+            }
+
+            int idxB = indices[j];
+            if (idxA == idxB) {
+                continue;
+            }
+            if (std::find(connVertFLAT.begin() + csrStart, connVertFLAT.begin() + csrEnd, idxB) !=
+                connVertFLAT.begin() + csrEnd) {
+                continue;
+            }
+
+            float dx = pos[idxB * 3] - ax;
+            // Early exit on X-axis if you sort your array by X first
+            if (dx * dx >= min_dist_sq) {
+                continue;
+            }
+
+            float dy = pos[idxB * 3 + 1] - ay;
+            float dz = pos[idxB * 3 + 2] - az;
+            float dist_sq = dx * dx + dy * dy + dz * dz;
+
+            if (dist_sq < min_dist_sq) {
+                min_dist_sq = dist_sq;
+                best_neighbor = idxB;
+            }
+        }
+        results[idxA] = best_neighbor;
+        if (best_neighbor != -1) {
+            results[best_neighbor] = idxA;
+        }
+    }
+    return results;
+}
+
+// https://rodolphe-vaillant.fr/entry/79/maya-c-api-set-skinning-weight-attributes
+
+// TO TEST
+
+// The fastest way to set multi attributes / array attributes is done through a DAG node. (100 times
+// faster than MPlugs!) const std::vector<std::map<int/*joint id*/, float/*skin weight*/> >&
+// weights,
+/*
+void set_skinning_weights(
+        const std::vector<std::map<int, float> >& weights,
+        MDataBlock& block)
+{
+    MStatus status = MS::kSuccess;
+    MArrayDataHandle array_hdl = block.outputArrayValue(_s_skin_weights, &status);
+    mayaCheck(status);
+    for(unsigned i = 0; i < weights.size(); i++)
+    {
+        mayaCheck( array_hdl.jumpToArrayElement( i ) );
+
+        // weightList[i]
+        MDataHandle element_hdl = array_hdl.outputValue( &status );
+        mayaCheck(status);
+        // weightList[i].weight
+        MDataHandle child = element_hdl.child( _s_per_joint_weights );
+
+        MArrayDataHandle weight_list_hdl(child, &status);
+        mayaCheck(status);
+
+        MArrayDataBuilder weight_list_builder = weight_list_hdl.builder(&status);
+        mayaCheck(status);
+
+        unsigned handle_count = weight_list_hdl.elementCount(&status);
+        mayaCheck(status);
+
+        unsigned builder_count = weight_list_builder.elementCount(&status);
+        mayaCheck(status);
+        mayaAssert( builder_count == handle_count);
+
+        std::map<int, float> map = weights[i];
+        //std::map<int influence obj id / joint id, float> map = weights[i];
+
+        std::vector to_remove;
+        to_remove.reserve( map.size() );
+
+        // Scan array, update existing element, remove unsused ones
+        for(unsigned j = 0; j < handle_count; ++j)
+        {
+            // weightList[i].weight[j]
+            mayaCheck( weight_list_hdl.jumpToArrayElement(j) );
+            unsigned index = weight_list_hdl.elementIndex(&status);
+            mayaCheck(status);
+
+            auto elt = map.find( index );
+
+            if( elt != map.end() )
+            {
+                MDataHandle hdl = weight_list_builder.addElement(index, &status);
+                mayaCheck(status);
+                hdl.setDouble( (double)elt->second );
+                map.erase( elt );
+            }
+            else
+            {
+                to_remove.push_back( index );
+            }
+        }
+
+        for( unsigned idx : to_remove ){
+            mayaCheck( weight_list_builder.removeElement( idx ) );
+        }
+
+        mayaCheck( weight_list_hdl.set( weight_list_builder ) );
+    }
+
+}
+*/

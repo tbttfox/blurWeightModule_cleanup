@@ -102,43 +102,99 @@ void SkinBrushContext::toolOnSetup(MEvent &)
     this->input.pickMaxInfluenceVal = false;
     this->input.pickInfluenceVal = false;
 
-    // first clear a bit the air --------------
-    this->weights.multiCurrentColors.clear();
-    this->influence.jointsColors.clear();
-    this->weights.soloCurrentColors.clear();
+    // read from selection or the input variables
+    getDagMesh();
+    getObjSkinCluster();
+    this->skipSkinValues = true;
 
-    status = getMesh();
-    MIntArray editVertsIndices;
-    if (!weights.skinObj.isNull()) {
-        // get the joints colors
-        getListColorsJoints(
-            weights.skinObj, this->influence.nbJoints, influence.indicesForInfluenceObjects,
-            influence.jointsColors
-        );
-
-        this->weights.skinWeightList.clear();
-        this->influence.ignoreLockJoints = MIntArray(this->influence.nbJoints, 0);
-        if (this->input.mirrorInfluences.length() == 0) {
-            this->input.mirrorInfluences = MIntArray(this->influence.nbJoints, 0);
-            for (unsigned int i = 0; i < this->influence.nbJoints; ++i) {
-                this->input.mirrorInfluences.set(i, i);
-            }
+    bool meshReentry = reenterMesh && (this->previousBrushDagPath.isValid() &&
+                                       this->mesh.meshDag == this->previousBrushDagPath);
+    if (meshReentry) {
+        if (verbose) {
+            MGlobal::displayInfo(" - MESH REENTRY TEST -");
         }
-
-        getListLockJoints(
-            weights.skinObj, this->influence.nbJoints, influence.indicesForInfluenceObjects,
-            this->influence.lockJoints
-        );
-        getListLockVertices(weights.skinObj, this->weights.lockVertices, editVertsIndices);
-
-        status = fillArrayValues(weights.skinObj, true); // WAY TOO SLOW ... but accurate ?
+        refreshPointsNormals();
     }
     else {
-        MGlobal::displayInfo(MString("FAILED : weights.skinObj.isNull"));
-        abortAction();
-        return;
+        catchTimeStamp();
+        status = getMesh();
+        endTimeStamp(MString("getMesh"));
     }
-    // get face color assignments ----------
+    // first clear a bit the air --------------
+    bool skinReentry =
+        meshReentry && reenterSkin &&
+        (!this->previousSkinMObject.isNull() && this->weights.skinObj == this->previousSkinMObject);
+    MIntArray editVertsIndices;
+    if (skinReentry) {
+        std::pair<unsigned int, unsigned int> infosPlugs =
+            infosSkinClusterPlugs(this->weights.skinObj);
+        skinReentry = infosPlugs == storedPlugCountSkinObj;
+        if (!skinReentry) {
+            MGlobal::displayInfo(MString("-- not same number of plugs--"));
+        }
+        else {
+            // catchTimeStamp();
+            MDagPathArray currentDagPaths;
+            MFnSkinCluster skinFn(this->weights.skinObj);
+            skinFn.influenceObjects(currentDagPaths);
+            skinReentry = areDagPathArraysEqual(currentDagPaths, this->influence.inflDagPaths);
+            if (!skinReentry) {
+                MGlobal::displayInfo(MString("-- not same dagPath for joints --"));
+            }
+            // endTimeStamp(MString("get joints dagPath for Check Objects"));
+        }
+    }
+    if (!skinReentry) {
+        if (verbose) {
+            MGlobal::displayInfo(MString("-- skin FAIL reentry --"));
+        }
+        secondPartSkincluster();
+        this->weights.multiCurrentColors.clear();
+        this->influence.jointsColors.clear();
+        this->weights.soloCurrentColors.clear();
+
+        if (!weights.skinObj.isNull()) {
+            getListColorsJoints(
+                weights.skinObj, this->influence.nbJoints, influence.indicesForInfluenceObjects,
+                influence.jointsColors, verbose
+            ); // get the joints colors
+            this->weights.skinWeightList.clear();
+            this->influence.ignoreLockJoints = MIntArray(this->influence.nbJoints, 0);
+            if (this->input.mirrorInfluences.length() == 0) {
+                this->input.mirrorInfluences = MIntArray(this->influence.nbJoints, 0);
+                for (unsigned int i = 0; i < this->influence.nbJoints; ++i) {
+                    this->input.mirrorInfluences.set(i, i);
+                }
+            }
+            getListLockJoints(
+                weights.skinObj, this->influence.nbJoints, influence.indicesForInfluenceObjects,
+                this->influence.lockJoints
+            );
+            getListLockVertices(weights.skinObj, this->weights.lockVertices, editVertsIndices);
+            storedPlugCountSkinObj = infosSkinClusterPlugs(this->weights.skinObj);
+
+            if (!skinReentry) {
+                status = fillArrayValues(weights.skinObj, true);
+            }
+
+            if (verbose) {
+                MGlobal::displayInfo(
+                    MString("nb found joints colors ") + influence.jointsColors.length()
+                );
+            }
+        }
+        else {
+            MGlobal::displayInfo(MString("FAILED toolOnSetup: weights.skinObj.isNull"));
+            abortAction();
+            return;
+        }
+    }
+    else {
+        if (verbose) {
+            MGlobal::displayInfo(MString("-- SKIN REENTRY --"));
+        }
+        getListLockVertices(weights.skinObj, this->weights.lockVertices, editVertsIndices);
+    }
 
     // solo colors -----------------------
     this->weights.soloCurrentColors = MColorArray(this->mesh.numVertices, MColor(0.0, 0, 0.0));
@@ -224,6 +280,11 @@ void SkinBrushContext::toolOffCleanup()
         this->interPersist.firstPaintDone = true;
         MUserEventMessage::postUserEvent("brSkinBrush_cleanCloseUndo");
     }
+    getSkinFromName = false;
+    getMeshFromName = false;
+    // for reentry
+    this->previousBrushDagPath = this->mesh.meshDag;
+    this->previousSkinMObject = this->weights.skinObj;
 }
 
 void SkinBrushContext::getClassName(MString &name) const { name.set("brSkinBrush"); }
@@ -343,8 +404,8 @@ void SkinBrushContext::refresh()
         );
         status = getListLockVertices(
             weights.skinObj, this->weights.lockVertices, editVertsIndices
-        );                                                  // problem ?
-        status = fillArrayValuesDEP(weights.skinObj, true); // get the skin data and all the colors
+        );
+        status = fillArrayValues(weights.skinObj, true);
     }
     else {
         MGlobal::displayError(MString("FAILED : weights.skinObj.isNull"));
@@ -368,6 +429,7 @@ void SkinBrushContext::refresh()
     ); // set the solo assignation
 
     // display the locks ----------------------
+
     MColorArray multiEditColors, soloEditColors;
     refreshColors(editVertsIndices, multiEditColors, soloEditColors);
     applyVertexColors(editVertsIndices, multiEditColors, soloEditColors);
@@ -1587,6 +1649,74 @@ void SkinBrushContext::doTheAction()
     // If the smoothing has been performed send the current values to
     // the tool command along with the necessary data for undo and redo.
     // The same goes for the select mode.
+    // CHECK MIRROR
+    if (sewVertices) {
+        if (this->vertToVertBorder.size() != (size_t)this->mesh.numVertices) {
+            getConnectedBorderVertices();
+        }
+
+        std::unordered_map<int, float> sewArr;
+        std::set<int> processed;
+        bool foundOnce = false;
+        for (const auto &element : this->paint.skinValuesToSet) {
+            int index = element.first;
+            // if (std::find(processed.begin(), processed.end(), index) != processed.end()) {
+            if (processed.find(index) != processed.end()) {
+                continue;
+            }
+            float value = element.second;
+            int sewnVert = this->vertToVertBorder[index];
+            if (sewnVert != -1) {
+                if (this->interPersist.verticesPainted.find(sewnVert) ==
+                    this->interPersist.verticesPainted.end()) {
+                    // if (this->paint.skinValuesToSet.find(sewnVert) ==
+                    // this->paint.skinValuesToSet.end()) {
+                    sewArr.insert(std::make_pair(sewnVert, value));
+                    foundOnce = true;
+                }
+                else {
+                    this->paint.skinValuesToSet[sewnVert] = value;
+                    processed.insert(sewnVert);
+                }
+            }
+        }
+        if (foundOnce) {
+            this->paint.skinValuesToSet.insert(sewArr.begin(), sewArr.end());
+            for (const auto &element : sewArr) {
+                this->interPersist.verticesPainted.insert(element.first);
+            }
+        }
+        if (this->input.paintMirror != 0) {
+            std::unordered_map<int, float> sewArr;
+            std::set<int> processed;
+            bool foundOnce = false;
+            for (const auto &element : this->mirror.skinValuesToSet) {
+                int index = element.first;
+                if (processed.find(index) != processed.end()) {
+                    continue;
+                }
+                float value = element.second;
+                int sewnVert = this->vertToVertBorder[index];
+                if (sewnVert != -1) {
+                    if (this->interPersist.verticesPainted.find(sewnVert) ==
+                        this->interPersist.verticesPainted.end()) {
+                        sewArr.insert(std::make_pair(sewnVert, value));
+                        foundOnce = true;
+                    }
+                    else {
+                        this->mirror.skinValuesToSet[sewnVert] = value;
+                        processed.insert(sewnVert);
+                    }
+                }
+            }
+            if (foundOnce) {
+                this->mirror.skinValuesToSet.insert(sewArr.begin(), sewArr.end());
+                for (const auto &element : sewArr) {
+                    this->interPersist.verticesPainted.insert(element.first);
+                }
+            }
+        }
+    }
     MColorArray multiEditColors, soloEditColors;
     int nbVerticesPainted = (int)this->interPersist.verticesPainted.size();
     MIntArray editVertsIndices(nbVerticesPainted, 0);
@@ -1812,6 +1942,15 @@ MStatus SkinBrushContext::applyCommandMirror()
 
                 double theWeight = (double)biggestValue;
                 std::vector<int> vertsAround = getSurroundingVerticesPerVert(theVert);
+
+                if (sewVertices) {
+                    int sewnVert = this->vertToVertBorder[theVert];
+                    if (sewnVert != -1) {
+                        std::vector<int> v2 = getSurroundingVerticesPerVert(sewnVert);
+                        vertsAround.insert(vertsAround.end(), v2.begin(), v2.end());
+                    }
+                }
+
                 status = setAverageWeight(
                     vertsAround, theVert, indexCurrVert, this->influence.nbJoints,
                     this->influence.lockJoints, this->weights.skinWeightList, theWeights,
@@ -1902,6 +2041,12 @@ MStatus SkinBrushContext::applyCommandMirror()
 MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, float> &valuesToSet)
 {
     MStatus status;
+    /*
+    we need to edit this->verticesPainted for sew vertices, meaning addind the mirror verts
+    this->verticesPainted
+    */
+
+    // ------------------------------------------
     // we need to sort all of that one way or another ---------------- here it is ------
     std::map<int, double> valuesToSetOrdered(valuesToSet.begin(), valuesToSet.end());
 
@@ -1925,6 +2070,13 @@ MStatus SkinBrushContext::applyCommand(int influence, std::unordered_map<int, fl
                     double theWeight = elem.second;
                     std::vector<int> vertsAround = getSurroundingVerticesPerVert(theVert);
 
+                    if (sewVertices) {
+                        int sewnVert = this->vertToVertBorder[theVert];
+                        if (sewnVert != -1) {
+                            std::vector<int> v2 = getSurroundingVerticesPerVert(sewnVert);
+                            vertsAround.insert(vertsAround.end(), v2.begin(), v2.end());
+                        }
+                    }
                     status = setAverageWeight(
                         vertsAround, theVert, i, this->influence.nbJoints,
                         this->influence.lockJoints, this->weights.skinWeightList, theWeights,
@@ -2076,7 +2228,7 @@ void copyToFloatMatrix(const MMatrix &src, MFloatMatrix &dst)
 // ---------------------------------------------------------------------
 // brush methods
 // ---------------------------------------------------------------------
-MStatus SkinBrushContext::getMesh()
+MStatus SkinBrushContext::getDagMesh()
 {
     MStatus status = MStatus::kSuccess;
     // Clear the previous data.
@@ -2087,7 +2239,15 @@ MStatus SkinBrushContext::getMesh()
     // mesh
     // -----------------------------------------------------------------
     MDagPath dagPath;
-    status = getSelection(mesh.meshDag);
+    if (getMeshFromName) {
+        getDagPath(passedMeshName, this->mesh.meshDag);
+        MGlobal::displayInfo(
+            MString("direct passed mesh: ") + this->mesh.meshDag.partialPathName()
+        );
+    }
+    else {
+        status = getSelection(mesh.meshDag);
+    }
     CHECK_MSTATUS_AND_RETURN_IT(status);
     if (mesh.meshDag.apiType() == MFn::kNurbsSurface) { // if is nurbs
         interFrame.isNurbs = true;
@@ -2116,6 +2276,37 @@ MStatus SkinBrushContext::getMesh()
     else {
         interFrame.isNurbs = false;
     }
+    return status;
+}
+MStatus SkinBrushContext::getObjSkinCluster()
+{
+    MStatus status = MStatus::kSuccess;
+    // Get the skin cluster node from the history of the mesh.
+    if (getSkinFromName) {
+        getMObject(passedSkinName, this->weights.skinObj);
+        MString skinName = getSkinClusterName();
+        MGlobal::displayInfo(MString("direct passed skin: ") + skinName);
+    }
+    else {
+        MObject skinClusterObj;
+        if (interFrame.isNurbs) {
+            status = getSkinCluster(nurbs.nurbsDag, skinClusterObj);
+        }
+        else {
+            status = getSkinCluster(mesh.meshDag, skinClusterObj);
+        }
+        CHECK_MSTATUS_AND_RETURN_IT(status);
+        // Store the skin cluster for undo.
+        weights.skinObj = skinClusterObj;
+        MString skinName = getSkinClusterName();
+        MGlobal::displayInfo(MString("skinned found from shape : ") + skinName);
+    }
+    return status;
+}
+
+MStatus SkinBrushContext::getMesh()
+{
+    MStatus status = MStatus::kSuccess;
     // get the matrix
     MMatrix MIM = mesh.meshDag.inclusiveMatrix();
     MMatrix MIMI = mesh.meshDag.inclusiveMatrixInverse();
@@ -2133,26 +2324,20 @@ MStatus SkinBrushContext::getMesh()
     // I dont know why, but '33' seems to work well
     this->mesh.accelParams = mesh.meshFn.uniformGridParams(33, 33, 33);
 
+    // getConnected vertices Guillaume function
+
     getConnectedVertices();
     getFromMeshNormals();
     getDerivedConnectivity();
+    getConnectedVerticesFlatten();
     this->mesh.mayaRawPoints = const_cast<float *>(mesh.meshFn.getRawPoints(&status));
     this->weights.lockVertices = MIntArray(this->mesh.numVertices, 0);
+    getTheOrigMeshForMirror();
+    return status;
+}
 
-    // -----------------------------------------------------------------
-    // skin cluster
-    // -----------------------------------------------------------------
-    // Get the skin cluster node from the history of the mesh.
-    MObject skinClusterObj;
-    if (interFrame.isNurbs) {
-        status = getSkinCluster(nurbs.nurbsDag, skinClusterObj);
-    }
-    else {
-        status = getSkinCluster(mesh.meshDag, skinClusterObj);
-    }
-    CHECK_MSTATUS_AND_RETURN_IT(status);
-    // Store the skin cluster for undo.
-    weights.skinObj = skinClusterObj;
+void SkinBrushContext::secondPartSkincluster()
+{
 
     // Create a component object representing all vertices of the mesh.
     allVtxCompObj = allVertexComponents();
@@ -2163,9 +2348,54 @@ MStatus SkinBrushContext::getMesh()
 
     // Get the skin cluster settings.
     unsigned int normalizeValue;
-    getSkinClusterAttributes(skinClusterObj, maxInfluences, maintainMaxInfluences, normalizeValue);
+    getSkinClusterAttributes(weights.skinObj, maxInfluences, maintainMaxInfluences, normalizeValue);
     normalize = (normalizeValue > 0);
-    getTheOrigMeshForMirror();
+}
+
+MStatus SkinBrushContext::swapSkinCluster()
+{
+    MStatus status = MStatus::kSuccess;
+
+    this->input.pickMaxInfluenceVal = false;
+    this->input.pickInfluenceVal = false;
+
+    this->weights.multiCurrentColors.clear();
+    this->influence.jointsColors.clear();
+    this->weights.soloCurrentColors.clear();
+
+    getMObject(passedSkinName, this->weights.skinObj);
+    if (verbose) {
+        MGlobal::displayInfo(MString("SWAP skinCluster: ") + passedSkinName);
+    }
+
+    unsigned int normalizeValue;
+    influence.influenceIndices = getInfluenceIndices();
+    if (verbose) {
+        MGlobal::displayInfo(MString("nbJoints: ") + this->influence.nbJoints);
+    }
+    getSkinClusterAttributes(
+        weights.skinObj, maxInfluences, maintainMaxInfluences, normalizeValue
+    );
+    normalize = (normalizeValue > 0);
+
+    if (weights.skinObj.isNull()) {
+        MGlobal::displayInfo(MString("FAILED swapSkinCluster: weights.skinObj.isNull"));
+        abortAction();
+        return MStatus::kFailure;
+    }
+    this->weights.skinWeightList.clear();
+    this->weights.multiCurrentColors.clear();
+    this->influence.jointsColors.clear();
+    this->weights.soloCurrentColors.clear();
+    this->paint.previousPaint.clear();
+    this->mirror.previousPaint.clear();
+
+    refresh();
+    if (verbose) {
+        MGlobal::displayInfo(MString("nbJoints after refresh: ") + this->influence.nbJoints);
+    }
+
+
     return status;
 }
 
@@ -2185,6 +2415,7 @@ MStatus SkinBrushContext::getTheOrigMeshForMirror()
     // get the orgi vertices -----------------------------------
     meshOrigFn.setObject(origMeshDag);
     mesh.mayaOrigRawPoints = const_cast<float *>(meshOrigFn.getRawPoints(&status));
+    this->mesh.accelParamsOrigMesh = meshOrigFn.uniformGridParams(33, 33, 33);
 
     MObject origMeshNode = origMeshDag.node();
     status = interStart.intersectorOrigShape.create(origMeshNode); // , matrix);
@@ -2261,12 +2492,17 @@ void SkinBrushContext::getConnectedVertices()
     mesh.perEdgeVertices.clear();
     mesh.perEdgeVertices.resize(mesh.numEdges);
     mesh.perVertexEdgesSetINDEX.assign(mesh.numVertices + 1, 0);
+    this->borderVertices.clear();
 
     for (unsigned i = 0; !edgeIter.isDone(); edgeIter.next(), ++i) {
         int pt0 = edgeIter.index(0), pt1 = edgeIter.index(1);
         mesh.perEdgeVertices[i] = {pt0, pt1};
         mesh.perVertexEdgesSetINDEX[pt0 + 1]++;
         mesh.perVertexEdgesSetINDEX[pt1 + 1]++;
+        if (edgeIter.onBoundary()) {
+            borderVertices.push_back(pt0);
+            borderVertices.push_back(pt1);
+        }
     }
     for (int v = 0; v < mesh.numVertices; ++v) {
         mesh.perVertexEdgesSetINDEX[v + 1] += mesh.perVertexEdgesSetINDEX[v];
@@ -2281,6 +2517,25 @@ void SkinBrushContext::getConnectedVertices()
             int pt1 = mesh.perEdgeVertices[i].second;
             mesh.perVertexEdgesSetFLAT[writePos[pt0]++] = i;
             mesh.perVertexEdgesSetFLAT[writePos[pt1]++] = i;
+        }
+    }
+}
+
+void SkinBrushContext::getConnectedBorderVertices()
+{
+    this->vertToVertBorder = findClosestWithinThreshold(
+        borderVertices, this->mesh.mayaOrigRawPoints,
+        mesh.perVertexVerticesSetFLAT, mesh.perVertexVerticesSetINDEX,
+        sewVerticesMinDist, this->mesh.numVertices, 0
+    );
+    if (verbose) {
+        for (size_t i = 0; i < this->vertToVertBorder.size(); ++i) {
+            if (this->vertToVertBorder[i] != -1) {
+                MGlobal::displayInfo(
+                    MString("vertex [") + (int)i + MString("] with vertex [") +
+                    this->vertToVertBorder[i] + MString("] ;")
+                );
+            }
         }
     }
 }
@@ -2497,7 +2752,7 @@ MStatus SkinBrushContext::fillArrayValues(MObject &skinCluster, bool doColors)
     MFnSkinCluster skinFn(skinCluster, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
     unsigned int infCount;
-
+    catchTimeStamp();
     if (!interFrame.isNurbs) {
         status =
             skinFn.getWeights(mesh.meshDag, allVtxCompObj, this->weights.skinWeightList, infCount);
@@ -2507,6 +2762,10 @@ MStatus SkinBrushContext::fillArrayValues(MObject &skinCluster, bool doColors)
             nurbs.nurbsDag, allVtxCompObj, this->weights.skinWeightList, infCount
         );
     }
+    this->skipSkinValues = false; // make sure we got the skin values
+    endTimeStamp(MString("skinFn.getWeights"));
+    catchTimeStamp();
+
     CHECK_MSTATUS_AND_RETURN_IT(status);
     this->influence.nbJoints = infCount;
 
@@ -2543,6 +2802,7 @@ MStatus SkinBrushContext::fillArrayValues(MObject &skinCluster, bool doColors)
             }
         }
     }
+    endTimeStamp(MString("fillArrayValues colors"));
 
     return status;
 }
@@ -3095,4 +3355,95 @@ void SkinBrushContext::setInViewMessage(bool display) const
     else {
         MGlobal::executeCommand("inViewMessage -clear topCenter");
     }
+}
+
+MString SkinBrushContext::getValuesForOptionVar()
+{
+    // Store the current settings as an option var. This way they are
+    // properly available for the next usage.
+    // MGlobal::displayInfo("skinBrushTool::finalize\n");
+    MString cmd;
+    cmd = "";
+    cmd += " " + MString(kCurveFlagLong) + " ";
+    cmd += getCurve();
+    cmd += " " + MString(kCommandIndexFlagLong) + " ";
+    cmd += static_cast<int>(commandIndex);
+    cmd += " " + MString(kSoloColorFlagLong) + " ";
+    cmd += getSoloColor();
+    cmd += " " + MString(kSoloColorTypeFlagLong) + " ";
+    cmd += getSoloColorType();
+    cmd += " " + MString(kCoverageLong) + " ";
+    cmd += getCoverage();
+    cmd += " " + MString(kMessageFlagLong) + " ";
+    cmd += getMessage();
+    cmd += " " + MString(kDrawBrushFlagLong) + " ";
+    cmd += getDrawBrush();
+    cmd += " " + MString(kDrawRangeFlagLong) + " ";
+    cmd += getDrawRange();
+    cmd += " " + MString(kFractionOversamplingFlagLong) + " ";
+    cmd += getFractionOversampling();
+    cmd += " " + MString(kIgnoreLockFlagLong) + " ";
+    cmd += getIgnoreLock();
+    cmd += " " + MString(kLineWidthFlagLong) + " ";
+    cmd += getLineWidth();
+    cmd += " " + MString(kOversamplingFlagLong) + " ";
+    cmd += getOversampling();
+    cmd += " " + MString(kRangeFlagLong) + " ";
+    cmd += getRange();
+    cmd += " " + MString(kSizeFlagLong) + " ";
+    cmd += getSize();
+    cmd += " " + MString(kStrengthFlagLong) + " ";
+    cmd += getStrength();
+    cmd += " " + MString(kSmoothStrengthFlagLong) + " ";
+    cmd += getSmoothStrength();
+    // cmd += " " + MString(kPruneWeightsFlagLong) + " ";
+    // cmd += pruneWeights;
+    cmd += " " + MString(kUndersamplingFlagLong) + " ";
+    cmd += getUndersampling();
+    cmd += " " + MString(kVolumeFlagLong) + " ";
+    cmd += getVolume();
+    cmd += " " + MString(kPostSettingFlagLong) + " ";
+    cmd += getPostSetting();
+    cmd += " " + MString(kInfluenceNameFlagLong) + " ";
+    cmd += getInfluenceName();
+    cmd += " " + MString(kSmoothRepeatFlagLong) + " ";
+    cmd += getSmoothRepeat();
+    cmd += " " + MString(kPaintMirrorFlagLong) + " ";
+    cmd += getPaintMirror();
+    cmd += " " + MString(kPaintMirrorToleranceFlagLong) + " ";
+    cmd += getMirrorTolerance();
+    cmd += " " + MString(kUseColorSetWhilePaintingFlagLong) + " ";
+    cmd += getUseColorSetsWhilePainting();
+    cmd += " " + MString(kMeshDragDrawTrianglesFlagLong) + " ";
+    cmd += getDrawTriangles();
+    cmd += " " + MString(kMeshDragDrawEdgesFlagLong) + " ";
+    cmd += getDrawEdges();
+    cmd += " " + MString(kMeshDragDrawPointsFlagLong) + " ";
+    cmd += getDrawPoints();
+    cmd += " " + MString(kMeshDragDrawTransFlagLong) + " ";
+    cmd += getDrawTransparency();
+    cmd += " " + MString(kMinColorFlagLong) + " ";
+    cmd += getMinColor();
+    cmd += " " + MString(kMaxColorFlagLong) + " ";
+    cmd += getMaxColor();
+    cmd += " " + MString(kSewVerticesFlagLong) + " ";
+    cmd += getSewVertices();
+    cmd += " " + MString(kSewVerticesOffsetFlagLong) + " ";
+    cmd += getSewVerticesOffset();
+    cmd += " " + MString(kSkinClusterNameFlagLong) + " ";
+    cmd += getSkinClusterName();
+    cmd += " " + MString(kMeshNameFlagLong) + " ";
+    cmd += getMeshName();
+    cmd += " " + MString(kVerboseFlagLong) + " ";
+    cmd += verbose;
+    cmd += " " + MString(kFastReEnterFlagLong) + " ";
+    cmd += getFastReenter();
+
+    return cmd;
+}
+
+void SkinBrushContext::storeValuesInOptionVar(MString nameOptionVar)
+{
+    MString cmd = getValuesForOptionVar();
+    MGlobal::setOptionVarValue(nameOptionVar, cmd);
 }

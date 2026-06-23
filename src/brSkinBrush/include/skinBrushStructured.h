@@ -72,7 +72,8 @@ struct MeshState {
     int numEdges;     // The number of edges on the current mesh
     int numVertices;  // The number of vertices on the current mesh
 
-    MMeshIsectAccelParams accelParams;   // Octree for speeding up raycasting
+    MMeshIsectAccelParams accelParams;         // Octree for speeding up raycasting
+    MMeshIsectAccelParams accelParamsOrigMesh; // Octree for the undeformed orig mesh
     MFloatMatrix inclusiveMatrix;        // The worldspace matrix of this mesh
     MFloatMatrix inclusiveMatrixInverse; // The inverse worldspace matrix of this mesh
 
