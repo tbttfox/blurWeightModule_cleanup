@@ -9,12 +9,9 @@ REM "debug" "debugoptimized" "release"
 SET BUILDTYPE=debug
 SET BUILDDIR=mayabuild_%BUILDTYPE%_%MAYA_VERSION%_%BACKEND%
 
-SET DK=D:\Users\Tyler\src\MayaDevkits\Autodesk_Maya_2025_2_Update_DEVKIT_Windows\devkitBase
-
 if not exist %BUILDDIR%\ (
     meson setup %BUILDDIR% ^
         -Dmaya:maya_version=%MAYA_VERSION% ^
-        -Dmaya:maya_devkit_base=%DK% ^
         --buildtype %BUILDTYPE% ^
         --backend %BACKEND% ^
         --vsenv
