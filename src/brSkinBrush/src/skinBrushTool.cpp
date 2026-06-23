@@ -298,7 +298,6 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
     MFnSkinCluster skinFn(weights.skinObj, &status);
     CHECK_MSTATUS_AND_RETURN_IT(status);
 
-    MFnMesh mesh.meshFn;
     bool validMesh = mesh.meshDag.isValid();
     if (validMesh) {
         mesh.meshFn.setObject(mesh.meshDag);
@@ -363,7 +362,7 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
         MObjectArray objectsDeformed;
         skinFn.getOutputGeometry(objectsDeformed);
         MFnDependencyNode deformedNameMesh(objectsDeformed[0]);
-        MPlug lockedVerticesPlug = deformedNameMesh.findPlug("lockedVertices", &stat);
+        MPlug lockedVerticesPlug = deformedNameMesh.findPlug("lockedVertices", &status);
         if (MS::kSuccess != status) {
             MGlobal::displayError(MString("cant find lockerdVertices plug"));
             return status;

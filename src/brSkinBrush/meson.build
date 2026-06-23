@@ -4,6 +4,7 @@ skin_brush_files = files([
   'src/skinBrushCmd.cpp',
   'src/skinBrushContext.cpp',
   'src/skinBrushContextSetFlags.cpp',
+  'src/skinBrushImperative.cpp',
   'src/skinBrushLegacy.cpp',
   'src/skinBrushTool.cpp',
 ])

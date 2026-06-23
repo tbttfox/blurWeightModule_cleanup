@@ -22,4 +22,4 @@ if exist %BUILDDIR%\ (
     meson install -C %BUILDDIR%
 )
 
-pause
+REM pause

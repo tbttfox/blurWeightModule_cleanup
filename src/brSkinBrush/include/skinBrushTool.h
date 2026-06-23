@@ -87,16 +87,6 @@
     if (status != MStatus::kSuccess)                                                               \
         return MStatus::kSuccess;
 
-// struct to store the deformers when pick using D key
-struct drawingDeformers {
-    MMatrix mat;
-    MPoint center;
-    MPoint minPt;
-    MPoint maxPt;
-    MVector up, right;
-    double width, height, depth;
-};
-
 // ---------------------------------------------------------------------
 // the tool
 // ---------------------------------------------------------------------
@@ -179,55 +169,21 @@ class skinBrushTool : public MPxToolCommand {
     void setContextPointer(SkinBrushContext *c);
 
   private:
-    MColor colorVal;
-    int curveVal;
-    bool drawBrushVal;
-    bool drawRangeVal;
-
     SkinBrushContext *ctxt;
 
-    MString moduleImportString;
-    MString enterToolCommandVal;
-    MString exitToolCommandVal;
-    bool fractionOversamplingVal;
-    bool ignoreLockVal;
-    int lineWidthVal;
-    int messageVal;
-    int oversamplingVal;
+    UserInputData input;
+    MeshState mesh;
+    NurbsData nurbs;
+    WeightData weights;
+    InfluenceData influence;
+    InteractionPerFrameData interFrame;
+
     double rangeVal;
-    double sizeVal;
-    double strengthVal, smoothStrengthVal;
-    int undersamplingVal;
-    bool volumeVal;
-
     bool coverageVal;
-    int influenceIndex = 0;
-    ModifierCommands commandIndex = ModifierCommands::Add;
-    int smoothRepeat = 3;
-    int soloColorTypeVal = 1; // 1 lava
-    int soloColorVal = 0;
-    bool postSetting = true;
-
-    int paintMirror = 0; // intValue
-    double mirrorMinDist = 0.05;
-    bool useColorSetsWhilePainting = false;
-    bool drawTriangles = true;
-    bool drawEdges = true;
-    bool drawPoints = true;
-    bool drawTransparency = true;
-
-    double minSoloColor = 0.0;
-    double maxSoloColor = 1.0;
-
-    MIntArray influenceIndices;
-    MDagPath meshDag, nurbsDag;
-    MObject skinObj;
-    MString skinName;
-    bool isNurbs = false;
-    int numCVsInV_ = 0;
-
     bool normalize;
     MString influenceName;
+    MString skinName;
+
     MDoubleArray redoWeights;
     MDoubleArray undoWeights;
     MIntArray undoVertices;
@@ -315,13 +271,13 @@ class SkinBrushContext : public MPxContext {
         MIntArray &editVertsIndices, MColorArray &multiEditColors, MColorArray &soloEditColors
     );
     MStatus editSoloColorSet(bool doBlack);
-    MColor getASoloColor(double val) const;
+    MColor getASoloColor(double val);
     MStatus refreshPointsNormals();
 
     void getColorWithMirror(
         int vertexIndex, float valueBase, float valueMirror, MColorArray &multiEditColors,
         MColorArray &soloEditColors, MColor &multColor, MColor &soloColor
-    ) const;
+    );
 
     MStatus querySkinClusterValues(
         MObject &skinCluster, MIntArray &verticesIndices, MDoubleArray &theSkinWeightList,
@@ -472,25 +428,13 @@ class SkinBrushContext : public MPxContext {
 
     skinBrushTool *cmd;
 
-    bool firstPaintDone;
-    bool performBrush;
     int performRefreshViewPort;
     int maxRefreshValue = 2;
-    int undersamplingSteps;
 
-    int paintMirror = 0;
-    double mirrorMinDist = 0.05;
-    bool useColorSetsWhilePainting = false;
-
-    bool verbose = false;
-    double interactiveValue = 1.0;  // for whateverUse in the code
-    double interactiveValue1 = 1.0; // for whateverUse in the code
-    double interactiveValue2 = 1.0; // for whateverUse in the code
-
-    skinBrushTool *cmd;
-
-    int performRefreshViewPort;
-    int maxRefreshValue = 2;
+    // Hard-coded values not stored in structs
+    double rangeVal = 0.5;
+    bool coverageVal = true;
+    bool refreshDone = false;
 
     // Persistent state not covered by other structs
     bool doNormalize = true;

@@ -31,31 +31,33 @@ MStatus SkinBrushContext::doDrag(MEvent &event)
     transMat.setScale(scale, MSpace::kWorld);
     viewMat = transMat.asMatrix();
 
-    view.beginXorDrawing(false, true, (float)lineWidthVal, M3dView::kStippleNone);
+    view.beginXorDrawing(false, true, (float)input.lineWidthVal, M3dView::kStippleNone);
 
-    if (drawBrushVal || event.mouseButton() == MEvent::kMiddleMouse) {
+    if (input.drawBrushVal || event.mouseButton() == MEvent::kMiddleMouse) {
         // Draw the circle in regular paint mode.
         // The range circle doens't get drawn here to avoid visual
         // clutter.
         if (event.mouseButton() == MEvent::kLeftMouse) {
-            drawCircle(surfacePoints[0], viewMat, sizeVal);
+            drawCircle(surfacePoints[0], viewMat, input.sizeVal);
         }
         // Adjusting the brush settings with the middle mouse button.
         else if (event.mouseButton() == MEvent::kMiddleMouse) {
             // When adjusting the size the circle needs to remain with
             // a static position but the size needs to change.
-            if (sizeAdjust) {
-                drawCircle(surfacePointAdjust, viewMat, adjustValue);
-                if (volumeVal && drawRangeVal) {
-                    drawCircle(surfacePointAdjust, viewMat, adjustValue * rangeVal);
+            if (interPersist.sizeAdjust) {
+                drawCircle(interStart.surfacePointAdjust, viewMat, interPersist.adjustValue);
+                if (input.volumeVal && input.drawRangeVal) {
+                    drawCircle(
+                        interStart.surfacePointAdjust, viewMat, interPersist.adjustValue * rangeVal
+                    );
                 }
             }
             // When adjusting the strength the circle needs to remain
             // fixed and only the strength indicator changes.
             else {
-                drawCircle(surfacePointAdjust, viewMat, sizeVal);
-                if (volumeVal && drawRangeVal) {
-                    drawCircle(surfacePointAdjust, viewMat, sizeVal * rangeVal);
+                drawCircle(interStart.surfacePointAdjust, viewMat, input.sizeVal);
+                if (input.volumeVal && input.drawRangeVal) {
+                    drawCircle(interStart.surfacePointAdjust, viewMat, input.sizeVal * rangeVal);
                 }
 
                 // Drawing the strength line is not properly working in
