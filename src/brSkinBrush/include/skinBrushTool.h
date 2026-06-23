@@ -16,6 +16,7 @@
 #include "skinBrushStructured.h"
 
 #include <math.h>
+
 #include <maya/M3dView.h>
 #include <maya/MArgDatabase.h>
 #include <maya/MArgList.h>
@@ -242,13 +243,7 @@ class SkinBrushContext : public MPxContext {
     MStatus getTheOrigMeshForMirror();
 
     void getConnectedVertices();
-    void getConnectedVerticesSecond();
-    void getConnectedVerticesThird();
-    void getConnectedVerticesTyler();
-    void getConnectedVerticesFlatten(
-        std::vector<int> &perVertexVerticesSetFLAT, std::vector<int> &perVertexVerticesSetINDEX,
-        std::vector<int> &perFaceVerticesSetFLAT, std::vector<int> &perFaceVerticesSetINDEX
-    ) const;
+    void getDerivedConnectivity();
 
     std::vector<int> getSurroundingVerticesPerVert(int vertexIndex) const;
     std::vector<int> getSurroundingVerticesPerFace(int vertexIndex) const;
@@ -443,8 +438,7 @@ class SkinBrushContext : public MPxContext {
     MIntArray deformersIndices;
     MIntArray cpIds; // vertex ids passed to update skin
     std::vector<std::vector<std::pair<int, float>>> skin_weights_;
-    MIntArray VertexCountPerPolygon, fullVertexList;
-    int fullVertexListLength = 0;
+    MIntArray fullVertexList;
     MPointArray surfacePoints; // cursor positions on the mesh in world space
     MPoint worldMirrorPoint;
     MVector normalMirroredVector; // mirrored normal vector to camera
@@ -465,10 +459,8 @@ class SkinBrushContext : public MPxContext {
     std::vector<bool> influenceLocks;
     MDGModifier colorSetMod;
     bool toggleColorState = false;
-    std::vector<std::vector<int>> perVertexVerticesSet; // per vertex vertices
-    std::vector<std::vector<int>> perFaceVerticesSet;   // per face vertices
-    std::vector<std::vector<int>> normalsIds;           // vector of face normal ids
-    std::vector<MIntArray> perFaceVertices;             // per face vertices (MIntArray form)
+    std::vector<std::vector<int>> normalsIds; // vector of face normal ids
+    std::vector<MIntArray> perFaceVertices;   // per face vertices (MIntArray form)
     MSelectionList prevSelection;
     MSelectionList prevHilite;
     M3dView view;

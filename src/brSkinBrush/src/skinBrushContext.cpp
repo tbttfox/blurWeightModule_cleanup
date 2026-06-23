@@ -2150,15 +2150,9 @@ MStatus SkinBrushContext::getMesh()
     // I dont know why, but '33' seems to work well
     this->mesh.accelParams = mesh.meshFn.uniformGridParams(33, 33, 33);
 
-    // getConnected vertices Guillaume function
     getConnectedVertices();
-    getConnectedVerticesSecond();
-    getConnectedVerticesThird();
     getFromMeshNormals();
-    getConnectedVerticesFlatten(
-        this->mesh.perVertexVerticesSetFLAT, this->mesh.perVertexVerticesSetINDEX,
-        this->mesh.perFaceVerticesSetFLAT, this->mesh.perFaceVerticesSetINDEX
-    );
+    getDerivedConnectivity();
     this->mesh.mayaRawPoints = const_cast<float *>(mesh.meshFn.getRawPoints(&status));
     this->weights.lockVertices = MIntArray(this->mesh.numVertices, 0);
 
@@ -2225,8 +2219,8 @@ void SkinBrushContext::getConnectedVertices()
     MStatus status;
 
     // MIntArray vertexCount, vertexList;
+    MIntArray VertexCountPerPolygon;
     status = mesh.meshFn.getVertices(VertexCountPerPolygon, fullVertexList);
-    this->fullVertexListLength = fullVertexList.length();
 
     MIntArray triangleCounts, triangleVertices; // get the triangles to draw the mesh
     status = mesh.meshFn.getTriangles(triangleCounts, triangleVertices);
@@ -2276,62 +2270,45 @@ void SkinBrushContext::getConnectedVertices()
     }
 }
 
-void SkinBrushContext::getConnectedVerticesSecond()
+void SkinBrushContext::getDerivedConnectivity()
 {
-    // Second run --------------------------------------------------------
-    this->perFaceVerticesSet.clear();
-    perFaceVerticesSet.resize(this->mesh.numFaces);
-    for (int faceTmp = 0; faceTmp < mesh.numFaces; ++faceTmp) {
-        std::vector<int> tmpSet;
-        MIntArray surroundingVertices = this->perFaceVertices[faceTmp];
-
-        tmpSet.resize(surroundingVertices.length());
-        surroundingVertices.get(&tmpSet[0]);
-
-        std::sort(tmpSet.begin(), tmpSet.end());
-        perFaceVerticesSet[faceTmp] = tmpSet;
-    }
-}
-
-void SkinBrushContext::getConnectedVerticesThird()
-{
-    // fill the std_array connectedSetVertices ------------------------
-    this->perVertexVerticesSet.clear();
-    this->perVertexVerticesSet.resize(this->mesh.numVertices);
-
-#pragma omp parallel for
-    for (int vtxTmp = 0; vtxTmp < this->mesh.numVertices; ++vtxTmp) {
-        std::vector<int> connVetsSet2;
-        MIntArray connectFaces = mesh.perVertexFaces[vtxTmp];
-        for (int fct = 0; fct < connectFaces.length(); ++fct) {
-            auto surroundingVertices = perFaceVerticesSet[connectFaces[fct]];
-            std::vector<int> connVetsSetTMP;
-
-            std::set_union(
-                connVetsSet2.begin(), connVetsSet2.end(), surroundingVertices.begin(),
-                surroundingVertices.end(), std::back_inserter(connVetsSetTMP)
-            );
-            connVetsSet2 = connVetsSetTMP;
-        }
-        auto it = std::find(connVetsSet2.begin(), connVetsSet2.end(), vtxTmp);
-        if (it != std::end(connVetsSet2)) {
-            connVetsSet2.erase(it);
-            this->perVertexVerticesSet[vtxTmp] = connVetsSet2;
+    // Build face → vertices flat array
+    mesh.perFaceVerticesSetFLAT.clear();
+    mesh.perFaceVerticesSetINDEX.clear();
+    int sum = 0;
+    for (int f = 0; f < mesh.numFaces; ++f) {
+        mesh.perFaceVerticesSetINDEX.push_back(sum);
+        const MIntArray &fv = perFaceVertices[f];
+        for (unsigned int i = 0; i < fv.length(); ++i) {
+            mesh.perFaceVerticesSetFLAT.push_back((int)fv[i]);
+            sum++;
         }
     }
-}
+    mesh.perFaceVerticesSetINDEX.push_back(sum);
 
-void SkinBrushContext::getConnectedVerticesTyler()
-{
-    std::vector<std::unordered_set<int>> faceNeighbors, edgeNeighbors;
-    std::vector<int> fCounts, fIndices, eCounts, eIndices;
-
-    getRawNeighbors(
-        this->VertexCountPerPolygon, this->fullVertexList, this->mesh.numVertices, faceNeighbors,
-        edgeNeighbors
-    );
-    convertToCountIndex(faceNeighbors, fCounts, fIndices);
-    convertToCountIndex(edgeNeighbors, eCounts, eIndices);
+    // Build vertex → face-sharing-vertices flat array, excluding self
+    std::vector<std::unordered_set<int>> vertNeighbors(mesh.numVertices);
+    for (int f = 0; f < mesh.numFaces; ++f) {
+        const MIntArray &fv = perFaceVertices[f];
+        for (unsigned int a = 0; a < fv.length(); ++a) {
+            for (unsigned int b = 0; b < fv.length(); ++b) {
+                if (a != b) {
+                    vertNeighbors[(int)fv[a]].insert((int)fv[b]);
+                }
+            }
+        }
+    }
+    mesh.perVertexVerticesSetFLAT.clear();
+    mesh.perVertexVerticesSetINDEX.clear();
+    sum = 0;
+    for (int v = 0; v < mesh.numVertices; ++v) {
+        mesh.perVertexVerticesSetINDEX.push_back(sum);
+        for (int u : vertNeighbors[v]) {
+            mesh.perVertexVerticesSetFLAT.push_back(u);
+            sum++;
+        }
+    }
+    mesh.perVertexVerticesSetINDEX.push_back(sum);
 }
 
 void SkinBrushContext::getFromMeshNormals()
@@ -2383,36 +2360,6 @@ void SkinBrushContext::getFromMeshNormals()
             this->mesh.verticesNormalsIndices.set(indNormal, vertexInd);
         }
     }
-}
-
-void SkinBrushContext::getConnectedVerticesFlatten(
-    std::vector<int> &perVertexVerticesSetFLAT, std::vector<int> &perVertexVerticesSetINDEX,
-    std::vector<int> &perFaceVerticesSetFLAT, std::vector<int> &perFaceVerticesSetINDEX
-) const
-{
-    perVertexVerticesSetFLAT.clear();
-    perVertexVerticesSetINDEX.clear();
-    int sum = 0;
-    for (auto surroundingVtices : this->perVertexVerticesSet) {
-        perVertexVerticesSetINDEX.push_back(sum);
-        for (int vtx : surroundingVtices) {
-            perVertexVerticesSetFLAT.push_back(vtx);
-            sum++;
-        }
-    }
-    perVertexVerticesSetINDEX.push_back(sum); // one extra for easy access
-    //------------------------------------------------------------------------
-    perFaceVerticesSetFLAT.clear();
-    perFaceVerticesSetINDEX.clear();
-    sum = 0;
-    for (auto surroundingVtices : this->perFaceVerticesSet) {
-        perFaceVerticesSetINDEX.push_back(sum);
-        for (int vtx : surroundingVtices) {
-            perFaceVerticesSetFLAT.push_back(vtx);
-            sum++;
-        }
-    }
-    perFaceVerticesSetINDEX.push_back(sum); // one extra for easy access
 }
 
 std::vector<int> SkinBrushContext::getSurroundingVerticesPerVert(int vertexIndex) const

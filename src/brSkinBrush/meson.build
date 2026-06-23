@@ -1,5 +1,6 @@
 skin_brush_files = files([
   'src/functions.cpp',
+  # 'src/meshData.cpp',
   'src/pluginMain.cpp',
   'src/skinBrushCmd.cpp',
   'src/skinBrushContext.cpp',
