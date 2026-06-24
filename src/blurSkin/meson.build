@@ -21,11 +21,12 @@ endif
 
 blur_skin_inc = include_directories(['include'])
 
+install_dir = meson.global_source_root() / 'modules' / meson.project_name() / (maya_platform + '-' + maya_version) / 'plug-ins'
 blur_skin_lib = shared_library(
   'blurSkin',
   blur_skin_files,
   install: true,
-  install_dir : meson.global_source_root() / 'output_Maya' + maya_version,
+  install_dir : install_dir,
   include_directories : blur_skin_inc,
   dependencies : [maya_dep],
   name_prefix : '',

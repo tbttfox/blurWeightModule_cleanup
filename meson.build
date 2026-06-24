@@ -4,6 +4,32 @@ fs = import('fs')
 maya_dep = dependency('maya')
 maya_name_suffix = maya_dep.get_variable('name_suffix')
 maya_version = maya_dep.get_variable('maya_version')
+maya_platform = maya_dep.get_variable('maya_platform')
 
 subdir('src/blurSkin')
 subdir('src/brSkinBrush')
+
+pyinstall_dir = meson.project_source_root() / 'modules' / meson.project_name()
+install_subdir(
+    'scripts',
+    install_dir: pyinstall_dir,
+    exclude_files: ['ruff.toml'],
+)
+
+# Define configuration data
+conf = configuration_data(
+    {
+        'PROJNAME': meson.project_name(),
+        'FOLDERNAME': meson.project_name(),
+        'VERSION': 'v1.0.0',
+        'MAYA_VERSION': maya_version,
+        'MAYA_PLATFORM': maya_platform,
+    },
+)
+configure_file(
+    input: 'module.mod.in',
+    output: meson.project_name() + '.mod',
+    configuration: conf,
+    install_dir: meson.global_source_root() / 'modules',
+    format: 'cmake',
+)

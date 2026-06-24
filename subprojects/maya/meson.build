@@ -18,6 +18,7 @@ if os_name == 'windows'
   maya_plugin_ext = 'mll'
   maya_compile_args += ['-DNT_PLUGIN']
   maya_link_args = ['/export:initializePlugin', '/export:uninitializePlugin']
+  maya_platform = 'win64'
 elif os_name == 'darwin'
   maya_install_base = '/Applications/Autodesk'
   maya_plugin_ext = 'bundle'
@@ -40,10 +41,12 @@ elif os_name == 'darwin'
 
   # ignore this warning that comes from maya's headers
   maya_compile_args += ['-Wno-inconsistent-missing-override']
+  maya_platform = 'mac'
 elif os_name == 'linux'
   maya_install_base = '/usr/autodesk'
   maya_plugin_ext = 'so'
   maya_compile_args += ['-DLINUX', '-fPIC']
+  maya_platform = 'linux'
 else
   error('Incompatible operating system')
 endif
@@ -128,7 +131,7 @@ maya_inc = include_directories(maya_inc_folders)
 maya_dep = declare_dependency(
   dependencies : maya_libs,
   include_directories : maya_inc,
-  variables : {'name_suffix' : maya_plugin_ext, 'maya_version' : maya_version},
+  variables : {'name_suffix' : maya_plugin_ext, 'maya_version' : maya_version, 'maya_platform' : maya_platform},
   compile_args : maya_compile_args,
   link_args : maya_link_args,
 
