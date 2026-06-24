@@ -5,7 +5,7 @@ maya_devkit_base = get_option('maya_devkit_base')
 maya_link_qt = get_option('maya_link_qt')
 maya_qt_extra_includes = get_option('maya_qt_extra_includes')
 
-os_name = build_machine.system()
+os_name = host_machine.system()
 
 maya_inc_suffix = 'include'
 maya_lib_suffix = 'lib'
@@ -55,6 +55,11 @@ maya_install_path = maya_install_base / ('Maya' + maya_version)
 if maya_devkit_base != ''
   message('Using Maya Devkit:', maya_devkit_base)
   maya_install_path = maya_devkit_base
+elif build_machine.system() != host_machine.system()
+  error(
+    'Cross-compiling requires a Maya devkit — Maya can only be installed natively on the build machine.\n',
+    'Set the `maya_devkit_base` option to the path of the Maya devkit for the target platform.',
+  )
 endif
 
 maya_inc_dir = maya_install_path / maya_inc_suffix
