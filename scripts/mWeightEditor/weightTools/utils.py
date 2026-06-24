@@ -215,19 +215,19 @@ def orderMelListWithWeights(listInd):
         return [(a,), w] if a == b else [(a, b), w]
 
     listInd = sorted(listInd)
-    curVal = listInd[0]
-    start = listInd[0]
+    curVal = listInd[0][0]
+    start = listInd[0][0]
     ret = []
     weights = []
     for i, (val, weight) in enumerate(listInd):
         key = val - i
         if curVal != key:
-            ret.append(tup(start, listInd[i - 1], weights))
+            ret.append(tup(start, listInd[i - 1][0], weights))
             start = val
             curVal = key
             weights = []
         weights.append(weight)
-    ret.append(tup(start, listInd[-1], weights))
+    ret.append(tup(start, listInd[-1][0], weights))
     return ret
 
 
@@ -605,7 +605,7 @@ def getMapForSelectedVerticesFromSelection(normalize=True, opp=False, axis="uv")
         diffU = maxU - minU
 
         indicesValues = [
-            (theVert, (u - minU) / diffU, (v - minU) / diffV)
+            (theVert, (u - minU) / diffU, (v - minV) / diffV)
             for (theVert, u, v) in indicesValues
         ]
     if opp:
@@ -644,7 +644,7 @@ def getMapForSelectedVertices(vertIter, normalize=True, opp=False, axis="uv"):
         diffU = maxU - minU
 
         indicesValues = [
-            (theVert, (u - minU) / diffU, (v - minU) / diffV)
+            (theVert, (u - minU) / diffU, (v - minV) / diffV)
             for (theVert, u, v) in indicesValues
         ]
     if opp:

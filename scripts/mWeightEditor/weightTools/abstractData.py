@@ -403,13 +403,13 @@ class DataAbstract(object):
             self.nbVertices = div_s * div_t * div_u
 
         elif self.shapePath.apiType() == OpenMaya.MFn.kNurbsCurve:
-            self.isNurbsCurve = False
+            self.isNurbsCurve = True
             deg = cmds.getAttr(self.deformedShape + ".degree")
             spans = cmds.getAttr(self.deformedShape + ".spans")
             self.nbVertices = deg + spans
 
         elif self.shapePath.apiType() == OpenMaya.MFn.kMesh:
-            self.isMesh = False
+            self.isMesh = True
             self.nbVertices = cmds.polyEvaluate(self.deformedShape, vertex=True)
 
     @staticmethod
@@ -924,7 +924,7 @@ class DataAbstract(object):
             toSel = []
             for indVtx in selectedVertices:
                 indexV = indVtx % self.numCVsInV_
-                indexU = indVtx / self.numCVsInV_
+                indexU = indVtx // self.numCVsInV_
                 toSel += ["{0}.cv[{1}][{2}]".format(self.deformedShape, indexU, indexV)]
         elif self.isLattice:
             toSel = []
@@ -936,7 +936,7 @@ class DataAbstract(object):
                 if cmds.nodeType(self.deformedShape) == "lattice"
                 else self.deformedShape
             )
-            for indVtx in self.vertices:
+            for indVtx in selectedVertices:
                 s, t, u = getThreeIndices(div_s, div_t, div_u, indVtx)
                 toSel += ["{0}.pt[{1}][{2}][{3}]".format(prt, s, t, u)]
         else:

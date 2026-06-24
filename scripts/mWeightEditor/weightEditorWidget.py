@@ -105,9 +105,8 @@ class SkinWeightWin(Window):
 
         self.get_data_frame()
         self.createWindow()
-        styleSheet = open(
-            os.path.join(os.path.dirname(__file__), "xsi.css"), "r"
-        ).read()
+        with open(os.path.join(os.path.dirname(__file__), "xsi.css"), "r") as f:
+            styleSheet = f.read()
         self.setStyleSheet(styleSheet)
 
         self.addCallBacks()
@@ -565,6 +564,8 @@ class SkinWeightWin(Window):
 
     def showMenu(self, pos):
         child = self.childAt(pos)
+        if child is None:
+            return
         widgetName = child.objectName()
         if widgetName in [
             "centralwidget",

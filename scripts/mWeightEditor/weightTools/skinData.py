@@ -119,7 +119,7 @@ class DataOfSkin(DataAbstract):
                     connVert = vertices[i]
                     origDist = origVerts[theVert].distanceTo(origVerts[connVert])
                     destDist = destVerts[theVert].distanceTo(destVerts[connVert])
-                    if (destDist / origDist) > tolerance:
+                    if origDist > 0 and (destDist / origDist) > tolerance:
                         problemVerts.add(theVert)
                 theVert += 1
                 iterVert.next()
@@ -130,7 +130,7 @@ class DataOfSkin(DataAbstract):
         with GlobalContext(message="normalize", doPrint=True):
             new2dArray = np.copy(self.orig2dArray)
             unLock = np.ma.array(new2dArray.copy(), mask=self.lockedMask, fill_value=0)
-            unLock.clip(0, 1)
+            unLock = unLock.clip(0, 1)
             sum_unLock = unLock.sum(axis=1)
             unLockNormalized = (
                 unLock
@@ -1088,7 +1088,7 @@ class DataOfSkin(DataAbstract):
                 if cmds.nodeType(self.deformedShape) == "lattice"
                 else self.deformedShape
             )
-            for indVtx in self.vertices:
+            for indVtx in selectedVertices:
                 s, t, u = getThreeIndices(div_s, div_t, div_u, indVtx)
                 toSel += ["{0}.pt[{1}][{2}][{3}]".format(prt, s, t, u)]
         else:
