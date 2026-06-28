@@ -277,6 +277,11 @@ def restoreShading():
         cmds.deleteAttr(att)
 
 
+def toggleDisplayColors(meshName):
+    displayColors = cmds.getAttr(meshName + ".displayColors") == 1
+    cmds.setAttr(meshName + ".displayColors", not displayColors)
+
+
 def getOrigShape(nrbs):
     (prt,) = cmds.listRelatives(nrbs, parent=True, path=True)
     allShapes = cmds.listRelatives(prt, shapes=True, noIntermediate=False)

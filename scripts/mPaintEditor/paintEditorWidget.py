@@ -35,6 +35,7 @@ from .brushTools.brushPythonFunctions import (
     disconnectNurbs,
     doUpdateWireFrameColorSoloMode,
     toggleWireFrame,
+    toggleDisplayColors,
 )
 from mWeightEditor.weightTools.skinData import DataOfSkin
 from mWeightEditor.weightTools.spinnerSlider import ValueSetting
@@ -676,6 +677,12 @@ class SkinPaintWin(Window):
         self.enterPaint_btn.setEnabled(False)
 
         with UndoContext("enterPaint"):
+            skinClusterName = self.dataOfSkin.theSkinCluster
+            checkSparceArray = cmdSkinCluster.skinClusterHasSparceArray(skinClusterName)
+            if checkSparceArray:
+                print("FIX sparce array")
+                cmdSkinCluster.reloadSkin(skinClusterName)
+
             setColorsOnJoints()
             dic = {
                 "soloColor": int(self.solo_rb.isChecked()),
@@ -994,6 +1001,7 @@ class SkinPaintWin(Window):
         self.listDeformers_cb.currentTextChanged.connect(self.changeDeformer)
 
         self.deleteExisitingColorSets_btn.clicked.connect(deleteExistingColorSets)
+        self.uiToggleVertexColorBtn.clicked.connect(self.toggleDisplayColorsCurrentMesh)
 
         self.showLocks_btn.setIcon(ICONS["eye"])
         self.showLocks_btn.toggled.connect(self.showHideLocks)
@@ -1216,6 +1224,10 @@ class SkinPaintWin(Window):
 
     def toggleBrushSwapShaders(self, val):
         cmds.optionVar(intValue=("brushSwapShaders", val))
+
+    def toggleDisplayColorsCurrentMesh(self):
+        meshName = cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), query=True, meshName=True)
+        toggleDisplayColors(meshName)
 
     def brSkinConn(self, nm, val):
         if isInPaint():

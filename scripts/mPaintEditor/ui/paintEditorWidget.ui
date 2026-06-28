@@ -806,23 +806,6 @@ Same behavior as setting Min Color to 1.0</string>
          </layout>
         </item>
         <item>
-         <widget class="QPushButton" name="WarningFixSkin_btn">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>35</height>
-           </size>
-          </property>
-          <property name="styleSheet">
-           <string notr="true">border:2px solid red;</string>
-          </property>
-          <property name="text">
-           <string>Skin has sparse array
-Click to fix</string>
-          </property>
-         </widget>
-        </item>
-        <item>
          <widget class="QComboBox" name="listDeformers_cb"/>
         </item>
         <item>
@@ -1218,6 +1201,32 @@ Click to fix</string>
            </widget>
           </item>
           <item>
+           <widget class="QPushButton" name="WarningFixSkin_btn">
+            <property name="minimumSize">
+             <size>
+              <width>10</width>
+              <height>0</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>18</width>
+              <height>18</height>
+             </size>
+            </property>
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;skin has sparce array, click to fix manually&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="styleSheet">
+             <string notr="true">border:2px solid red;
+</string>
+            </property>
+            <property name="text">
+             <string>!</string>
+            </property>
+           </widget>
+          </item>
+          <item>
            <spacer name="horizontalSpacer_5">
             <property name="orientation">
              <enum>Qt::Horizontal</enum>
@@ -1342,6 +1351,13 @@ Click to fix</string>
              <widget class="QPushButton" name="deleteExisitingColorSets_btn">
               <property name="text">
                <string>Delete Existing ColorSets</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="uiToggleVertexColorBtn">
+              <property name="text">
+               <string>toggle display colors</string>
               </property>
              </widget>
             </item>
