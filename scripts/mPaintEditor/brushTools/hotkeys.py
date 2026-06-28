@@ -1,20 +1,20 @@
 from Qt import QtCore, QtGui
 
 _default_hotkeys = {
-    "smooth_key": QtCore.Qt.Key_Shift,
-    "remove_key": QtCore.Qt.Key_Control,
-    "exit_key": QtCore.Qt.Key_Escape,
-    "solo_key": QtCore.Qt.Key_S,
-    "mirror_key": QtCore.Qt.Key_M,
-    "set_orbit_pos_key": QtCore.Qt.Key_F,
-    "solo_opaque_key": QtCore.Qt.Key_A,
+    "smooth_key": QtCore.Qt.Key.Key_Shift,
+    "remove_key": QtCore.Qt.Key.Key_Control,
+    "exit_key": QtCore.Qt.Key.Key_Escape,
+    "solo_key": QtCore.Qt.Key.Key_S,
+    "mirror_key": QtCore.Qt.Key.Key_M,
+    "set_orbit_pos_key": QtCore.Qt.Key.Key_F,
+    "solo_opaque_key": QtCore.Qt.Key.Key_A,
     # +Alt: pick MAX influence
-    "pick_influence_key": QtCore.Qt.Key_D,
+    "pick_influence_key": QtCore.Qt.Key.Key_D,
     # ALT KEYS
-    "toggle_wireframe_key": QtCore.Qt.Key_W,
-    "toggle_xray_key": QtCore.Qt.Key_X,
+    "toggle_wireframe_key": QtCore.Qt.Key.Key_W,
+    "toggle_xray_key": QtCore.Qt.Key.Key_X,
     # Handled specially
-    "marking_menu_key": QtCore.Qt.Key_U,
+    "marking_menu_key": QtCore.Qt.Key.Key_U,
 }
 
 
@@ -23,9 +23,9 @@ class HOTKEY_CLASS:
         self.updateHotkeys(hotkeyDict)
 
     def _key_to_string(self, key):
-        if key == QtCore.Qt.Key_Control:
+        if key == QtCore.Qt.Key.Key_Control:
             return "Ctrl"
-        elif key == QtCore.Qt.Key_Shift:
+        elif key == QtCore.Qt.Key.Key_Shift:
             return "Shift"
         return QtGui.QKeySequence(key).toString()
 

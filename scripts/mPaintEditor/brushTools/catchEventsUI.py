@@ -446,11 +446,11 @@ class CatchEventsWidget(QtWidgets.QWidget):
         ):
             if (
                 event.type()
-                in [QtCore.QEvent.MouseButtonPress, QtCore.QEvent.MouseButtonRelease]
-                and event.modifiers() != QtCore.Qt.AltModifier
+                in [QtCore.QEvent.Type.MouseButtonPress, QtCore.QEvent.Type.MouseButtonRelease]
+                and event.modifiers() != QtCore.Qt.KeyboardModifier.AltModifier
             ):
-                if event.modifiers() == QtCore.Qt.NoModifier:  # regular click
-                    if event.type() == QtCore.QEvent.MouseButtonPress:  # click
+                if event.modifiers() == QtCore.Qt.KeyboardModifier.NoModifier:  # regular click
+                    if event.type() == QtCore.QEvent.Type.MouseButtonPress:  # click
                         with disableUndoContext():
                             if self.markingMenuKeyPressed:
                                 if not self.markingMenuShown:
@@ -463,7 +463,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                                 self.markingMenuKeyPressed = False
                                 self.closingNextPressMarkingMenu = False
                     elif (
-                        event.type() == QtCore.QEvent.MouseButtonRelease
+                        event.type() == QtCore.QEvent.Type.MouseButtonRelease
                     ):  # click release
                         if self.markingMenuShown:
                             self.closingNextPressMarkingMenu = True
@@ -472,7 +472,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
 
         if obj in self.eventFilterWidgetReceiver:
             # action on Release
-            if event.type() == QtCore.QEvent.KeyRelease:
+            if event.type() == QtCore.QEvent.Type.KeyRelease:
                 if event.key() == HOTKEYS.REMOVE_KEY:
                     self.isRemoveKeyPressed = False
                     self.RemoveKeyReleased.emit()
@@ -487,11 +487,11 @@ class CatchEventsWidget(QtWidgets.QWidget):
                     return True
 
             # action on Press
-            elif event.type() == QtCore.QEvent.KeyPress:
+            elif event.type() == QtCore.QEvent.Type.KeyPress:
                 if event.key() == HOTKEYS.REMOVE_KEY:
                     if self.isRemoveKeyPressed:  # already pressed
                         return False
-                    if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.NoButton:
+                    if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.MouseButton.NoButton:
                         self.isRemoveKeyPressed = True
                         self.RemoveKeyPressed.emit()
                         return False
@@ -499,7 +499,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 elif event.key() == HOTKEYS.SMOOTH_KEY:
                     if self.isSmoothKeyPressed:  # already pressed
                         return False
-                    if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.NoButton:
+                    if QtWidgets.QApplication.mouseButtons() == QtCore.Qt.MouseButton.NoButton:
                         self.isSmoothKeyPressed = True
                         self.SmoothKeyPressed.emit()
                         return False
@@ -516,7 +516,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                 elif event.key() == HOTKEYS.PICK_INFLUENCE_KEY:
                     with disableUndoContext():
                         if not event.isAutoRepeat():
-                            if event.modifiers() == QtCore.Qt.AltModifier:
+                            if event.modifiers() == QtCore.Qt.KeyboardModifier.AltModifier:
                                 self.PickMaxInfluenceKeyPressed.emit()
                             else:
                                 self.PickInfluenceKeyPressed.emit()
@@ -528,7 +528,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
                             self.SetOrbitPosKeyPressed.emit()
                     return True
 
-                elif event.modifiers() == QtCore.Qt.AltModifier:
+                elif event.modifiers() == QtCore.Qt.KeyboardModifier.AltModifier:
                     if event.key() == HOTKEYS.TOGGLE_XRAY_KEY:
                         with disableUndoContext():
                             if not event.isAutoRepeat():

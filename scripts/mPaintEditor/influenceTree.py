@@ -31,11 +31,11 @@ class InfluenceTree(QtWidgets.QTreeWidget):
 
     def paintEnd(self):
         self.setStyleSheet("")
-        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
 
     def paintStart(self):
         self.setStyleSheet("QWidget {border : 2px solid red}\n")
-        self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         selItems = self.selectedItems()
         if selItems:
             self.clearSelection()
@@ -44,7 +44,7 @@ class InfluenceTree(QtWidgets.QTreeWidget):
     def __init__(self, *args):
         self.isOn = False
         super(InfluenceTree, self).__init__(*args)
-        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setIndentation(5)
         self.setColumnCount(5)
         self.header().hide()

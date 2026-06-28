@@ -122,7 +122,7 @@ class ValueSettingPE(ValueSetting):
         btn.move(100, 0)
         btn.pos()
         btn.show()
-        btn.setAttribute(QtCore.Qt.WA_TransparentForMouseEvents, True)
+        btn.setAttribute(QtCore.Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         btn.setStyleSheet(FLAT_BUTTON_ENABLED_SS)
         self.btn = btn
         self.updateBtn()
@@ -286,9 +286,9 @@ class SkinPaintWin(Window):
         self.colorDialog = QtWidgets.QColorDialog()
         self.colorDialog.currentColorChanged.connect(self.colorSelected)
         self.colorDialog.rejected.connect(self.revertColor)
-        self.colorDialog.setWindowFlags(QtCore.Qt.Tool)
+        self.colorDialog.setWindowFlags(QtCore.Qt.WindowType.Tool)
         self.colorDialog.setWindowTitle("Pick Color")
-        self.colorDialog.setWindowModality(QtCore.Qt.ApplicationModal)
+        self.colorDialog.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
 
     def buildRCMenu(self):
         self.mainPopMenu = QtWidgets.QMenu(self)
@@ -304,7 +304,7 @@ class SkinPaintWin(Window):
             act.setCheckable(True)
             act.setChecked(soloColorIndex == ind)
 
-        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showMainMenu)
 
         self.popMenu = QtWidgets.QMenu(self.uiInfluenceTREE)
@@ -364,7 +364,7 @@ class SkinPaintWin(Window):
         checkableAction.setDefaultWidget(chbox)
         self.popMenu.addAction(checkableAction)
 
-        self.uiInfluenceTREE.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.uiInfluenceTREE.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.uiInfluenceTREE.customContextMenuRequested.connect(self.showMenu)
 
     def showMenu(self, pos):
@@ -398,7 +398,7 @@ class SkinPaintWin(Window):
                 item.setHidden(not self.showZeroDeformers)
 
     def setWindowDisplay(self):
-        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.Tool)
+        self.setWindowFlags(QtCore.Qt.WindowType.Window | QtCore.Qt.WindowType.Tool)
         self.setWindowTitle("Paint Editor")
         self.show()
 
