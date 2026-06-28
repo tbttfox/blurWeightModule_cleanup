@@ -370,10 +370,10 @@ class SkinPaintWin(Window):
         self.uiInfluenceTREE.customContextMenuRequested.connect(self.showMenu)
 
     def showMenu(self, pos):
-        self.popMenu.exec_(self.uiInfluenceTREE.mapToGlobal(pos))
+        self.popMenu.exec(self.uiInfluenceTREE.mapToGlobal(pos))
 
     def showMainMenu(self, pos):
-        self.mainPopMenu.exec_(self.mapToGlobal(pos))
+        self.mainPopMenu.exec(self.mapToGlobal(pos))
 
     def updateSoloColor(self, ind):
         self.soloColor_cb.setCurrentIndex(ind)
