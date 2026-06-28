@@ -36,6 +36,7 @@ from .brushTools.brushPythonFunctions import (
     doUpdateWireFrameColorSoloMode,
     toggleWireFrame,
     toggleDisplayColors,
+    togglePanelsDisplay,
 )
 from mWeightEditor.weightTools.skinData import DataOfSkin
 from mWeightEditor.weightTools.spinnerSlider import ValueSetting
@@ -1002,6 +1003,7 @@ class SkinPaintWin(Window):
 
         self.deleteExisitingColorSets_btn.clicked.connect(deleteExistingColorSets)
         self.uiToggleVertexColorBtn.clicked.connect(self.toggleDisplayColorsCurrentMesh)
+        self.uiTogglePanelViewBtn.clicked.connect(self.togglePanelView)
 
         self.showLocks_btn.setIcon(ICONS["eye"])
         self.showLocks_btn.toggled.connect(self.showHideLocks)
@@ -1226,8 +1228,13 @@ class SkinPaintWin(Window):
         cmds.optionVar(intValue=("brushSwapShaders", val))
 
     def toggleDisplayColorsCurrentMesh(self):
-        meshName = cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), query=True, meshName=True)
-        toggleDisplayColors(meshName)
+        if self.isInPaint():
+            meshName = cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), query=True, meshName=True)
+            toggleDisplayColors(meshName)
+
+    def togglePanelView(self):
+        if self.isInPaint():
+            togglePanelsDisplay()
 
     def brSkinConn(self, nm, val):
         if isInPaint():

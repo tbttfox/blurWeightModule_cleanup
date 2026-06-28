@@ -324,7 +324,14 @@ class HandleEventsMaya:
         if cmds.popupMenu(MM_NAME, exists=True):
             cmds.deleteUI(MM_NAME)
 
+    def togglePanelsDisplay(self):
+        if self.viewPaint:
+            self.setPanelsDisplayOff()
+        else:
+            self.setPanelsDisplayOn()
+
     def setPanelsDisplayOn(self):
+        self.viewPaint = True
         self.restorePanels = []
         dicPanel = {"edit": True, "displayLights": "flat", "useDefaultMaterial": False}
         listModelEditorKeys = [
@@ -345,6 +352,7 @@ class HandleEventsMaya:
             cmds.modelEditor(panel, edit=True, cmEnabled=False)
 
     def setPanelsDisplayOff(self):
+        self.viewPaint = False
         for panel, valDic in self.restorePanels:
             cmds.modelEditor(panel, edit=True, **valDic)
 
@@ -396,6 +404,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
         self.isSmoothKeyPressed = False
         self.filterInstalled = False
         self.eventFilterWidgetReceiver = None
+        self.viewPaint = False
 
         self.mayaEventHandler = HandleEventsMaya(self)
 

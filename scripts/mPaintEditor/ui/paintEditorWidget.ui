@@ -1355,6 +1355,13 @@ Same behavior as setting Min Color to 1.0</string>
              </widget>
             </item>
             <item>
+             <widget class="QPushButton" name="uiTogglePanelViewBtn">
+              <property name="text">
+               <string>toggle Panel View</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QPushButton" name="uiToggleVertexColorBtn">
               <property name="text">
                <string>toggle display colors</string>

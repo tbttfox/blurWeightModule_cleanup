@@ -279,7 +279,15 @@ def restoreShading():
 
 def toggleDisplayColors(meshName):
     displayColors = cmds.getAttr(meshName + ".displayColors") == 1
-    cmds.setAttr(meshName + ".displayColors", not displayColors)
+    newDisplayColors = not displayColors
+    cmds.setAttr(meshName + ".displayColors", newDisplayColors)
+
+
+def togglePanelsDisplay():
+    from . import catchEventsUI
+
+    if hasattr(catchEventsUI, "EVENTCATCHER"):
+        catchEventsUI.EVENTCATCHER.togglePanelsDisplay()
 
 
 def getOrigShape(nrbs):
