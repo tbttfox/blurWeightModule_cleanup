@@ -671,6 +671,7 @@ class SkinPaintWin(Window):
         if not self.dataOfSkin.theSkinCluster:
             return
 
+        self.checkInfluences(True)
         self.enterPaint_btn.setEnabled(False)
 
         with UndoContext("enterPaint"):
@@ -1444,11 +1445,21 @@ class SkinPaintWin(Window):
                 item.setHidden(not self.showZeroDeformers and item.isZeroDfm)
 
     def refreshBtn(self):
-        self.dataOfSkin = DataOfSkin(
-            useShortestNames=self.useShortestNames, createDisplayLocator=False
-        )
-        self.dataOfSkin.softOn = False
-        self.refresh(force=True)
+        if self.isInPaint():
+            cmds.evalDeferred(
+                partial(
+                    cmds.brSkinBrushContext,
+                    "brSkinBrushContext1",
+                    edit=True,
+                    refresh=True,
+                )
+            )
+        else:
+            self.dataOfSkin = DataOfSkin(
+                useShortestNames=self.useShortestNames, createDisplayLocator=False
+            )
+            self.dataOfSkin.softOn = False
+            self.refresh(force=True)
 
     def selectRefresh(self):
         cmds.select(self.dataOfSkin.deformedShape)
@@ -1463,7 +1474,26 @@ class SkinPaintWin(Window):
 
     def refreshCallBack(self):
         if not self.lock_btn.isChecked():
-            self.refresh()
+            self.refresh(force=self.checkInfluences())
+
+    def checkInfluences(self, withRefresh=False):
+        if not self.dataOfSkin.theSkinCluster:
+            return False
+        if not cmds.objExists(self.dataOfSkin.theSkinCluster):
+            return True
+        selItems = self.selectedInfluences()
+        currentInfl = selItems[0] if selItems else None
+        toolInfluences = set(self.dataOfSkin.driverNames)
+        realInfluences = set(
+            cmds.skinCluster(self.dataOfSkin.theSkinCluster, query=1, influence=1)
+        )
+        if toolInfluences != realInfluences:
+            if withRefresh:
+                self.refresh(force=True)
+                if currentInfl in realInfluences:
+                    self.uiInfluenceTREE.setCurrentItem(currentInfl)
+            return True
+        return False
 
     def refresh(self, force=False, renamedCalled=False):
         with GlobalContext(message="paintEditor getAllData", doPrint=self.doPrint):
@@ -1490,6 +1520,9 @@ class SkinPaintWin(Window):
                     self.dataOfSkin.deformedShape,
                     self.dataOfSkin.theDeformer,
                 ) = prevDataOfSkin
+
+        if renamedCalled and not force:
+            force = self.checkInfluences()
 
         if renamedCalled or resultData or force:
             self.uiInfluenceTREE.clear()
