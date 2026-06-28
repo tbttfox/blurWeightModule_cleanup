@@ -2,7 +2,6 @@ from __future__ import print_function
 from __future__ import absolute_import
 
 from maya import cmds
-from six.moves import range
 from Qt import QtGui, QtWidgets
 
 from .icons import ICONS

@@ -1,8 +1,6 @@
 from __future__ import print_function
 from __future__ import absolute_import
 from maya import cmds, OpenMaya as om, OpenMayaAnim as oma
-import six
-from six.moves import range, zip
 
 
 def getThreeIndices(div_s, div_t, div_u, *args):
@@ -124,7 +122,7 @@ def reloadSkin(skinClusterName, newGeometrie=None, resetBindAtt=True):
 
     listBindPreMat = {}
     listInfluenceColor = {}
-    for influenceName, influencesIndex in six.iteritems(influencesIndices):
+    for influenceName, influencesIndex in influencesIndices.items():
         bindPreAtt = "{}.bindPreMatrix[{}]".format(skinClusterName, influencesIndex)
         bindPreConn = cmds.listConnections(
             bindPreAtt, source=True, destination=False, plugs=True
@@ -228,10 +226,10 @@ def reloadSkin(skinClusterName, newGeometrie=None, resetBindAtt=True):
     )
 
     # reconnect the Atts -----------------------
-    for influenceName, influencesIndex in six.iteritems(influencesIndicesNew):
+    for influenceName, influencesIndex in influencesIndicesNew.items():
         bindPreAtt = "{}.bindPreMatrix[{}]".format(newSkinName, influencesIndex)
         bindPreValue = listBindPreMat[influenceName]
-        if isinstance(bindPreValue, six.string_types):
+        if isinstance(bindPreValue, str):
             cmds.connectAttr(bindPreValue, bindPreAtt, force=True)
         elif resetBindAtt:
             cmds.setAttr(bindPreAtt, bindPreValue, type="matrix")
@@ -239,7 +237,7 @@ def reloadSkin(skinClusterName, newGeometrie=None, resetBindAtt=True):
         influenceColorAtt = "{}.influenceColor[{}]".format(newSkinName, influencesIndex)
         influenceColorValue = listInfluenceColor[influenceName]
 
-        if not isinstance(influenceColorValue, six.string_types):
+        if not isinstance(influenceColorValue, str):
             cmds.setAttr(influenceColorAtt, *influenceColorValue, type="float3")
     # rename ----------------------
     cmds.rename(newSkinName, skinClusterName)

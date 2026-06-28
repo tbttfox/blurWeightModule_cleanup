@@ -3,11 +3,9 @@ from __future__ import absolute_import
 
 import os
 import re
-import six
 from fractions import Fraction
 
 from maya import cmds, mel, OpenMaya
-from six.moves import range
 import numpy as np
 from Qt import QtGui, QtCore, QtWidgets, QtCompat
 from functools import partial
@@ -1433,7 +1431,7 @@ class SkinPaintWin(Window):
             while "" in newTexts:
                 newTexts.remove("")
 
-            for nm, it in six.iteritems(self._treeDicWidgName):
+            for nm, it in self._treeDicWidgName.items():
                 foundText = False
                 for txt in newTexts:
                     txt = txt.replace("*", ".*")
@@ -1442,7 +1440,7 @@ class SkinPaintWin(Window):
                         break
                 it.setHidden(not foundText)
         else:
-            for item in six.itervalues(self._treeDicWidgName):
+            for item in self._treeDicWidgName.values():
                 item.setHidden(not self.showZeroDeformers and item.isZeroDfm)
 
     def refreshBtn(self):

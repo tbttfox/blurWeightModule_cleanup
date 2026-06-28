@@ -9,7 +9,6 @@ from Qt import QtGui
 from contextlib import contextmanager
 
 from maya import cmds
-from six.moves import range, zip
 
 from ..utils import rootWindow
 from .. import PAINT_EDITOR_CONTEXT_OPTIONS, GET_CONTEXT
