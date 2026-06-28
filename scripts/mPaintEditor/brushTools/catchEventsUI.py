@@ -7,6 +7,7 @@ from maya import OpenMayaUI, cmds, mel
 from .brushPythonFunctions import (
     doRemoveColorSets,
     disableUndoContext,
+    toggleWireFrame,
 )
 from . import meshFnIntersection
 from .hotkeys import HOTKEYS
@@ -293,18 +294,9 @@ class HandleEventsMaya:
         ]
 
     def toggleWireframeKeyPressed(self):
-        if cmds.objExists("SkinningWireframe"):
-            vis = cmds.getAttr("SkinningWireframe.v")
-            cmds.setAttr("SkinningWireframe.v", not vis)
-        else:
-            listModelPanels = self.getModelPanels()
-            val = not cmds.modelEditor(
-                listModelPanels[0],
-                query=True,
-                wireframeOnShaded=True,
-            )
-            for pnel in listModelPanels:
-                cmds.modelEditor(pnel, edit=True, wireframeOnShaded=val)
+        ctx = "brSkinBrushContext1"
+        meshName = cmds.brSkinBrushContext(ctx, query=True, meshName=True)
+        toggleWireFrame(meshName)
 
     def toggleXrayKeyPressed(self):
         listModelPanels = self.getModelPanels()
@@ -339,12 +331,8 @@ class HandleEventsMaya:
             "displayLights",
             "cmEnabled",
             "selectionHiliteDisplay",
-            "wireframeOnShaded",
             "useDefaultMaterial",
         ]
-
-        if cmds.objExists("SkinningWireframe"):
-            dicPanel["wireframeOnShaded"] = False
 
         for panel in self.getModelPanels():
             valDic = {}

@@ -34,6 +34,7 @@ from .brushTools.brushPythonFunctions import (
     retrieveParallelMode,
     disconnectNurbs,
     doUpdateWireFrameColorSoloMode,
+    toggleWireFrame,
 )
 from mWeightEditor.weightTools.skinData import DataOfSkin
 from mWeightEditor.weightTools.spinnerSlider import ValueSetting
@@ -46,6 +47,7 @@ from mWeightEditor.weightTools.utils import (
     SettingVariable,
     orderMelList,
     Prefs,
+    getListDeformersFromSel,
 )
 
 try:
@@ -477,8 +479,6 @@ class SkinPaintWin(Window):
 
     def toolOffCleanup(self):
         with GlobalContext(message="toolOffCleanup", doPrint=False):
-            if cmds.objExists("SkinningWireframe"):
-                cmds.delete("SkinningWireframe")
             closeEventCatcher()
             # unhide previous wireFrames
 
@@ -488,6 +488,7 @@ class SkinPaintWin(Window):
                 GET_CONTEXT.getLatest(), query=True, meshName=True
             )
             if mshShape and cmds.objExists(mshShape):
+                toggleWireFrame(mshShape, False, clear=True)
                 (theMesh,) = cmds.listRelatives(mshShape, parent=True, path=True)
                 showBackNurbs(theMesh)
 
@@ -690,10 +691,18 @@ class SkinPaintWin(Window):
 
             GET_CONTEXT.updateIndex()
 
+            context = GET_CONTEXT.getLatest()
+            # here pass the mesh and the skinCluster
+            cmds.brSkinBrushContext(
+                context,
+                edit=True,
+                skinClusterName=self.dataOfSkin.theSkinCluster,
+                meshName=self.dataOfSkin.deformedShape_longName,
+            )
             # getMirrorInfluenceArray
             # let's select the shape first
-            cmds.select(self.dataOfSkin.deformedShape, replace=True)
-            cmds.setToolTo(GET_CONTEXT.getLatest())
+            cmds.select([self.dataOfSkin.deformedShape_longName], replace=True)
+            cmds.setToolTo(context)
             self.getMirrorInfluenceArray()
 
     def setFocusToPanel(self):
@@ -982,6 +991,7 @@ class SkinPaintWin(Window):
         self.dgParallel_btn.toggled.connect(self.changeDGParallel)
         self.refresh_btn.clicked.connect(self.refreshBtn)
         self.enterPaint_btn.clicked.connect(self.enterPaint)
+        self.listDeformers_cb.currentTextChanged.connect(self.changeDeformer)
 
         self.deleteExisitingColorSets_btn.clicked.connect(deleteExistingColorSets)
 
@@ -1495,12 +1505,32 @@ class SkinPaintWin(Window):
             return True
         return False
 
-    def refresh(self, force=False, renamedCalled=False):
+    def changeDeformer(self, newVal):
+        self.refresh(force=True, passedDeformer=newVal)
+        if self.isInPaint():
+            selectedInfluences = self.selectedInfluences()
+            influenceName = selectedInfluences[0] if selectedInfluences else ""
+            ctx = GET_CONTEXT.getLatest()
+            cmds.brSkinBrushContext(
+                ctx,
+                edit=True,
+                swapSkinName=self.dataOfSkin.theSkinCluster,
+                influenceName=influenceName,
+            )
+            cmds.evalDeferred(
+                partial(cmds.brSkinBrushContext, ctx, edit=True, refresh=True)
+            )
+
+    def refresh(self, force=False, renamedCalled=False, passedDeformer=None):
+        if passedDeformer is None:
+            self.editNbDeformers()
         with GlobalContext(message="paintEditor getAllData", doPrint=self.doPrint):
             prevDataOfSkin = self.dataOfSkin.deformedShape, self.dataOfSkin.theDeformer
-            resultData = self.dataOfSkin.getAllData(
-                displayLocator=False, getskinWeights=False, force=force
-            )
+            dico = dict(displayLocator=False, getskinWeights=False, force=force)
+            if passedDeformer is not None:
+                dico["theDeformer"] = passedDeformer
+                dico["deformedShape"] = self.dataOfSkin.deformedShape
+            resultData = self.dataOfSkin.getAllData(**dico)
             doForce = not resultData
 
             dShape = self.dataOfSkin.deformedShape
@@ -1572,6 +1602,19 @@ class SkinPaintWin(Window):
         self.dgParallel_btn.setChecked(cmds.optionVar(query="evaluationMode") == 3)
         self.updateWarningBtn()
         self.showHideLocks(self.showLocks_btn.isChecked())
+
+    def editNbDeformers(self):
+        sel = cmds.ls(selection=True)
+        if not sel:
+            return
+        selShape, listDeformers = getListDeformersFromSel(sel)
+        if selShape == self.dataOfSkin.deformedShape:
+            return
+        if listDeformers:
+            skns = cmds.ls(listDeformers, type="skinCluster") or []
+            with toggleBlockSignals([self.listDeformers_cb]):
+                self.listDeformers_cb.clear()
+                self.listDeformers_cb.addItems(skns)
 
     def fixSparseArray(self):
         if isInPaint():

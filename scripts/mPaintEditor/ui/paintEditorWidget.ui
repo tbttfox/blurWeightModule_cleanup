@@ -823,6 +823,9 @@ Click to fix</string>
          </widget>
         </item>
         <item>
+         <widget class="QComboBox" name="listDeformers_cb"/>
+        </item>
+        <item>
          <widget class="QWidget" name="widget_paintBtns" native="true">
           <layout class="QHBoxLayout" name="horizontalLayout_5">
            <property name="spacing">

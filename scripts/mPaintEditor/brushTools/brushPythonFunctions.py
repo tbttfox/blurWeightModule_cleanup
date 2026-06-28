@@ -456,6 +456,25 @@ def deleteExistingColorSets():
                     cmds.polyColorSet(obj, delete=True, colorSet=colSet)
 
 
+def toggleWireFrame(meshName, val=None, clear=False):  # None is toggle
+    if clear:
+        val = False
+    else:
+        if val is None:
+            val = not cmds.getAttr(meshName + ".displaySmoothMesh")
+
+    nmOptionVar = "brushSkinSmoothLevel_" + meshName
+    if not cmds.optionVar(exists=nmOptionVar):
+        valSmoothLevel = cmds.getAttr(meshName + ".smoothLevel")
+        if not clear:
+            cmds.optionVar(intValue=[nmOptionVar, valSmoothLevel])
+    else:
+        valSmoothLevel = cmds.optionVar(query=nmOptionVar)
+
+    cmds.setAttr(meshName + ".displaySmoothMesh", val)
+    cmds.setAttr(meshName + ".smoothLevel", 0 if val else valSmoothLevel)
+
+
 def afterPaint():
     with UndoContext("afterPaint"):
         import mWeightEditor
