@@ -263,7 +263,7 @@ class SkinPaintWin(Window):
         super(SkinPaintWin, self).showEvent(event)
         self.addCallBacks()
         cmds.evalDeferred(self.updateUIwithContextValues)
-        cmds.evalDeferred(self.refresh)
+        cmds.evalDeferred(partial(self.refresh, calledFrom="showEvent"))
 
     def colorSelected(self, color):
         values = [color.red() / 255.0, color.green() / 255.0, color.blue() / 255.0]
@@ -412,7 +412,7 @@ class SkinPaintWin(Window):
             ]
             self.dataOfSkin.renameCB(oldName, newName)
             if oldName in lst:
-                self.refresh(force=False, renamedCalled=True)
+                self.refresh(force=False, renamedCalled=True, calledFrom="renameCB")
 
     def eventHandlerConnectCallBack(self):
         """Connect and disconnect from the eventhandler"""
@@ -1469,11 +1469,11 @@ class SkinPaintWin(Window):
                 useShortestNames=self.useShortestNames, createDisplayLocator=False
             )
             self.dataOfSkin.softOn = False
-            self.refresh(force=True)
+            self.refresh(force=True, calledFrom="refreshBtn")
 
     def selectRefresh(self):
         cmds.select(self.dataOfSkin.deformedShape)
-        self.refresh(force=True)
+        self.refresh(force=True, calledFrom="selectRefresh")
 
     def refreshColorsAndLocks(self):
         for i in range(self.uiInfluenceTREE.topLevelItemCount()):
@@ -1484,7 +1484,7 @@ class SkinPaintWin(Window):
 
     def refreshCallBack(self):
         if not self.lock_btn.isChecked():
-            self.refresh(force=self.checkInfluences())
+            self.refresh(force=self.checkInfluences(), calledFrom="refreshCallBack")
 
     def checkInfluences(self, withRefresh=False):
         if not self.dataOfSkin.theSkinCluster:
@@ -1506,7 +1506,7 @@ class SkinPaintWin(Window):
         return False
 
     def changeDeformer(self, newVal):
-        self.refresh(force=True, passedDeformer=newVal)
+        self.refresh(force=True, passedDeformer=newVal, calledFrom="changeDeformer")
         if self.isInPaint():
             selectedInfluences = self.selectedInfluences()
             influenceName = selectedInfluences[0] if selectedInfluences else ""
@@ -1521,9 +1521,17 @@ class SkinPaintWin(Window):
                 partial(cmds.brSkinBrushContext, ctx, edit=True, refresh=True)
             )
 
-    def refresh(self, force=False, renamedCalled=False, passedDeformer=None):
+    def refresh(
+        self, force=False, renamedCalled=False, passedDeformer=None, calledFrom=""
+    ):
         if passedDeformer is None:
-            self.editNbDeformers()
+            passedDeformer = self.editNbDeformers()
+        if self.doPrint:
+            print(
+                "refresh CALLED from [{}] force [{}] renamedCalled [{}] passedDeformer [{}]".format(
+                    calledFrom, force, renamedCalled, passedDeformer
+                )
+            )
         with GlobalContext(message="paintEditor getAllData", doPrint=self.doPrint):
             prevDataOfSkin = self.dataOfSkin.deformedShape, self.dataOfSkin.theDeformer
             dico = dict(displayLocator=False, getskinWeights=False, force=force)
@@ -1554,67 +1562,83 @@ class SkinPaintWin(Window):
         if renamedCalled and not force:
             force = self.checkInfluences()
 
-        if renamedCalled or resultData or force:
-            self.uiInfluenceTREE.clear()
-            self._treeDicWidgName = {}
-
-            if not hasattr(self.dataOfSkin, "shapePath"):
-                return
-
-            isPaintable = False
-            if self.dataOfSkin.shapePath:
-                isPaintable = self.dataOfSkin.shapePath.apiType() in [
-                    OpenMaya.MFn.kMesh,
-                    OpenMaya.MFn.kNurbsSurface,
-                ]
-
-            for uiObj in [
-                "options_widget",
-                "buttonWidg",
-                "widgetAbs",
-                "valueSetter",
-                "sizeBrushSetter",
-                "widget_paintBtns",
-                "option_GB",
-            ]:
-                wid = self.findChild(QtWidgets.QWidget, uiObj)
-                if wid:
-                    wid.setEnabled(isPaintable)
-
-            with GlobalContext(message="Just Tree", doPrint=self.doPrint):
-                with toggleBlockSignals([self.uiInfluenceTREE]):
-                    for ind, nm in enumerate(self.dataOfSkin.driverNames):
-                        theIndexJnt = self.dataOfSkin.indicesJoints[ind]
-                        theCol = self.uiInfluenceTREE.getDeformerColor(nm)
-                        jointItem = InfluenceTreeWidgetItem(
-                            nm, theIndexJnt, theCol, self.dataOfSkin.theSkinCluster
-                        )
-
-                        self.uiInfluenceTREE.addTopLevelItem(jointItem)
-                        self._treeDicWidgName[nm] = jointItem
-
-                        jointItem.isZeroDfm = ind in self.dataOfSkin.hideColumnIndices
-                        jointItem.setHidden(
-                            not self.showZeroDeformers and jointItem.isZeroDfm
-                        )
-
-                self.updateCurrentInfluence(self.previousInfluenceName)
+        doRefreshTree = (
+            self.dataOfSkin.deformedShape,
+            self.dataOfSkin.theDeformer,
+        ) != prevDataOfSkin
+        doRefreshTree |= renamedCalled
+        doRefreshTree |= force
+        if doRefreshTree:
+            self.refreshTree()
         self.dgParallel_btn.setChecked(cmds.optionVar(query="evaluationMode") == 3)
         self.updateWarningBtn()
         self.showHideLocks(self.showLocks_btn.isChecked())
 
+    def refreshTree(self):
+        if self.doPrint:
+            print("refreshTree CALLED")
+        self.uiInfluenceTREE.clear()
+        self._treeDicWidgName = {}
+
+        if not hasattr(self.dataOfSkin, "shapePath"):
+            return
+
+        isPaintable = False
+        if self.dataOfSkin.shapePath:
+            isPaintable = self.dataOfSkin.shapePath.apiType() in [
+                OpenMaya.MFn.kMesh,
+                OpenMaya.MFn.kNurbsSurface,
+            ]
+
+        for uiObj in [
+            "options_widget",
+            "buttonWidg",
+            "widgetAbs",
+            "valueSetter",
+            "sizeBrushSetter",
+            "widget_paintBtns",
+            "option_GB",
+        ]:
+            wid = self.findChild(QtWidgets.QWidget, uiObj)
+            if wid:
+                wid.setEnabled(isPaintable)
+
+        with GlobalContext(message="Just Tree", doPrint=self.doPrint):
+            with toggleBlockSignals([self.uiInfluenceTREE]):
+                for ind, nm in enumerate(self.dataOfSkin.driverNames):
+                    theIndexJnt = self.dataOfSkin.indicesJoints[ind]
+                    theCol = self.uiInfluenceTREE.getDeformerColor(nm)
+                    jointItem = InfluenceTreeWidgetItem(
+                        nm, theIndexJnt, theCol, self.dataOfSkin.theSkinCluster
+                    )
+
+                    self.uiInfluenceTREE.addTopLevelItem(jointItem)
+                    self._treeDicWidgName[nm] = jointItem
+
+                    jointItem.isZeroDfm = ind in self.dataOfSkin.hideColumnIndices
+                    jointItem.setHidden(
+                        not self.showZeroDeformers and jointItem.isZeroDfm
+                    )
+
+            self.updateCurrentInfluence(self.previousInfluenceName)
+
     def editNbDeformers(self):
         sel = cmds.ls(selection=True)
         if not sel:
-            return
+            if self.doPrint:
+                print("no Selection")
+            return None
         selShape, listDeformers = getListDeformersFromSel(sel)
         if selShape == self.dataOfSkin.deformedShape:
-            return
+            if self.doPrint:
+                print("Same Geometry selected")
+            return self.listDeformers_cb.currentText()
         if listDeformers:
             skns = cmds.ls(listDeformers, type="skinCluster") or []
             with toggleBlockSignals([self.listDeformers_cb]):
                 self.listDeformers_cb.clear()
                 self.listDeformers_cb.addItems(skns)
+        return None
 
     def fixSparseArray(self):
         if isInPaint():
@@ -1624,7 +1648,7 @@ class SkinPaintWin(Window):
             skn = self.dataOfSkin.theSkinCluster
             if skn and cmds.objExists(skn):
                 cmdSkinCluster.reloadSkin(skn)
-                self.refresh(force=True)
+                self.refresh(force=True, calledFrom="fixSparseArray")
                 cmds.select(prevSelection)
 
     def updateWarningBtn(self):
