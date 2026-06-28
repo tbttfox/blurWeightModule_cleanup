@@ -92,7 +92,7 @@ def setColorsOnJoints():
                 cmds.connectAttr(jnt + ".wireColorRGB", destConn, force=True)
 
 
-def doRemoveColorSets():
+def doRemoveColorSets(full=True):
     with UndoContext("doRemoveColorSets"):
         msh = cmds.brSkinBrushContext(
             GET_CONTEXT.getLatest(), query=True, meshName=True
@@ -104,11 +104,12 @@ def doRemoveColorSets():
         )
         cmds.setAttr(msh + ".displayColors", 0)
 
-        while skinnedMesh_history:
-            nd = skinnedMesh_history.pop(0)
-            if cmds.nodeType(nd) != "createColorSet":
-                break
-            cmds.delete(nd)
+        if full:
+            while skinnedMesh_history:
+                nd = skinnedMesh_history.pop(0)
+                if cmds.nodeType(nd) != "createColorSet":
+                    break
+                cmds.delete(nd)
 
 
 def getShapesSelected(returnTransform=False):
@@ -443,30 +444,35 @@ def fixOptionVarContext():
     return {k.strip("-"): v for k, v in json.loads(cmd).items()}
 
 
+def checkOrigColorSets(obj, onlyCheck=True):
+    existingColorSets = cmds.polyColorSet(obj, query=True, allColorSets=True) or []
+
+    colorSetsToDelete = []
+    for colSet in [
+        "multiColorsSet",
+        "multiColorsSet2",
+        "soloColorsSet",
+        "soloColorsSet2",
+    ]:
+        if colSet in existingColorSets:
+            if not onlyCheck:
+                cmds.polyColorSet(obj, delete=True, colorSet=colSet)
+            colorSetsToDelete.append(colSet)
+    if not onlyCheck and colorSetsToDelete:
+        cmds.delete(obj, constructionHistory=True)
+    return colorSetsToDelete
+
+
 def deleteExistingColorSets():
     with UndoContext("deleteExistingColorSets"):
         sel = cmds.ls(selection=True)
         for obj in sel:
-            skinnedMesh_history = (
-                cmds.listHistory(obj, levels=0, pruneDagObjects=True) or []
-            )
+            obj_history = cmds.listHistory(obj, levels=0, pruneDagObjects=True) or []
             cmds.setAttr(obj + ".displayColors", 0)
-            res = cmds.ls(
-                skinnedMesh_history, type=["createColorSet", "deleteColorSet"]
-            )
+            res = cmds.ls(obj_history, type=["createColorSet", "deleteColorSet"])
             if res:
                 cmds.delete(res)
-            existingColorSets = (
-                cmds.polyColorSet(obj, query=True, allColorSets=True) or []
-            )
-            for colSet in [
-                "multiColorsSet",
-                "multiColorsSet2",
-                "soloColorsSet",
-                "soloColorsSet2",
-            ]:
-                if colSet in existingColorSets:
-                    cmds.polyColorSet(obj, delete=True, colorSet=colSet)
+            checkOrigColorSets(obj, onlyCheck=False)
 
 
 def toggleWireFrame(meshName, val=None, clear=False):  # None is toggle

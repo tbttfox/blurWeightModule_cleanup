@@ -385,8 +385,8 @@ class SkinPaintWin(Window):
             cmds.optionVar(intValue=("soloColor_SkinPaintWin", ind))
             for i in range(3):
                 self.subMenuSoloColor.actions()[i].setChecked(i == ind)
-            if isInPaint():
-                cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, soloColorType=ind)
+            if self.contextExists():
+                cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), edit=True, soloColorType=ind)
 
     def showZeroDefmChecked(self, checked):
         cmds.optionVar(intValue=("showZeroDeformers", checked))
@@ -581,10 +581,8 @@ class SkinPaintWin(Window):
                 pass
             self.updateStrengthVal(theValue)
 
-        if isInPaint():
-            cmds.brSkinBrushContext(
-                cmds.currentCtx(), edit=True, commandIndex=newCommand
-            )
+        if self.contextExists():
+            cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), edit=True, commandIndex=newCommand)
 
     def closeEvent(self, event):
         mel.eval("setToolTo $gMove;")
@@ -660,6 +658,12 @@ class SkinPaintWin(Window):
         if cmds.contextInfo(currentContext, c=True) == "brSkinBrush":
             return currentContext
         return False
+
+    def contextExists(self):
+        context = GET_CONTEXT.getLatest()
+        if not context:
+            return False
+        return cmds.brSkinBrushContext(context, query=True, ex=True)
 
     def exitPaint(self, *args):
         self.enterPaint_btn.setEnabled(True)
@@ -787,8 +791,8 @@ class SkinPaintWin(Window):
                 self.uiInfluenceTREE.setCurrentItem(ito)
 
     def changeMultiSolo(self, val):
-        if isInPaint():
-            cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, soloColor=val)
+        if self.contextExists():
+            cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), edit=True, soloColor=val)
             setSoloMode(val)
 
     def addInfluences(self):
@@ -974,7 +978,37 @@ class SkinPaintWin(Window):
         if isInPaint():
             cmds.brSkinBrushContext(cmds.currentCtx(), edit=True, refresh=True)
 
+    def addTimerForSewScrolling(self):
+        self.timerSew = QtCore.QTimer(self)
+        self.timerSew.setSingleShot(True)
+        self.timerSew.timeout.connect(self.callSewOffset)
+        self.nmKeyToUi["sewVertices"] = self.sewVertices_cb
+        self.nmKeyToUi["sewVerticesOffset"] = self.uiSewTolerance_SB
+
+    def callTimerSew(self):
+        sewVerticesOffset = self.uiSewTolerance_SB.value()
+        stp = self.uiSewTolerance_SB.singleStep()
+        if sewVerticesOffset == 0.0:
+            self.uiSewTolerance_SB.setSingleStep(stp * 0.1)
+            self.uiSewTolerance_SB.setValue(stp - stp * 0.1)
+        if stp < 0.1 and sewVerticesOffset > stp * 9:
+            self.uiSewTolerance_SB.setSingleStep(stp * 10)
+
+        self.timerSew.start(700)
+
+    def callSewOffset(self):
+        sewVerticesOffset = self.uiSewTolerance_SB.value()
+        sewVertices = self.sewVertices_cb.isChecked()
+        if self.contextExists():
+            cmds.brSkinBrushContext(
+                GET_CONTEXT.getLatest(),
+                edit=True,
+                sewVertices=sewVertices,
+                sewVerticesOffset=sewVerticesOffset,
+            )
+
     def createWindow(self):
+        self.nmKeyToUi = {}
         self.unLock = True
         dialogLayout = self.mainLayout
 
@@ -1021,8 +1055,10 @@ class SkinPaintWin(Window):
 
         self.searchInfluences_le.textChanged.connect(self.filterInfluences)
         self.solo_rb.toggled.connect(self.changeMultiSolo)
+        self.nmKeyToUi["soloColor"] = self.solo_rb
 
         self.soloColor_cb.currentIndexChanged.connect(self.comboSoloColorChanged)
+        self.nmKeyToUi["soloColorType"] = self.soloColor_cb
         self.uiInfluenceTREE.itemDoubleClicked.connect(self.influenceDoubleClicked)
         self.uiInfluenceTREE.itemClicked.connect(self.influenceClicked)
 
@@ -1134,6 +1170,7 @@ class SkinPaintWin(Window):
             "message",
             "ignoreLock",
             "verbose",
+            "sewVertices",
         ]
         self.replaceShader_cb.setChecked(cmds.optionVar(query="brushSwapShaders"))
         self.replaceShader_cb.toggled.connect(self.toggleBrushSwapShaders)
@@ -1152,6 +1189,7 @@ class SkinPaintWin(Window):
 
         self.maxColor_sb.valueChanged.connect(partial(self.brSkinConn, "maxColor"))
         self.minColor_sb.valueChanged.connect(self.editSoloColor)
+        self.nmKeyToUi["minColor"] = self.minColor_sb
 
         self.soloOpaque_cb.toggled.connect(self.opaqueSet)
 
@@ -1176,9 +1214,13 @@ class SkinPaintWin(Window):
             partial(self.uiSymmetryCB.setCurrentIndex, 0)
         )
         self.uiSymmetryCB.currentIndexChanged.connect(self.symmetryChanged)
+        self.nmKeyToUi["mirrorPaint"] = self.uiSymmetryCB
         self.uiTolerance_SB.valueChanged.connect(
             partial(self.brSkinConn, "toleranceMirror")
         )
+
+        self.addTimerForSewScrolling()
+        self.uiSewTolerance_SB.valueChanged.connect(self.callTimerSew)
 
         self.mirrorActive_cb.toggled.connect(self.changedMirrorActiveMode)
         self.uiLeftNamesLE.editingFinished.connect(self.getMirrorInfluenceArray)
@@ -1237,10 +1279,18 @@ class SkinPaintWin(Window):
             togglePanelsDisplay()
 
     def brSkinConn(self, nm, val):
-        if isInPaint():
+        if self.contextExists():
             kArgs = {"edit": True}
             kArgs[nm] = val
-            cmds.brSkinBrushContext(cmds.currentCtx(), **kArgs)
+            cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), **kArgs)
+
+    def directUIConn(self, ui, nmKey, val=None, connTyp="clicked"):
+        lst = [self.brSkinConn, nmKey]
+        if val is not None:
+            lst.append(val)
+        fn = partial(*lst)
+        getattr(ui, connTyp).connect(fn)
+        self.nmKeyToUi[nmKey] = ui
 
     def displayOptions(self, val):
         heightOption = 480
@@ -1476,12 +1526,7 @@ class SkinPaintWin(Window):
     def refreshBtn(self):
         if self.isInPaint():
             cmds.evalDeferred(
-                partial(
-                    cmds.brSkinBrushContext,
-                    "brSkinBrushContext1",
-                    edit=True,
-                    refresh=True,
-                )
+                partial(cmds.brSkinBrushContext, GET_CONTEXT.getLatest(), edit=True, refresh=True)
             )
         else:
             self.dataOfSkin = DataOfSkin(
@@ -1506,10 +1551,14 @@ class SkinPaintWin(Window):
             self.refresh(force=self.checkInfluences(), calledFrom="refreshCallBack")
 
     def checkInfluences(self, withRefresh=False):
+        if self.dataOfSkin is None:
+            return False
         if not self.dataOfSkin.theSkinCluster:
             return False
         if not cmds.objExists(self.dataOfSkin.theSkinCluster):
             return True
+        if self.dataOfSkin.driverNames is None:
+            return False
         selItems = self.selectedInfluences()
         currentInfl = selItems[0] if selItems else None
         toolInfluences = set(self.dataOfSkin.driverNames)
