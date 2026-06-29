@@ -301,7 +301,7 @@ class DataAbstract(object):
                 )
 
     # functions utils
-    def getDeformerFromSel(self, sel, typeOfDeformer="skinCluster"):
+    def getDeformerFromSel(self, sel, typeOfDeformer="skinCluster", indexDeformer=0):
         """Get the deformers that are deforming the passed in object
         It is technically possible for the deformed shape not to be a child of
         `sel`, but it's extremely unlikely
@@ -309,6 +309,7 @@ class DataAbstract(object):
         Arguments:
             sel (str): The object to get the deformer of
             typeOfDeformer (str): The deformer type to look for
+            indexDeformer (int): Index into the list of matching deformers
 
         Returns:
             str: The name of the deformer node. Empty string if no deformer found
@@ -321,7 +322,8 @@ class DataAbstract(object):
                     listDeformers = cmds.ls(listDeformers, type=typeOfDeformer)
                     if not listDeformers:
                         return "", selShape
-                    theDeformer = listDeformers[0]
+                    indexDeformer = min(indexDeformer, len(listDeformers) - 1)
+                    theDeformer = listDeformers[indexDeformer]
                     theDeformedShape = cmds.ls(
                         cmds.listHistory(theDeformer, allFuture=True, future=True),
                         type="shape",
@@ -548,17 +550,20 @@ class DataAbstract(object):
         inputVertices=None,
         theDeformer=None,
         deformedShape=None,
+        indexDeformer=0,
     ):
         """A convenience function to be able to load the currently selected object"""
         sel = cmds.ls(selection=True)
         if not sel:
             return None
         return self.getDataFromObject(
-            sel[0], typeOfDeformer, force, theDeformer, deformedShape, inputVertices
+            sel[0], typeOfDeformer, force, theDeformer, deformedShape, inputVertices,
+            indexDeformer=indexDeformer,
         )
 
     def getDataFromObject(
-        self, sel, typeOfDeformer, force, theDeformer, deformedShape, inputVertices
+        self, sel, typeOfDeformer, force, theDeformer, deformedShape, inputVertices,
+        indexDeformer=0,
     ):
         """Load data from a given object
 
@@ -589,7 +594,7 @@ class DataAbstract(object):
             sel = cmds.ls(selection=True)
             if theDeformer is None or deformedShape is None:
                 theDeformer, deformedShape = self.getDeformerFromSel(
-                    sel, typeOfDeformer=typeOfDeformer
+                    sel, typeOfDeformer=typeOfDeformer, indexDeformer=indexDeformer
                 )
             self.deformedShape = deformedShape
             self.theDeformer = theDeformer

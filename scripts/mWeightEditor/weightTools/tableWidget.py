@@ -675,7 +675,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         metrics = QtGui.QFontMetrics(ff)
         allMetrics = [metrics.width(colName) for colName in colNames]
         if allMetrics:
-            return max(allMetrics) + 15
+            return min(180, max(allMetrics)) + 15
         else:
             return 50
 

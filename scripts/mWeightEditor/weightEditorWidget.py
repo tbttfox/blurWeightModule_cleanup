@@ -102,7 +102,7 @@ class SkinWeightWin(Window):
             mainWindow=self,
             createDisplayLocator=self.useDisplayLocator,
         )
-
+        self.indexDeformer = 0
         self.get_data_frame()
         self.createWindow()
         with open(os.path.join(os.path.dirname(__file__), "xsi.css"), "r") as f:
@@ -353,6 +353,7 @@ class SkinWeightWin(Window):
         self.listInputs_CB.currentIndexChanged.connect(self.changeTypeOfData)
         self.listInputs_CB.currentIndexChanged.connect(self.updateFont)
         self.listInputs_CB.currentIndexChanged.connect(self.refresh)
+        self.indexDeformer_SPN.valueChanged.connect(self.changeIndexDeformer)
 
         self.orderType_CB.currentTextChanged.connect(self.changeOrder)
         self.nbColumns_CB.currentTextChanged.connect(self.maxColumnsDisplay)
@@ -798,6 +799,8 @@ class SkinWeightWin(Window):
 
     def selectionCallBackRefresh(self):
         changing, mapsAreAvailable = self.pickInputToDisplay()
+        self.setDeformerName()
+        self.editNbDeformers()
         # if it changed it refreshed automatically
         # if it didn't change but maps are available, we do refresh
         # if it is a skin, we refresh to enalbe highlight of deformers
@@ -817,7 +820,9 @@ class SkinWeightWin(Window):
                 with GlobalContext(message="weightEdtior getAllData", doPrint=False):
                     dicoToRestore = self.dataOfDeformer.getBaseDataToRestore()
                     self.dataOfDeformer.updateDisplayVerts([])
-                    resultData = self.dataOfDeformer.getAllData(force=force)
+                    resultData = self.dataOfDeformer.getAllData(
+                        force=force, indexDeformer=self.indexDeformer
+                    )
                     if not resultData:
                         self.dataOfDeformer.restoreBaseData(dicoToRestore)
 
@@ -836,6 +841,7 @@ class SkinWeightWin(Window):
 
         elif not self.unLock and isinstance(self.dataOfDeformer, DataOfSkin):
             self.highlightSelectedDeformers()
+        self.setDeformerName()
 
     def refreshCurrentSelectionOrder(self):
         if isinstance(self.dataOfDeformer, DataOfSkin):
@@ -1136,6 +1142,7 @@ class SkinWeightWin(Window):
     # Misc
     #
     def changeTypeOfData(self, ind):
+        self.editNbDeformers(ind)
         UvsEnabled = False
         if ind == 0:  # skinCluster
             self.dataOfDeformer = DataOfSkin(
@@ -1175,7 +1182,7 @@ class SkinWeightWin(Window):
 
     def get_data_frame(self):
         with GlobalContext(message="get_data_frame"):
-            self.dataOfDeformer.getAllData()
+            self.dataOfDeformer.getAllData(indexDeformer=self.indexDeformer)
         return self.dataOfDeformer
 
     #
@@ -1194,7 +1201,30 @@ class SkinWeightWin(Window):
             for ind in self.dataOfDeformer.hideColumnIndices:
                 self._tv.hideColumn(ind)
 
+    def editNbDeformers(self, ind=None):
+        if not hasattr(self, "nbDeformersPerTyp"):
+            return
+        if ind is None:
+            ind = self.listInputs_CB.currentIndex()
+        nbDeformers = self.nbDeformersPerTyp[ind]
+        self.indexDeformer_SPN.setEnabled(nbDeformers > 1)
+        if nbDeformers > 1:
+            self.indexDeformer_SPN.setMaximum(nbDeformers - 1)
+
+    def setDeformerName(self):
+        nm = (
+            self.dataOfDeformer.theSkinCluster
+            if isinstance(self.dataOfDeformer, DataOfSkin)
+            else self.dataOfDeformer.theDeformer
+        )
+        self.nameDeformer_le.setText(nm)
+
+    def changeIndexDeformer(self, newVal):
+        self.indexDeformer = newVal
+        self.refresh(force=True)
+
     def pickInputToDisplay(self):
+        self.nbDeformersPerTyp = [0, 0, 0, 0]
         changing = False
         mapsAreAvailable = False
         if not self.unLock:
@@ -1226,11 +1256,14 @@ class SkinWeightWin(Window):
             tweaks = cmds.ls(listDeformers, type="tweak") or []
             if skns:
                 indicesAvailable.add(0)
+                self.nbDeformersPerTyp[0] = len(skns)
             if BSs:
                 indicesAvailable.add(1)
+                self.nbDeformersPerTyp[1] = len(BSs)
             otherDeformers = set(listDeformers) - set(skns + BSs + tweaks)
             if otherDeformers:
                 indicesAvailable.add(2)
+                self.nbDeformersPerTyp[2] = len(otherDeformers)
 
         allFonts = []
         for ind in range(4):

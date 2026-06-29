@@ -467,12 +467,13 @@ class DataOfBlendShape(DataOfOneDimensionalAttrs):
     #
     # redefine abstract data functions
     #
-    def getAllData(self, displayLocator=True, force=True, inputVertices=None):
+    def getAllData(self, displayLocator=True, force=True, inputVertices=None, indexDeformer=0):
         with GlobalContext(message="getAllData BlendShapes", doPrint=self.verbose):
             prevDeformedShape = self.deformedShape
 
             success = self.getDataFromSelection(
-                typeOfDeformer="blendShape", force=force, inputVertices=inputVertices
+                typeOfDeformer="blendShape", force=force, inputVertices=inputVertices,
+                indexDeformer=indexDeformer,
             )
             if not success or self.theDeformer == "":
                 return False
