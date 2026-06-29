@@ -1107,7 +1107,30 @@ class SkinWeightWin(Window):
         chunks = []
         for item in sel:
             chunks.append((item.top(), item.bottom(), item.left(), item.right()))
-        return chunks
+
+        hiddenColumns = set(
+            indCol
+            for indCol in range(self.dataOfDeformer.columnCount)
+            if self._tv.HHeaderView.isSectionHidden(indCol)
+        )
+        processedChunks = []
+        for chunk in chunks:
+            columns = list(set(range(chunk[2], chunk[3] + 1)) - hiddenColumns)
+            columns.sort()
+            for colChunk in orderMelList(columns, onlyStr=False):
+                if len(colChunk) == 1:
+                    processedChunks.append((chunk[0], chunk[1], colChunk[0], colChunk[0]))
+                else:
+                    processedChunks.append((chunk[0], chunk[1], colChunk[0], colChunk[1]))
+
+        newSel = self._tv.selectionModel().selection()
+        newSel.clear()
+        for chunk in processedChunks:
+            topLeft = self._tm.index(chunk[0], chunk[2])
+            botRight = self._tm.index(chunk[1], chunk[3])
+            newSel.select(topLeft, botRight)
+        self._tv.selectionModel().select(newSel, QtCore.QItemSelectionModel.ClearAndSelect)
+        return processedChunks
 
     #
     # Misc
