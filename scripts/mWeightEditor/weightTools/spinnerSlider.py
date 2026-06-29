@@ -330,7 +330,7 @@ class ProgressItem(QtWidgets.QProgressBar):
         self.currentValue = val
 
         val *= 100.0
-        self.punched.emit(int(val))
+        self.punched.emit(val)
         self.setValue(int(val))
 
     startDrag = False
