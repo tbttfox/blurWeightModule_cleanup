@@ -324,11 +324,7 @@ class DataAbstract(object):
                         return "", selShape
                     indexDeformer = min(indexDeformer, len(listDeformers) - 1)
                     theDeformer = listDeformers[indexDeformer]
-                    theDeformedShape = cmds.ls(
-                        cmds.listHistory(theDeformer, allFuture=True, future=True),
-                        type="shape",
-                    )
-                    return theDeformer, theDeformedShape[0]
+                    return theDeformer, selShape
                 return "", selShape
             return "", ""
 
