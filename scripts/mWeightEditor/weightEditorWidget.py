@@ -391,9 +391,7 @@ class SkinWeightWin(Window):
         self.importQueryFrame.hide()
 
         self.searchInfluences_le.textChanged.connect(self.filterInfluences)
-        self.clearWildCardBTN.clicked.connect(
-            lambda: self.searchInfluences_le.setText("")
-        )
+        self.clearWildCardBTN.clicked.connect(self.resetFilterInfluences)
         self.clearWildCardBTN.setIcon(_icons["clearText"])
         self.clearWildCardBTN.setText("")
 
@@ -732,6 +730,11 @@ class SkinWeightWin(Window):
 
     def filterInfluences(self, newText):
         self.applyDisplayColumnsFilters(newText)
+        self.getRowColumnsSelected()
+
+    def resetFilterInfluences(self):
+        self.getRowColumnsSelected()
+        self.searchInfluences_le.setText("")
 
     def autoPruneChecked(self, checked):
         cmds.optionVar(intValue=["autoPrune", checked])
@@ -1060,6 +1063,7 @@ class SkinWeightWin(Window):
     # Selection
     #
     def storeSelection(self):
+        self.getRowColumnsSelected()
         selection = self._tv.selectionModel().selection()
         self.topLeftBotRightSel = [
             (item.top(), item.left(), item.bottom(), item.right()) for item in selection
