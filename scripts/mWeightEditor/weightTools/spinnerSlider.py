@@ -50,7 +50,7 @@ class ButtonWithValue(QtWidgets.QPushButton):
 
     def wheelEvent(self, event):
         step = self.step
-        if event.modifiers() & QtCore.Qt.ControlModifier:
+        if event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             if step == 0.1:
                 step = 0.5
         val = event.angleDelta().y()
@@ -87,7 +87,7 @@ class ButtonWithValue(QtWidgets.QPushButton):
     def mousePressEvent(self, e):
         if not self.clickable:
             return
-        if e.button() == QtCore.Qt.MidButton:
+        if e.button() == QtCore.Qt.MouseButton.MidButton:
             self.startDrag = True
             self.startPos = e.globalPos()
             self.startPrecision = self.precision
@@ -156,11 +156,11 @@ class ValueSetting(QtWidgets.QWidget):
         self.theSpinner.setRange(-16777214, 16777215)
         self.theSpinner.setSingleStep(singleStep)
         self.theSpinner.setDecimals(precision)
-        self.theSpinner.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        self.theSpinner.setButtonSymbols(QtWidgets.QAbstractSpinBox.ButtonSymbols.NoButtons)
         self.theSpinner.setStyleSheet(self.theStyleSheet)
 
         newPolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum
+            QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Minimum
         )
         self.theSpinner.setMaximumSize(40, 18)
         newPolicy.setHorizontalStretch(0)
@@ -342,15 +342,15 @@ class ProgressItem(QtWidgets.QProgressBar):
     def mousePressEvent(self, event):
         self.currentValue = self.value() / 100.0
         shiftControl = event.modifiers() == (
-            QtCore.Qt.KeyboardModifiers(QtCore.Qt.ControlModifier)
-            | QtCore.Qt.KeyboardModifiers(QtCore.Qt.ShiftModifier)
+            QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ControlModifier)
+            | QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ShiftModifier)
         )
-        self.shiftHold = shiftControl or (event.modifiers() == QtCore.Qt.ShiftModifier)
+        self.shiftHold = shiftControl or (event.modifiers() == QtCore.Qt.KeyboardModifier.ShiftModifier)
 
         if self.shiftHold:
             self.shiftKeyValue = self.value() / 100.0
 
-        if event.modifiers() == event.button() != QtCore.Qt.LeftButton:
+        if event.modifiers() == event.button() != QtCore.Qt.MouseButton.LeftButton:
             super(ProgressItem, self).mousePressEvent(event)
             self.startDrag = False
         else:
@@ -362,7 +362,7 @@ class ProgressItem(QtWidgets.QProgressBar):
 
     def mouseReleaseEvent(self, event):
         self.startDrag = False
-        if event.modifiers() == event.button() != QtCore.Qt.LeftButton:
+        if event.modifiers() == event.button() != QtCore.Qt.MouseButton.LeftButton:
             super(ProgressItem, self).mouseReleaseEvent(event)
         else:
             self.setMouseTracking(False)
@@ -378,12 +378,12 @@ class ProgressItem(QtWidgets.QProgressBar):
 
     def applyTheEvent(self, e):
         shiftControl = e.modifiers() == (
-            QtCore.Qt.KeyboardModifiers(QtCore.Qt.ControlModifier)
-            | QtCore.Qt.KeyboardModifiers(QtCore.Qt.ShiftModifier)
+            QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ControlModifier)
+            | QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ShiftModifier)
         )
 
-        shitIsHold = shiftControl or (e.modifiers() == QtCore.Qt.ShiftModifier)
-        ctrlIsHold = shiftControl or (e.modifiers() == QtCore.Qt.ControlModifier)
+        shitIsHold = shiftControl or (e.modifiers() == QtCore.Qt.KeyboardModifier.ShiftModifier)
+        ctrlIsHold = shiftControl or (e.modifiers() == QtCore.Qt.KeyboardModifier.ControlModifier)
 
         if shitIsHold and not self.shiftHold:
             self.shiftKeyValue = self.currentValue

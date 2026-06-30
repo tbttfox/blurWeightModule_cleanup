@@ -135,9 +135,9 @@ class SkinWeightWin(Window):
         super(SkinWeightWin, self).closeEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.MidButton:
+        if event.button() == QtCore.Qt.MouseButton.MidButton:
             self.resizeToMinimum()
-        elif event.button() == QtCore.Qt.LeftButton:
+        elif event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._tv.clearSelection()
         super(SkinWeightWin, self).mousePressEvent(event)
 
@@ -145,10 +145,10 @@ class SkinWeightWin(Window):
     # widget creation/edition
     #
     def addMinButton(self):
-        self.setWindowFlags(QtCore.Qt.Window)
+        self.setWindowFlags(QtCore.Qt.WindowType.Window)
 
     def setWindowDisplay(self):
-        self.setWindowFlags(QtCore.Qt.Window | QtCore.Qt.Tool)
+        self.setWindowFlags(QtCore.Qt.WindowType.Window | QtCore.Qt.WindowType.Tool)
         self.setWindowTitle("Weight Editor")
         self.refreshPosition()
         self.show()
@@ -447,8 +447,8 @@ class SkinWeightWin(Window):
                 associationItem.setText(0, str(nm))
                 associationItem.setFlags(
                     associationItem.flags()
-                    | QtCore.Qt.ItemIsEditable
-                    | QtCore.Qt.ItemIsUserCheckable
+                    | QtCore.Qt.ItemFlag.ItemIsEditable
+                    | QtCore.Qt.ItemFlag.ItemIsUserCheckable
                 )
                 self.associationXml_tbl.addTopLevelItem(associationItem)
                 comboB = QtWidgets.QComboBox()
@@ -559,7 +559,7 @@ class SkinWeightWin(Window):
         checkableAction.setDefaultWidget(chbox)
         self.popMenu.addAction(checkableAction)
 
-        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showMenu)
 
     def showRightClickMenu(self, event):
@@ -1099,7 +1099,7 @@ class SkinWeightWin(Window):
             somethingSelected = True
             newSel.select(self._tm.index(top, left), self._tm.index(bottom, right))
         self._tv.selectionModel().select(
-            newSel, QtCore.QItemSelectionModel.ClearAndSelect
+            newSel, QtCore.QItemSelectionModel.SelectionFlag.ClearAndSelect
         )
         self._tv.ignoreReselect = False
         self._tv.selEmptied.emit(somethingSelected)
@@ -1124,13 +1124,13 @@ class SkinWeightWin(Window):
                 )
                 self._tv.showColumn(index)
             self._tv.selectionModel().select(
-                newSel, QtCore.QItemSelectionModel.ClearAndSelect
+                newSel, QtCore.QItemSelectionModel.SelectionFlag.ClearAndSelect
             )
         else:
             newSel = self._tv.selectionModel().selection()
             newSel.clear()
             self._tv.selectionModel().select(
-                newSel, QtCore.QItemSelectionModel.ClearAndSelect
+                newSel, QtCore.QItemSelectionModel.SelectionFlag.ClearAndSelect
             )
             self.dataOfDeformer.updateDisplayVerts([])
 
@@ -1161,7 +1161,7 @@ class SkinWeightWin(Window):
             topLeft = self._tm.index(chunk[0], chunk[2])
             botRight = self._tm.index(chunk[1], chunk[3])
             newSel.select(topLeft, botRight)
-        self._tv.selectionModel().select(newSel, QtCore.QItemSelectionModel.ClearAndSelect)
+        self._tv.selectionModel().select(newSel, QtCore.QItemSelectionModel.SelectionFlag.ClearAndSelect)
         return processedChunks
 
     #

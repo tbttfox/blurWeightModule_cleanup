@@ -61,17 +61,17 @@ class TableModel(QtCore.QAbstractTableModel):
             return []
         return self.datatable.columnsNames
 
-    def data(self, index, role=QtCore.Qt.DisplayRole):
-        if role == QtCore.Qt.DisplayRole:
+    def data(self, index, role=QtCore.Qt.ItemDataRole.DisplayRole):
+        if role == QtCore.Qt.ItemDataRole.DisplayRole:
             return "{0:g}".format(round(self.realData(index) * 100, 1))
-        elif role == QtCore.Qt.EditRole:
+        elif role == QtCore.Qt.ItemDataRole.EditRole:
             return self.realData(index) * 100
-        elif role == QtCore.Qt.TextAlignmentRole:
-            return QtCore.Qt.AlignCenter
+        elif role == QtCore.Qt.ItemDataRole.TextAlignmentRole:
+            return QtCore.Qt.AlignmentFlag.AlignCenter
         return None
 
-    def setData(self, index, value, role=QtCore.Qt.EditRole):
-        if role == QtCore.Qt.EditRole:
+    def setData(self, index, value, role=QtCore.Qt.ItemDataRole.EditRole):
+        if role == QtCore.Qt.ItemDataRole.EditRole:
             par = self.parent()
             par.prepareToSetValue()
             par.doAddValue(value / 100, forceAbsolute=True)
@@ -102,16 +102,16 @@ class TableModel(QtCore.QAbstractTableModel):
             and column >= self.datatable.nbDrivers
         )
 
-    def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
-        if role == QtCore.Qt.DisplayRole:
+    def headerData(self, section, orientation, role=QtCore.Qt.ItemDataRole.DisplayRole):
+        if role == QtCore.Qt.ItemDataRole.DisplayRole:
             if self.datatable is None:
                 return ""
-            elif orientation == QtCore.Qt.Horizontal:
+            elif orientation == QtCore.Qt.Orientation.Horizontal:
                 return self.datatable.columnsNames[section]
             else:
                 return self.datatable.rowText[section]
-        elif role == QtCore.Qt.TextAlignmentRole:
-            return QtCore.Qt.AlignCenter
+        elif role == QtCore.Qt.ItemDataRole.TextAlignmentRole:
+            return QtCore.Qt.AlignmentFlag.AlignCenter
         else:
             return None
 
@@ -148,23 +148,23 @@ class TableModel(QtCore.QAbstractTableModel):
 
     def flags(self, index):
         if self.datatable is None:
-            return QtCore.Qt.ItemIsEnabled
+            return QtCore.Qt.ItemFlag.ItemIsEnabled
 
         if not index.isValid():
-            return QtCore.Qt.ItemIsEnabled
+            return QtCore.Qt.ItemFlag.ItemIsEnabled
         column = index.column()
         if (
             isinstance(self.datatable, DataOfSkin)
             and column == self.datatable.nbDrivers
         ):
-            result = QtCore.Qt.ItemIsEnabled
+            result = QtCore.Qt.ItemFlag.ItemIsEnabled
         elif self.isLocked(index):
-            result = QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+            result = QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemIsSelectable
         else:
             result = (
-                QtCore.Qt.ItemIsEnabled
-                | QtCore.Qt.ItemIsSelectable
-                | QtCore.Qt.ItemIsEditable
+                QtCore.Qt.ItemFlag.ItemIsEnabled
+                | QtCore.Qt.ItemFlag.ItemIsSelectable
+                | QtCore.Qt.ItemFlag.ItemIsEditable
             )
         return QtCore.Qt.ItemFlags(result)
 
@@ -175,11 +175,11 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
         editor.setMaximum(100)
         editor.setMinimum(0)
         editor.setMinimumWidth(50)
-        editor.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
+        editor.setButtonSymbols(QtWidgets.QAbstractSpinBox.ButtonSymbols.NoButtons)
         return editor
 
     def setEditorData(self, editor, index):
-        editor.setValue(index.data(role=QtCore.Qt.EditRole))
+        editor.setValue(index.data(role=QtCore.Qt.ItemDataRole.EditRole))
 
     def initStyleOption(self, option, index):
         super(HighlightDelegate, self).initStyleOption(option, index)
@@ -194,7 +194,7 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
         isZero = np.isclose(realData, 0.0, atol=TOL)
         isOne = np.isclose(realData, 1.0, atol=TOL)
 
-        hilightColor = pal.color(QtGui.QPalette.Highlight)
+        hilightColor = pal.color(QtGui.QPalette.ColorRole.Highlight)
 
         if model.isSumColumn(index):
             bgColor = view.sumColumnBG if isOne else view.sumColumnERROR
@@ -216,7 +216,7 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
         pal.setColor(QtGui.QPalette.Foreground, fgColor)
         pal.setColor(QtGui.QPalette.Text, fgColor)
         pal.setColor(QtGui.QPalette.WindowText, fgColor)
-        pal.setColor(QtGui.QPalette.Highlight, hilightColor)
+        pal.setColor(QtGui.QPalette.ColorRole.Highlight, hilightColor)
         option.backgroundBrush = QtGui.QBrush(pal.color(QtGui.QPalette.Background))
 
 
@@ -227,15 +227,15 @@ class VertHeaderView(QtWidgets.QHeaderView):
 
     def __init__(self, mainWindow=None, parent=None):
         self._multiStore = {}
-        super(VertHeaderView, self).__init__(QtCore.Qt.Vertical, parent)
+        super(VertHeaderView, self).__init__(QtCore.Qt.Orientation.Vertical, parent)
         self.mainWindow = mainWindow
         self.setMinimumWidth(20)
 
         self.setSectionsClickable(True)
         self.setHighlightSections(True)
-        self.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+        self.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Fixed)
 
-        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showMenu)
 
     def showMenu(self, pos):
@@ -295,7 +295,7 @@ class VertHeaderView(QtWidgets.QHeaderView):
         painter.setBrush(QtGui.QBrush(theBGBrush))
         painter.drawRect(rect.adjusted(0, -1, -2, -1))
         painter.restore()
-        painter.drawText(rect, QtCore.Qt.AlignCenter, text)
+        painter.drawText(rect, QtCore.Qt.AlignmentFlag.AlignCenter, text)
 
     def getSelectedRows(self):
         sel = self.selectionModel().selection()
@@ -325,7 +325,7 @@ class VertHeaderView(QtWidgets.QHeaderView):
             if datatable.vertices[row] in datatable.lockedVertices:
                 newSel.select(model.index(row, 0), model.index(row, nbColumns - 1))
 
-        self.selectionModel().select(newSel, QtCore.QItemSelectionModel.ClearAndSelect)
+        self.selectionModel().select(newSel, QtCore.QItemSelectionModel.SelectionFlag.ClearAndSelect)
 
     def lockSelectedRows(self):
         selectedIndices = self.getSelectedRows()
@@ -356,7 +356,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
 
     def __init__(self, mainWindow=None, colWidth=10, parent=None):
         self._multiStore = {}
-        super(HorizHeaderView, self).__init__(QtCore.Qt.Horizontal, parent)
+        super(HorizHeaderView, self).__init__(QtCore.Qt.Orientation.Horizontal, parent)
         self.mainWindow = mainWindow
         self.getColors()
         self.colWidth = colWidth
@@ -365,11 +365,11 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         self._colorDrawHeight = 20
         self.setSectionsClickable(True)
         self.setHighlightSections(True)
-        self.setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+        self.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Fixed)
 
         self.letVerticesDraw = True
 
-        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showMenu)
 
     def getColors(self):
@@ -401,10 +401,10 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         index = self.visualIndexAt(event.pos().x())
         outClick = index == -1
         if outClick:
-            if event.button() == QtCore.Qt.MidButton:
+            if event.button() == QtCore.Qt.MouseButton.MidButton:
                 if self.mainWindow is not None:
                     self.mainWindow.resizeToMinimum()
-            elif event.button() == QtCore.Qt.LeftButton:
+            elif event.button() == QtCore.Qt.MouseButton.LeftButton:
                 self.parent().clearSelection()
         else:
             self.letVerticesDraw = False
@@ -605,7 +605,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
 
             painter.setFont(font)
             painter.setPen(self.totalFG)
-            painter.drawText(rect, QtCore.Qt.AlignCenter, data)
+            painter.drawText(rect, QtCore.Qt.AlignmentFlag.AlignCenter, data)
         else:
             isBold = False
             par = self.parent()
@@ -722,7 +722,7 @@ class FastTableView(QtWidgets.QTableView):
         self.setHorizontalHeader(self.HHeaderView)
         self.setVerticalHeader(self.VHeaderView)
 
-        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.Fixed)
+        self.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Fixed)
 
         self._margin = 10
         self._colorDrawHeight = 20
@@ -753,7 +753,7 @@ class FastTableView(QtWidgets.QTableView):
         s = QtCore.QSize(
             btn.style()
             .sizeFromContents(
-                QtWidgets.QStyle.CT_HeaderSection, opt, QtCore.QSize(), btn
+                QtWidgets.QStyle.ContentsType.CT_HeaderSection, opt, QtCore.QSize(), btn
             )
             .expandedTo(QtWidgets.QApplication.globalStrut())
         )
@@ -816,7 +816,7 @@ class FastTableView(QtWidgets.QTableView):
     def eventFilter(self, obj, event):
         # The only QAbstractButton that gets painted by this view is the upper left corner
         # button, so add an event filter to intercept its paint event
-        if event.type() != QtCore.QEvent.Paint:
+        if event.type() != QtCore.QEvent.Type.Paint:
             return False
 
         if not isinstance(obj, QtWidgets.QAbstractButton):
@@ -827,7 +827,7 @@ class FastTableView(QtWidgets.QTableView):
         opt = QtWidgets.QStyleOptionHeader()
         opt.initFrom(obj)
         opt.rect = obj.rect()
-        opt.position = QtWidgets.QStyleOptionHeader.OnlyOneSection
+        opt.position = QtWidgets.QStyleOptionHeader.SectionPosition.OnlyOneSection
         painter = QtWidgets.QStylePainter(obj)
         painter.drawItemPixmap(opt.rect, 1, self.drawRotatedText(opt.rect))
 
