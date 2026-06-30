@@ -49,11 +49,15 @@ class ButtonWithValue(QtWidgets.QPushButton):
         self.updateName()
 
     def wheelEvent(self, event):
+        step = self.step
+        if event.modifiers() & QtCore.Qt.ControlModifier:
+            if step == 0.1:
+                step = 0.5
         val = event.angleDelta().y()
         if val > 0.0:
-            self.precision += self.step
+            self.precision += step
         else:
-            self.precision -= self.step
+            self.precision -= step
         if self.precision < self.minimumValue:
             self.precision = self.minimumValue
         if self.precision > self.maximumValue:

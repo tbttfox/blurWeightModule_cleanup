@@ -973,6 +973,7 @@ class SkinWeightWin(Window):
                     chunks,
                     repeat=self.smoothBTN.precision,
                     percentMvt=self.percentBTN.precision,
+                    skinClusterIndex=self.indexDeformer,
                 )
                 if self.dataOfDeformer.blurSkinNode and cmds.objExists(
                     self.dataOfDeformer.blurSkinNode

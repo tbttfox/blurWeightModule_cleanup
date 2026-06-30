@@ -150,6 +150,20 @@ def getNumberVertices(msh):
     return 0
 
 
+def getSelectionAndDeformer(typeOfDeformer="skinCluster", returnIndices=False):
+    selection = getSoftSelectionValuesNEW() or {}
+    toReturn = []
+    for mshTr, indices in list(selection.items()):
+        selShape, listDeformers = getListDeformersFromSel([mshTr])
+        listDeformers = cmds.ls(listDeformers, type=typeOfDeformer)
+        if listDeformers:
+            if returnIndices:
+                toReturn.append((selShape, listDeformers, indices))
+            else:
+                toReturn.append((selShape, listDeformers))
+    return toReturn
+
+
 def orderMelList(listInd, onlyStr=True):
     """Group a sorted list of indices into ranges for use in mel scripts
 
@@ -564,6 +578,26 @@ def getComponentIndexList(componentList=None):
             )
     # Return Result
     return componentIndexList
+
+
+def getCvsIndices(nodeName, selectedVertices):
+    selList = OpenMaya.MSelectionList()
+    OpenMaya.MGlobal.getSelectionListByName(nodeName, selList)
+    depNode = OpenMaya.MObject()
+    selList.getDependNode(0, depNode)
+
+    shapePath = OpenMaya.MDagPath()
+    selList.getDagPath(0, shapePath, depNode)
+
+    MfnSurface = OpenMaya.MFnNurbsSurface(shapePath)
+    numCVsInV_ = MfnSurface.numCVsInV()
+
+    listCVsIndices = []
+    for indVtx in selectedVertices:
+        indexV = indVtx % numCVsInV_
+        indexU = indVtx // numCVsInV_
+        listCVsIndices.append((indexU, indexV))
+    return listCVsIndices
 
 
 #

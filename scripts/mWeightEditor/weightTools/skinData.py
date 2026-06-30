@@ -61,7 +61,7 @@ class DataOfSkin(DataAbstract):
     #
     # functions
     #
-    def smoothSkin(self, selectedIndices, repeat=1, percentMvt=1):
+    def smoothSkin(self, selectedIndices, repeat=1, percentMvt=1, skinClusterIndex=0):
         rowsSel = []
         for item in selectedIndices:
             rowsSel += list(range(item[0], item[1] + 1))
@@ -79,9 +79,15 @@ class DataOfSkin(DataAbstract):
                 percentMvt=percentMvt,
                 meshName=self.deformedShape,
                 listCVsIndices=listCVsIndices,
+                skinClusterIndex=skinClusterIndex,
             )
         elif self.isLattice:
-            cmds.blurSkinCmd(command="smooth", repeat=repeat, percentMvt=percentMvt)
+            cmds.blurSkinCmd(
+                command="smooth",
+                repeat=repeat,
+                percentMvt=percentMvt,
+                skinClusterIndex=skinClusterIndex,
+            )
         else:
             cmds.blurSkinCmd(
                 command="smooth",
@@ -89,6 +95,7 @@ class DataOfSkin(DataAbstract):
                 percentMvt=percentMvt,
                 meshName=self.deformedShape,
                 listVerticesIndices=selectedVertices,
+                skinClusterIndex=skinClusterIndex,
             )
 
     def fixAroundVertices(self, tolerance=3):
