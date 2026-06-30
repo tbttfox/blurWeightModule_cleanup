@@ -328,12 +328,13 @@ class DataAbstract(object):
                 return "", selShape
             return "", ""
 
-    def getSoftSelectionVertices(self, inputVertices=None):
+    def getSoftSelectionVertices(self, inputVertices=None, dicOfSel=None):
         """Get the current soft selection weights, or the weights of a passed
         set of vertices on the current deformed shape, and store that data
         on the class
         """
-        dicOfSel = getSoftSelectionValues()
+        if dicOfSel is None:
+            dicOfSel = getSoftSelectionValues()
         res = dicOfSel.get(self.deformedShape_longName, [])
 
         if inputVertices is not None:
@@ -559,7 +560,7 @@ class DataAbstract(object):
 
     def getDataFromObject(
         self, sel, typeOfDeformer, force, theDeformer, deformedShape, inputVertices,
-        indexDeformer=0,
+        indexDeformer=0, passedSel=None,
     ):
         """Load data from a given object
 
@@ -587,7 +588,7 @@ class DataAbstract(object):
         with GlobalContext(message="getDataFromSelection", doPrint=self.verbose):
             if inputVertices is not None:
                 inputVertices = list(map(int, inputVertices))
-            sel = cmds.ls(selection=True)
+            sel = cmds.ls(selection=True) if passedSel is None else passedSel
             if theDeformer is None or deformedShape is None:
                 theDeformer, deformedShape = self.getDeformerFromSel(
                     sel, typeOfDeformer=typeOfDeformer, indexDeformer=indexDeformer

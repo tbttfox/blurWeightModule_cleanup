@@ -353,6 +353,7 @@ class SkinWeightWin(Window):
         self.listInputs_CB.currentIndexChanged.connect(self.changeTypeOfData)
         self.listInputs_CB.currentIndexChanged.connect(self.updateFont)
         self.listInputs_CB.currentIndexChanged.connect(self.refresh)
+        self.uiAddJointsBTN.clicked.connect(self.addInfluences)
         self.indexDeformer_SPN.valueChanged.connect(self.changeIndexDeformer)
 
         self.orderType_CB.currentTextChanged.connect(self.changeOrder)
@@ -804,6 +805,8 @@ class SkinWeightWin(Window):
         changing, mapsAreAvailable = self.pickInputToDisplay()
         self.setDeformerName()
         self.editNbDeformers()
+        selection = self._tv.selectionModel().selection()
+        self._tv.selEmptied.emit(not selection.isEmpty())
         # if it changed it refreshed automatically
         # if it didn't change but maps are available, we do refresh
         # if it is a skin, we refresh to enalbe highlight of deformers
@@ -874,6 +877,16 @@ class SkinWeightWin(Window):
                 self.dataOfDeformer.preSettingValuesFn(chunks, actualyVisibleColumns)
                 self.dataOfDeformer.reassignLocally()
                 self.postSetValue()
+
+    def addInfluences(self):
+        if self.dataOfDeformer and isinstance(self.dataOfDeformer, DataOfSkin):
+            prevSel = cmds.ls(selection=True)
+            addedJoints = self.dataOfDeformer.addInfluences()
+            if addedJoints:
+                dicoToRestore = self.dataOfDeformer.getBaseDataToRestore()
+                cmds.select(dicoToRestore["preSel"])
+                self.refresh(True)
+                cmds.select(prevSel, replace=True)
 
     def pruneWeights(self):
         chunks = self.getRowColumnsSelected()
@@ -1148,6 +1161,7 @@ class SkinWeightWin(Window):
     def changeTypeOfData(self, ind):
         self.editNbDeformers(ind)
         UvsEnabled = False
+        addJointsEnabled = False
         if ind == 0:  # skinCluster
             self.dataOfDeformer = DataOfSkin(
                 useShortestNames=self.useShortestNames,
@@ -1155,21 +1169,20 @@ class SkinWeightWin(Window):
                 mainWindow=self,
                 createDisplayLocator=self.useDisplayLocator,
             )
-            self.problemVertsBTN.setEnabled(True)
+            addJointsEnabled = True
         elif ind == 1:  # blendShape
             self.dataOfDeformer = DataOfBlendShape(
                 useShortestNames=self.useShortestNames,
                 mainWindow=self,
                 createDisplayLocator=self.useDisplayLocator,
             )
-            self.problemVertsBTN.setEnabled(False)
+            UvsEnabled = True
         elif ind == 2:  # deformers
             self.dataOfDeformer = DataOfDeformers(
                 useShortestNames=self.useShortestNames,
                 mainWindow=self,
                 createDisplayLocator=self.useDisplayLocator,
             )
-            self.problemVertsBTN.setEnabled(False)
             UvsEnabled = True
         elif ind == 3:  # qualoth
             self.dataOfDeformer = DataOfDeformers(
@@ -1178,11 +1191,11 @@ class SkinWeightWin(Window):
                 createDisplayLocator=False,
                 isQualoth=True,
             )
-            self.problemVertsBTN.setEnabled(False)
-            UvsEnabled = False
         with ResettingModel(self._tm):
             self._tm.update(self.dataOfDeformer)
         self.uiUVsSettingWDG.setEnabled(UvsEnabled)
+        self.uiAddJointsWDG.setEnabled(addJointsEnabled)
+        self.problemVertsBTN.setEnabled(addJointsEnabled)
 
     def get_data_frame(self):
         with GlobalContext(message="get_data_frame"):

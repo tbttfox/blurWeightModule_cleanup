@@ -698,6 +698,20 @@ class DataOfSkin(DataAbstract):
             self.sknFn.getWeights(self.shapePath, self.fullComponent, weights, intPtr)
         return weights
 
+    def addInfluences(self):
+        toAdd = cmds.ls(selection=True, type="joint", long=True)
+        driverNames = cmds.ls(self.driverNames, long=True)
+        toAdd = [el for el in toAdd if el not in driverNames]
+        if toAdd:
+            cmds.skinCluster(
+                self.theSkinCluster,
+                edit=True,
+                lockWeights=False,
+                weight=0.0,
+                addInfluence=toAdd,
+            )
+        return toAdd
+
     def getValuesSkinClusterCmds(self, inputSkinCluster, allIndices):
         recomputedIndices = False
         if not allIndices:
@@ -864,19 +878,22 @@ class DataOfSkin(DataAbstract):
         getskinWeights=True,
         force=True,
         inputVertices=None,
+        byPassSelection=False,
+        dicOfSel=None,
         **kwargs,
     ):
-        success = self.getDataFromSelection(
-            typeOfDeformer="skinCluster",
-            force=force,
-            inputVertices=inputVertices,
-            **kwargs,
-        )
-        if not success or self.theDeformer == "":
-            if not force:
-                return False
-        else:
-            self.theSkinCluster = self.theDeformer
+        if not byPassSelection:
+            success = self.getDataFromSelection(
+                typeOfDeformer="skinCluster",
+                force=force,
+                inputVertices=inputVertices,
+                **kwargs,
+            )
+            if not success or self.theDeformer == "":
+                if not force:
+                    return False
+            else:
+                self.theSkinCluster = self.theDeformer
 
         # get skin infos vertices
         if (
@@ -898,7 +915,7 @@ class DataOfSkin(DataAbstract):
 
         # use vertex selection
         with GlobalContext(message="rawSkinValues", doPrint=self.verbose):
-            self.getSoftSelectionVertices(inputVertices=inputVertices)
+            self.getSoftSelectionVertices(inputVertices=inputVertices, dicOfSel=dicOfSel)
 
             if not self.vertices:
                 self.vertices = cmds.getAttr(
