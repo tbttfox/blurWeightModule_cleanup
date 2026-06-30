@@ -535,6 +535,9 @@ class SkinWeightWin(Window):
         resizeAction = self.popMenu.addAction("Resize to Minimum (MiddleClick)")
         resizeAction.triggered.connect(self.resizeToMinimum)
 
+        reverseAction = self.popMenu.addAction("Reverse Value")
+        reverseAction.triggered.connect(self.doReverse)
+
         chbox = QtWidgets.QCheckBox("Auto Prune", self.popMenu)
         chbox.setChecked(self.autoPrune)
         chbox.toggled.connect(self.autoPruneChecked)
@@ -949,6 +952,11 @@ class SkinWeightWin(Window):
     def doAverage(self):
         self.prepareToSetValue(selectAllIfNothing=True)
         self.doAddValue(self.averageBTN.precision, forceAbsolute=False, average=True)
+        self.postSetValue()
+
+    def doReverse(self):
+        self.prepareToSetValue(selectAllIfNothing=True)
+        self.dataOfDeformer.doReverse()
         self.postSetValue()
 
     def smooth(self):

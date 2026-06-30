@@ -738,6 +738,22 @@ class DataAbstract(object):
                 new2dArray = new2dArray * iw + self.orig2dArray * (1.0 - iw)
             self.commandForDoIt(new2dArray)
 
+    def doReverse(self):
+        with GlobalContext(message="reverse", doPrint=self.verbose):
+            new2dArray = np.copy(self.orig2dArray)
+            selectArr = np.copy(self.orig2dArray)
+
+            addValues = 1.0 - np.ma.array(selectArr, fill_value=0)
+            np.copyto(new2dArray, addValues)
+
+            if self.softOn:
+                new2dArray = (
+                    new2dArray * self.indicesWeights[:, np.newaxis]
+                    + self.orig2dArray * (1.0 - self.indicesWeights)[:, np.newaxis]
+                )
+
+            self.commandForDoIt(new2dArray)
+
     def preSettingValuesFn(self, chunks, actualyVisibleColumns):
         """Method to be called before setting values. GUILLAUME
 

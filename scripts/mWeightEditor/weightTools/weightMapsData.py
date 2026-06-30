@@ -424,10 +424,14 @@ class DataOfBlendShape(DataOfOneDimensionalAttrs):
                 )
 
                 # get the alias
-                listAlias = cmds.aliasAttr(BSnode, query=True)
-                listAliasIndices = cmds.getAttr(
-                    BSnode + ".inputTarget[{}].inputTargetGroup".format(inputTarget),
-                    multiIndices=True,
+                listAlias = cmds.aliasAttr(BSnode, query=True) or []
+                listAliasIndices = (
+                    cmds.getAttr(
+                        BSnode
+                        + ".inputTarget[{}].inputTargetGroup".format(inputTarget),
+                        multiIndices=True,
+                    )
+                    or []
                 )
 
                 listAliasNme = (
