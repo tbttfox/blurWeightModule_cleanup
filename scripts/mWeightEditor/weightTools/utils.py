@@ -731,6 +731,25 @@ def removeUserEventCallback(callbackId):
     OpenMaya.MUserEventMessage.removeCallback(callbackId)
 
 
+class ToggleIntermediateObject(object):
+    def __init__(self, shapeName):
+        self.shapeName = shapeName
+        self.isIntermediateObject = cmds.getAttr(shapeName + ".intermediateObject")
+        self.isVisible = cmds.getAttr(shapeName + ".visibility")
+
+    def __enter__(self):
+        if self.isIntermediateObject:
+            cmds.setAttr(self.shapeName + ".intermediateObject", False)
+        if not self.isVisible:
+            cmds.setAttr(self.shapeName + ".visibility", True)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.isIntermediateObject:
+            cmds.setAttr(self.shapeName + ".intermediateObject", True)
+        if not self.isVisible:
+            cmds.setAttr(self.shapeName + ".visibility", False)
+
+
 class Prefs(object):
     """A wrapper for reading/writing prefs both internal and external to blur"""
 

@@ -4,7 +4,7 @@ from maya import OpenMaya, OpenMayaAnim, cmds
 
 import numpy as np
 import re
-from .utils import GlobalContext, getThreeIndices, orderMelList
+from .utils import GlobalContext, getThreeIndices, orderMelList, ToggleIntermediateObject
 
 from .abstractData import DataAbstract
 from six.moves import range, zip
@@ -576,11 +576,12 @@ class DataOfSkin(DataAbstract):
         sknFn,
     ):
         with GlobalContext(message="actuallySetValue", doPrint=self.verbose):
+            shapeName = shapePath.fullPathName()
             arrayForSetting = new2dArray
             if self.softOn:
                 arrayForSetting = new2dArray[self.subOpposite_sortedIndices]
 
-            with GlobalContext(message="OpenMaya setWeights", doPrint=self.verbose):
+            with ToggleIntermediateObject(shapeName):
                 newArray = numpyToMaya(arrayForSetting.flatten(), OpenMaya.MDoubleArray)
                 normalize = False
                 UndoValues = OpenMaya.MDoubleArray()
@@ -622,7 +623,11 @@ class DataOfSkin(DataAbstract):
 
         geometries = OpenMaya.MObjectArray()
         self.sknFn.getOutputGeometry(geometries)
-        self.shapePath = OpenMaya.MDagPath().getAPathTo(geometries[0])
+        if geometries.length() == 0:
+            shapeName = cmds.skinCluster(inputSkinCluster, query=True, geometry=True)[0]
+            self.shapePath = self.getMObject(shapeName)
+        else:
+            self.shapePath = OpenMaya.MDagPath().getAPathTo(geometries[0])
 
         shapeName = self.shapePath.fullPathName()
         vertexCount = 0
@@ -702,7 +707,8 @@ class DataOfSkin(DataAbstract):
         intptrUtil.createFromInt(0)
         intPtr = intptrUtil.asUintPtr()
         with GlobalContext(message="sknFn.getWeights", doPrint=self.verbose):
-            self.sknFn.getWeights(self.shapePath, self.fullComponent, weights, intPtr)
+            with ToggleIntermediateObject(shapeName):
+                self.sknFn.getWeights(self.shapePath, self.fullComponent, weights, intPtr)
         return weights
 
     def addInfluences(self):
