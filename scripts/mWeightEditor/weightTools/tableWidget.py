@@ -264,7 +264,7 @@ class VertHeaderView(QtWidgets.QHeaderView):
 
         clearLocksAction = popMenu.addAction("Clear All Locks")
         clearLocksAction.triggered.connect(self.clearLocks)
-        popMenu.exec_(self.mapToGlobal(pos))
+        popMenu.exec(self.mapToGlobal(pos))
 
     def paintSection(self, painter, rect, index):
         if not rect.isValid():
@@ -436,7 +436,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
     def setColor(self, pos, index):
         menu = ColorMenu(self)
         pos = self.mapToGlobal(pos)
-        menu.exec_(pos)
+        menu.exec(pos)
         color = menu.color()
         if color is None:
             return
@@ -569,7 +569,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             paintAttr.triggered.connect(self.enterPaintAttribute)
             paintAttr.setEnabled(not selectionIsEmpty)
 
-        popMenu.exec_(self.mapToGlobal(pos))
+        popMenu.exec(self.mapToGlobal(pos))
 
     def toggledColumn(self, ind, ColumnName, checked):
         par = self.parent()

@@ -563,7 +563,7 @@ class SkinWeightWin(Window):
         self.customContextMenuRequested.connect(self.showMenu)
 
     def showRightClickMenu(self, event):
-        self.popMenu.exec_(event.globalPos())
+        self.popMenu.exec(event.globalPos())
 
     def showMenu(self, pos):
         child = self.childAt(pos)
@@ -577,7 +577,7 @@ class SkinWeightWin(Window):
             "widgetAdd",
             "widgetAbs",
         ]:
-            self.popMenu.exec_(self.mapToGlobal(pos))
+            self.popMenu.exec(self.mapToGlobal(pos))
 
     #
     # optionVars
