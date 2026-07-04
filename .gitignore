@@ -65,3 +65,7 @@ Temporary Items
 
 # Don't store my symlink to compile_commands.json
 compile_commands.json
+
+# Test suite build output
+tests/cpp/cppbuild/
+/modules/

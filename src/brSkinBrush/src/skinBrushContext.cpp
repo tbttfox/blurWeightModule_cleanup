@@ -158,7 +158,7 @@ void SkinBrushContext::toolOnSetup(MEvent &)
         if (!weights.skinObj.isNull()) {
             getListColorsJoints(
                 weights.skinObj, this->influence.nbJoints, influence.indicesForInfluenceObjects,
-                influence.jointsColors, verbose
+                influence.jointsColors
             ); // get the joints colors
             this->weights.skinWeightList.clear();
             this->influence.ignoreLockJoints = MIntArray(this->influence.nbJoints, 0);
@@ -2314,7 +2314,6 @@ MStatus SkinBrushContext::getMesh()
     getConnectedVertices();
     getFromMeshNormals();
     getDerivedConnectivity();
-    getConnectedVerticesFlatten();
     this->mesh.mayaRawPoints = const_cast<float *>(mesh.meshFn.getRawPoints(&status));
     this->weights.lockVertices = MIntArray(this->mesh.numVertices, 0);
     getTheOrigMeshForMirror();
@@ -3277,7 +3276,7 @@ MString SkinBrushContext::getValuesForOptionVar()
     cmd += " " + MString(kCurveFlagLong) + " ";
     cmd += getCurve();
     cmd += " " + MString(kCommandIndexFlagLong) + " ";
-    cmd += static_cast<int>(commandIndex);
+    cmd += static_cast<int>(input.commandIndex);
     cmd += " " + MString(kSoloColorFlagLong) + " ";
     cmd += getSoloColor();
     cmd += " " + MString(kSoloColorTypeFlagLong) + " ";

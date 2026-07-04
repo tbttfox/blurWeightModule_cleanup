@@ -1,0 +1,6 @@
+option(
+  'maya_install_path',
+  type: 'string',
+  value: 'C:/Program Files/Autodesk/Maya2026',
+  description: 'Path to the Maya install used to compile/link the pure-logic test executables',
+)

@@ -21,5 +21,3 @@ if exist %BUILDDIR%\ (
     meson compile -C %BUILDDIR%
     meson install -C %BUILDDIR%
 )
-
-pause
