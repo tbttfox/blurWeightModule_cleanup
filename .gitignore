@@ -69,3 +69,10 @@ compile_commands.json
 # Test suite build output
 tests/cpp/cppbuild/
 /modules/
+
+# Meson subprojects: keep the .wrap pointer files, ignore what they download
+# (the extracted/cloned source tree, the shared download cache, and the lock file)
+**/subprojects/packagecache/
+**/subprojects/.wraplock
+**/subprojects/*/
+!**/subprojects/maya/
