@@ -1,5 +1,4 @@
 from typing import Optional, Union, Callable, Any
-import os
 import sys
 import shutil
 import time
@@ -21,6 +20,23 @@ EXTS = {
     "linux2": ".so",
     "darwin": ".bundle",
 }
+
+
+def unloadFolder(folder: Union[str, Path]):
+    """Unload a folder from sys.modules"""
+    folder = Path(folder)
+    todel = []
+    for name, mod in sys.modules.items():
+        try:
+            f = mod.__file__
+        except AttributeError:
+            continue
+        if not f:
+            continue
+        if folder in Path(f).parents:
+            todel.append(name)
+    for d in todel:
+        del sys.modules[d]
 
 
 def _findSrcAndReleaseType(

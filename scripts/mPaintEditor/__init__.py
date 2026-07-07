@@ -9,10 +9,10 @@ PAINT_EDITOR_CONTEXT_OPTIONS = "brSkinBrushContextOptions"
 
 class GetContext:
     """Maya doesn't let you delete a context, but we *can* overwrite it
-    so on plugin unload.
-
-    So we can overwrite the existing contexts with an arbitrary context.
-    Then the next time we load the UI, we can create a brand new context
+    So on plugin unload we overwrite the existing brSkinBrush contexts
+    with an arbitrary context (manipMoveContext)
+    Then the next time we load the UI, we can create brand new contexts
+    that won't crash maya
     """
 
     def __init__(self):
