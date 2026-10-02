@@ -442,7 +442,7 @@ MStatus blurSkinDisplay::compute(const MPlug &plug, MDataBlock &dataBlock)
                                 std::unordered_set<int> toFixVtx;
                                 for (unsigned int i = 0; i < this->paintedValues.length(); i++) {
                                     if (this->paintedValues[i] > threshold) {
-                                        MIntArray vertsAround = this->connectedVertices[i];
+                                        const MIntArray &vertsAround = this->connectedVertices[i];
                                         for (int j = 0; j < vertsAround.length(); ++j) {
                                             int theVertAround = vertsAround[j];
                                             if (this->paintedValues[theVertAround] <= 0.05) {
@@ -457,7 +457,7 @@ MStatus blurSkinDisplay::compute(const MPlug &plug, MDataBlock &dataBlock)
                                 }
                                 for (int i = 0; i < vtxToFix.length(); ++i) {
                                     int vtx = vtxToFix[i];
-                                    MIntArray vertsAround = this->connectedVertices[vtx];
+                                    const MIntArray &vertsAround = this->connectedVertices[vtx];
                                     double newVal = 0.0;
                                     int nbAround = 0;
                                     for (int j = 0; j < vertsAround.length(); ++j) {
@@ -467,8 +467,9 @@ MStatus blurSkinDisplay::compute(const MPlug &plug, MDataBlock &dataBlock)
                                             newVal += this->paintedValues[theVertAround];
                                         }
                                     }
-                                    newVal /= nbAround;
-                                    this->paintedValues[vtx] = newVal;
+                                    if (nbAround > 0) {
+                                        this->paintedValues[vtx] = newVal / nbAround;
+                                    }
                                 }
                             }
                         }
@@ -562,7 +563,7 @@ MStatus blurSkinDisplay::compute(const MPlug &plug, MDataBlock &dataBlock)
                     bool callRefreshLocksVal = true;
                     if (!this->init) {
                         MDataHandle callRefreshLocksData = dataBlock.inputValue(_getLockWeights);
-                        bool callRefreshLocksVal = callRefreshLocksData.asBool();
+                        callRefreshLocksVal = callRefreshLocksData.asBool();
                     }
                     MIntArray prevLockVertices;
                     prevLockVertices.copy(this->lockVertices);
@@ -907,9 +908,8 @@ MStatus blurSkinDisplay::applyCommand(
                     int theVert = theEditVerts[i];
                     double theVal = verticesWeight[i];
 
-                    MIntArray vertsAround = this->allVertsAround[theVert];
                     status = setAverageWeight(
-                        vertsAround, theVert, i, this->nbJoints, this->lockJoints,
+                        this->allVertsAround[theVert], theVert, i, this->nbJoints, this->lockJoints,
                         this->skinWeightList, theWeights
                     );
                 }
@@ -972,8 +972,8 @@ void blurSkinDisplay::refreshVertsConnection()
 {
     this->allVertsAround.clear();
     this->allVertsAround.resize(this->connectedVertices.size());
-    for (int i = 0; i < this->connectedVertices.size(); ++i) {
-        MIntArray surroundingVertices = this->connectedVertices[i];
+    for (size_t i = 0; i < this->connectedVertices.size(); ++i) {
+        const MIntArray &surroundingVertices = this->connectedVertices[i];
         std::unordered_set<int> setOfVerts;
         for (unsigned int itVtx = 0; itVtx < surroundingVertices.length(); itVtx++) {
             setOfVerts.insert(surroundingVertices[itVtx]);
@@ -1054,8 +1054,11 @@ void blurSkinDisplay::setInfluenceColorAttr()
     // for (int i = 0; i < this->jointsColors.length(); ++i) {
     for (int i = 0; i < (int)this->deformersIndices.length(); ++i) {
         int indexLogical = this->deformersIndices[i];
+        if (indexLogical >= (int)this->jointsColors.length()) {
+            continue;
+        }
         MPlug thecolorPlug = influenceColor_Plug.elementByLogicalIndex(indexLogical, &status);
-        MColor theColor = this->jointsColors[i];
+        MColor theColor = this->jointsColors[indexLogical];
         thecolorPlug.child(0).setValue(theColor.r);
         thecolorPlug.child(1).setValue(theColor.g);
         thecolorPlug.child(2).setValue(theColor.b);
@@ -1193,9 +1196,12 @@ MStatus blurSkinDisplay::fillArrayValues(bool doColors)
     this->nbJoints = matrix_plug.numElements();
 
     matrix_plug.getExistingArrayAttributeIndices(this->deformersIndices);
+    if (this->deformersIndices.length() == 0) {
+        MGlobal::displayError(MString("blurSkinDisplay: the skinCluster has no influences"));
+        return MS::kFailure;
+    }
 
-    this->nbJointsBig = this->deformersIndices[this->deformersIndices.length() - 1] +
-                        1; // matrix_plug.evaluateNumElements();
+    this->nbJointsBig = this->deformersIndices[this->deformersIndices.length() - 1] + 1;
     if (verbose) {
         MGlobal::displayInfo(
             MString(" nb jnts ") + this->nbJoints + MString("  ") + this->nbJointsBig
@@ -1203,12 +1209,17 @@ MStatus blurSkinDisplay::fillArrayValues(bool doColors)
     }
     this->nbJoints = this->nbJointsBig;
 
+    // weightList can be sparse, so size the per-vertex arrays by the largest logical index
+    int nbVerts = 0;
+    if (nbElements > 0) {
+        nbVerts = weight_list_plug.elementByPhysicalIndex(nbElements - 1).logicalIndex() + 1;
+    }
     skin_weights_.resize(nbElements);
     if (doColors) {
         this->multiCurrentColors.clear();
-        this->multiCurrentColors.setLength(nbElements);
+        this->multiCurrentColors.setLength(nbVerts);
     }
-    this->skinWeightList = MDoubleArray(nbElements * this->nbJoints, 0.0);
+    this->skinWeightList = MDoubleArray(nbVerts * this->nbJoints, 0.0);
 
     for (int i = 0; i < nbElements; ++i) {
         // weightList[i]
@@ -1255,7 +1266,7 @@ void blurSkinDisplay::set_skinning_weights(MDataBlock &block)
     auto nbVerts = skin_weights_.size();
     // array_builder.growArray(nbVerts);
     for (int i = 0; i < nbVerts; i++) {
-        auto vertexWeight = skin_weights_[i];
+        const auto &vertexWeight = skin_weights_[i];
         auto nbInfluences = vertexWeight.size();
 
         MDataHandle element_hdl = array_builder.addElement(i, &status); // weightList[i]
@@ -1383,7 +1394,7 @@ MStatus blurSkinDisplay::initialize()
     ///////////////////////////////////////////////////////////////////////////
     blurSkinDisplay::_paintableAttr =
         tAttr.create("paintAttr", "pa", MFnData::kDoubleArray, MObject::kNullObj, &status);
-    meshAttr.setStorable(true);
+    tAttr.setStorable(true);
     status = blurSkinDisplay::addAttribute(blurSkinDisplay::_paintableAttr);
 
     blurSkinDisplay::_clearArray =
@@ -1398,7 +1409,6 @@ MStatus blurSkinDisplay::initialize()
 
     blurSkinDisplay::_getLockWeights =
         numAtt.create("getLockWeights", "glw", MFnNumericData::kBoolean, false, &status);
-    numAtt.setStorable(true);
     numAtt.setStorable(true);
     status = blurSkinDisplay::addAttribute(blurSkinDisplay::_getLockWeights);
 
@@ -1417,7 +1427,7 @@ MStatus blurSkinDisplay::initialize()
 
     blurSkinDisplay::_mirrorInfluenceArray =
         tAttr.create("mirrorInfluenceArray", "mia", MFnData::kIntArray, MObject::kNullObj, &status);
-    meshAttr.setStorable(true);
+    tAttr.setStorable(true);
     status = blurSkinDisplay::addAttribute(blurSkinDisplay::_mirrorInfluenceArray);
     ///////////////////////////////////////////////////////////////////////////
     // creation attributes
@@ -1598,7 +1608,7 @@ blurSkinDisplay::setDependentsDirty(const MPlug &plugBeingDirtied, MPlugArray &a
         }
     }
     if ((plugBeingDirtied == _paintableAttr) || this->reloadCommand || this->clearTheArray ||
-        this->callUndo || this->changedColorInfluence) {
+        this->callUndo || this->changedColorInfluence != -1) {
         this->applyPaint = true;
         MPlug outMeshPlug(thisNode, blurSkinDisplay::_outMesh);
         affectedPlugs.append(outMeshPlug);

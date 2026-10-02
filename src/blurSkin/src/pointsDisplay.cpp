@@ -66,7 +66,8 @@ void pointsDisplay::draw(
     glColor4fv(data.color);
     glPointSize(data.pointWidth);
 
-    for (int i = 0; i < data.pointsVertices.length(); i++) {
+    glBegin(GL_POINTS);
+    for (unsigned int i = 0; i < data.pointsVertices.length(); i++) {
         glVertex3f(data.pointsVertices[i][0], data.pointsVertices[i][1], data.pointsVertices[i][2]);
     }
     glEnd();
@@ -140,9 +141,6 @@ void PointsDisplayData::getData(const MObject &node)
         MObject theNode = plugs[0].node();
 
         // get the transform  matrix
-        MFnDagNode theShape(theNode);
-        MObject prt = theShape.parent(0);
-
         MDagPath pth;
         status = MDagPath::getAPathTo(theNode, pth);
         MMatrix worldMatrix = pth.inclusiveMatrix();
@@ -251,6 +249,8 @@ void PointsDisplayData::getData(const MObject &node)
                 }
             }
         }
+        // The points are drawn in world space, so the bounding box needs to be as well
+        this->theBoundingBox.transformUsing(worldMatrix);
     }
 }
 

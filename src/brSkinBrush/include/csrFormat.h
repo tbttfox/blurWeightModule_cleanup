@@ -66,12 +66,17 @@ template <typename T = int> class FlatCounts {
     {
         offsets.clear();
         values.clear();
-        const auto maxit = std::max_element(inVals.begin(), inVals.end());
-        K maxkey = maxit->first;
-        offsets.reserve(maxkey + 1);
         offsets.push_back(0);
+        if (inVals.empty()) {
+            return;
+        }
+        K maxkey = inVals.begin()->first;
+        for (const auto &kv : inVals) {
+            maxkey = std::max(maxkey, kv.first);
+        }
+        offsets.reserve(maxkey + 2);
         size_t offset = 0;
-        for (size_t i = 0; i < maxkey; ++i) {
+        for (size_t i = 0; i <= (size_t)maxkey; ++i) {
             auto search = inVals.find(i);
             if (search != inVals.end()) {
                 offset += search->second.size();
@@ -94,8 +99,9 @@ template <typename T = int, size_t C = 2> class FlatChunks {
     std::vector<T> values;
 
   public:
-    void set(const std::vector<std::array<int, C>> &invals)
+    void set(const std::vector<std::array<T, C>> &invals)
     {
+        values.clear();
         values.reserve(invals.size() * C);
         for (const auto &ev : invals) {
             for (const auto &v : ev) {
@@ -162,10 +168,10 @@ template <typename T = int, size_t C = 3> class DoubleChunks {
     size_t length() const { return offsets.size() - 1; }
     size_t length2(size_t i) const { return offsets[i + 1] - offsets[i]; }
 
+    // offsets are counted in chunks, so scale by C to index into the flat values
     const std::span<const T> operator()(size_t i, size_t j) const
     {
-        return std::span<const T>(
-            values.begin() + offsets[i] + (C * j), values.begin() + offsets[i] + (C * (j + 1))
-        );
+        size_t start = C * (offsets[i] + j);
+        return std::span<const T>(values.begin() + start, values.begin() + start + C);
     }
 };

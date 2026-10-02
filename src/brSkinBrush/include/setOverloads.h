@@ -2,13 +2,13 @@
 #include <algorithm>
 #include <iterator>
 #include <unordered_set>
+#include <vector>
 
 template <class T>
 std::unordered_set<T>
 operator-(const std::unordered_set<T> &base, const std::unordered_set<T> &other)
 {
-    std::unordered_set<T> result;
-    result = base;
+    std::unordered_set<T> result(base);
     for (auto &elem : other) {
         result.erase(elem);
     }
@@ -37,8 +37,7 @@ template <class T>
 std::unordered_set<T>
 operator+(const std::unordered_set<T> &base, const std::unordered_set<T> &other)
 {
-    std::unordered_set<T> result;
-    result = base;
+    std::unordered_set<T> result(base);
     result.insert(other.begin(), other.end());
     return result;
 }
@@ -71,11 +70,6 @@ template <class T> std::vector<T> operator&(const std::vector<T> &base, const st
     return result;
 }
 
-template <class T> std::vector<T> operator|(const std::vector<T> &base, const std::vector<T> &other)
-{
-    return base + other;
-}
-
 template <class T> std::vector<T> operator+(const std::vector<T> &base, const std::vector<T> &other)
 {
     std::vector<T> result;
@@ -83,4 +77,9 @@ template <class T> std::vector<T> operator+(const std::vector<T> &base, const st
         base.begin(), base.end(), other.begin(), other.end(), std::back_inserter(result)
     );
     return result;
+}
+
+template <class T> std::vector<T> operator|(const std::vector<T> &base, const std::vector<T> &other)
+{
+    return base + other;
 }

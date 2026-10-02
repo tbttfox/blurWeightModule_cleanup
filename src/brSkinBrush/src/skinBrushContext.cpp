@@ -1,5 +1,6 @@
 #include "skinBrushFlags.h"
 #include "skinBrushTool.h"
+#include <limits>
 #include <span>
 
 // Forward declarations for free functions defined in skinBrushImperative.cpp
@@ -551,7 +552,9 @@ MStatus SkinBrushContext::drawMeshWhileDrag(MHWRender::MUIDrawManager &drawManag
     // This function is the hottest path when painting
     // So it can and should be optimized more
     // I think the endgame for this is to only update the changed vertices each runthrough
-    int nbVtx = this->interPersist.verticesPainted.size();
+
+    // Everything drawn here is indexed by the entries of mirroredJoinedArray
+    unsigned int nbVtx = (unsigned int)this->weights.mirroredJoinedArray.size();
 
     MFloatPointArray points(nbVtx);
     MFloatVectorArray normals(nbVtx);
@@ -1250,8 +1253,9 @@ void SkinBrushContext::growArrayOfHitsFromCenters(
 
     // build hit point list for distance queries
     std::vector<point_t> points;
+    points.reserve(AllHitPoints.length());
     for (auto hitPt : AllHitPoints) {
-        points.push_back(std::make_tuple(hitPt.x, hitPt.y, hitPt.z));
+        points.push_back({hitPt.x, hitPt.y, hitPt.z});
     }
 
     // set of visited vertices
@@ -1285,16 +1289,17 @@ void SkinBrushContext::growArrayOfHitsFromCenters(
                     continue;
                 }
             }
-            point_t thisPoint = std::make_tuple(
+            point_t thisPoint = {
                 this->mesh.mayaRawPoints[vertexBorder * 3],
                 this->mesh.mayaRawPoints[vertexBorder * 3 + 1],
                 this->mesh.mayaRawPoints[vertexBorder * 3 + 2]
-            );
-            auto glambda = [&thisPoint](const point_t &a, const point_t &b) {
-                return distance_sq(a, thisPoint) < distance_sq(b, thisPoint);
             };
-            std::partial_sort(points.begin(), points.begin() + 1, points.end(), glambda);
-            float closestDist = distance(points.front(), thisPoint);
+            // Only the distance to the closest hit point matters, no need to reorder
+            float closestDistSq = std::numeric_limits<float>::max();
+            for (const point_t &pt : points) {
+                closestDistSq = std::min(closestDistSq, distance_sq(pt, thisPoint));
+            }
+            float closestDist = std::sqrt(closestDistSq);
             if (closestDist <= this->input.sizeVal) {
                 processing = true;
                 foundGrowVertsWithinDistance.push_back(vertexBorder);
@@ -1363,6 +1368,7 @@ MStatus SkinBrushContext::doDragCommon(MEvent &event)
             if (input.paintMirror != 0) { // if mirror is not OFf
                 successFullMirrorHit2 = getMirrorHit(faceMirrorHit, hitMirrorPoint);
                 if (successFullMirrorHit2) {
+                    this->mirror.dicVertsDistSTART.clear();
                     hitMirrorPointIM = hitMirrorPoint * this->mesh.inclusiveMatrixInverse;
                     expandHit(faceMirrorHit, hitMirrorPointIM, this->mirror.dicVertsDistSTART);
                 }
@@ -1454,7 +1460,7 @@ MStatus SkinBrushContext::doDragCommon(MEvent &event)
                 this->interPersist.verticesPainted, true
             );
         }
-        mergeMirrorArray(this->paint.skinValuesToSet, this->mirror.skinValuesToSet);
+        ::mergeMirrorArray(this->weights, this->paint, this->mirror);
         if (this->input.useColorSetsWhilePainting || !this->input.postSetting) {
             doPerformPaint();
         }
@@ -1741,7 +1747,7 @@ void SkinBrushContext::doTheAction()
     else {
         if (this->input.paintMirror != 0) {
             int mirrorInfluenceIndex = this->input.mirrorInfluences[this->input.influenceIndex];
-            mergeMirrorArray(this->paint.skinValuesToSet, this->mirror.skinValuesToSet);
+            ::mergeMirrorArray(this->weights, this->paint, this->mirror);
 
             if (mirrorInfluenceIndex != this->input.influenceIndex) {
                 status = applyCommandMirror();
@@ -1877,16 +1883,6 @@ ModifierCommands SkinBrushContext::getCommandIndexModifiers() const
     return ::getCommandIndexModifiers(this->input, this->interFrame);
 }
 
-void SkinBrushContext::mergeMirrorArray(
-    std::unordered_map<int, float> &valuesBase, std::unordered_map<int, float> &valuesMirrored
-)
-{
-    MirrorableData tmpBase, tmpMirror;
-    tmpBase.skinValuesToSet = valuesBase;
-    tmpMirror.skinValuesToSet = valuesMirrored;
-    ::mergeMirrorArray(this->weights, tmpBase, tmpMirror);
-}
-
 MStatus SkinBrushContext::applyCommandMirror()
 {
     MStatus status;
@@ -1918,9 +1914,6 @@ MStatus SkinBrushContext::applyCommandMirror()
             int indexCurrVert = 0;
             for (const auto &elem : mirroredJoinedArrayOrdered) {
                 int theVert = elem.first;
-                if (repeat == 0) {
-                    objVertices.append(theVert);
-                }
                 float valueBase = elem.second.first;
                 float valueMirror = elem.second.second;
                 float biggestValue = std::max(valueBase, valueMirror);
@@ -2190,25 +2183,7 @@ MColor SkinBrushContext::getASoloColor(double val)
     return ::getASoloColor(val, this->input, this->influence);
 }
 
-void copyToFloatMatrix(const MMatrix &src, MFloatMatrix &dst)
-{
-    dst[0][0] = (float)src[0][0];
-    dst[0][1] = (float)src[0][1];
-    dst[0][2] = (float)src[0][2];
-    dst[0][3] = (float)src[0][3];
-    dst[1][0] = (float)src[1][0];
-    dst[1][1] = (float)src[1][1];
-    dst[1][2] = (float)src[1][2];
-    dst[1][3] = (float)src[1][3];
-    dst[2][0] = (float)src[2][0];
-    dst[2][1] = (float)src[2][1];
-    dst[2][2] = (float)src[2][2];
-    dst[2][3] = (float)src[2][3];
-    dst[3][0] = (float)src[3][0];
-    dst[3][1] = (float)src[3][1];
-    dst[3][2] = (float)src[3][2];
-    dst[3][3] = (float)src[3][3];
-}
+static void copyToFloatMatrix(const MMatrix &src, MFloatMatrix &dst) { src.get(dst.matrix); }
 
 // ---------------------------------------------------------------------
 // brush methods
@@ -2460,9 +2435,8 @@ void SkinBrushContext::getConnectedVertices()
 void SkinBrushContext::getConnectedBorderVertices()
 {
     this->vertToVertBorder = findClosestWithinThreshold(
-        borderVertices, this->mesh.mayaOrigRawPoints,
-        mesh.perVertexVertices,
-        sewVerticesMinDist, this->mesh.numVertices, 0
+        borderVertices, this->mesh.mayaOrigRawPoints, mesh.perVertexVertices, sewVerticesMinDist,
+        this->mesh.numVertices
     );
     if (verbose) {
         for (size_t i = 0; i < this->vertToVertBorder.size(); ++i) {
@@ -2501,16 +2475,7 @@ void SkinBrushContext::getFromMeshNormals()
 
     MIntArray normalCounts, normals;
     this->mesh.meshFn.getNormalIds(normalCounts, normals);
-
-    // Store the first normal ID per face (only index [0] is ever needed).
-    mesh.normalIdPerFace.resize(mesh.numFaces);
-    {
-        int startIndex = 0;
-        for (int f = 0; f < mesh.numFaces; ++f) {
-            mesh.normalIdPerFace[f] = normals[startIndex];
-            startIndex += normalCounts[f];
-        }
-    }
+    mesh.perFaceNormalIds.set(normalCounts, normals);
 
     MStatus stat;
     this->mesh.rawNormals = const_cast<float *>(this->mesh.meshFn.getRawNormals(&stat));
@@ -2524,9 +2489,11 @@ void SkinBrushContext::getFromMeshNormals()
         if (!faces.empty()) {
             int indFace = faces[0];
             int indNormal = -1;
-            for (int v : mesh.perFaceVertices[indFace]) {
-                if (v == vertexInd) {
-                    indNormal = mesh.normalIdPerFace[indFace];
+            auto faceVerts = mesh.perFaceVertices[indFace];
+            auto faceNormals = mesh.perFaceNormalIds[indFace];
+            for (size_t k = 0; k < faceVerts.size(); ++k) {
+                if (faceVerts[k] == vertexInd) {
+                    indNormal = faceNormals[k];
                     break;
                 }
             }
@@ -2818,9 +2785,18 @@ MIntArray SkinBrushContext::getInfluenceIndices()
 
     this->influence.inflNames.setLength(lent);
     this->influence.inflNamePixelSize.setLength(2 * lent);
-    this->influence.indicesForInfluenceObjects.setLength(lent);
     MStatus stat;
     this->influence.nbJoints = lent;
+
+    // Logical indices can be sparse (eg: after removing an influence), so size the
+    // logical->physical map by the largest logical index. Unused entries map to -1
+    unsigned int maxLogical = 0;
+    for (unsigned i = 0; i < lent; i++) {
+        maxLogical = std::max(
+            maxLogical, skinFn.indexForInfluenceObject(this->influence.inflDagPaths[i])
+        );
+    }
+    this->influence.indicesForInfluenceObjects = MIntArray(lent ? maxLogical + 1 : 0, -1);
 
     QFontMetrics fontMetrics(QFont("MS Shell Dlg 2", 14));
 
@@ -2886,23 +2862,13 @@ MStatus SkinBrushContext::querySkinClusterValues(
 
     for (unsigned int i = 0; i < verticesIndices.length(); ++i) {
         int vertexIndex = verticesIndices[i];
-
-        MColor theColor;
         for (unsigned int j = 0; j < infCount; j++) { // for each joint
             double theWeight = weightsVertices[i * infCount + j];
             int ind_swl = vertexIndex * this->influence.nbJoints + j;
-            if (ind_swl >= this->weights.skinWeightList.length()) {
+            if (ind_swl >= (int)theSkinWeightList.length()) {
                 theSkinWeightList.setLength(ind_swl + 1);
             }
             theSkinWeightList[ind_swl] = theWeight;
-            if (doColors) {
-                if (influence.lockJoints[j] == 1) {
-                    theColor += influence.lockJntColor * theWeight;
-                }
-                else {
-                    theColor += this->influence.jointsColors[j] * theWeight;
-                }
-            }
         }
     }
     return status;

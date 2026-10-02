@@ -251,7 +251,7 @@ MStatus blurSkinCmd::printWeight(int vertex, int u, int v)
     return MS::kSuccess;
 }
 
-MStatus blurSkinCmd::getAverageWeight(MIntArray vertices, int currentVertex)
+MStatus blurSkinCmd::getAverageWeight(const MIntArray &vertices, int currentVertex)
 {
     if (verbose) {
         MGlobal::displayInfo(MString(" ---- getAverageWeight ----"));
@@ -259,8 +259,10 @@ MStatus blurSkinCmd::getAverageWeight(MIntArray vertices, int currentVertex)
     if (verbose) {
         MGlobal::displayInfo(MString("nbJoints ") + nbJoints);
     }
-    MStatus stat;
     int sizeVertices = vertices.length();
+    if (sizeVertices == 0) { // nothing to average with, keep the current weights
+        return MS::kSuccess;
+    }
     int i, j, posi;
 
     MDoubleArray sumWeigths(nbJoints, 0.0);
@@ -392,6 +394,9 @@ MStatus blurSkinCmd::addWeights(int currentVertex)
     if ((totalOfAdding >= totalWithLocks) ||
         (command_ == kCommandAbsolute && otherJointsTotal == 0.)) {
         // normalize, rest of joints get zero
+        if (totalOfAdding <= 0.0) {
+            return MS::kSuccess;
+        }
         double multFactor = totalWithLocks / totalOfAdding;
         for (j = 0; j < nbJoints; j++) {
             posi = currentVertex * nbJoints + j;
@@ -418,7 +423,7 @@ MStatus blurSkinCmd::addWeights(int currentVertex)
     else {
         // rest is the value to set to the other joints
         double rest = totalWithLocks - totalOfAdding;
-        double multFactor = rest / otherJointsTotal;
+        double multFactor = otherJointsTotal > 0.0 ? rest / otherJointsTotal : 0.0;
         for (j = 0; j < nbJoints; j++) {
             posi = currentVertex * nbJoints + j;
             double value = currentWeights[posi];
@@ -1036,18 +1041,8 @@ MStatus blurSkinCmd::doIt(const MArgList &args)
             }
             else if (isNurbsSurface_) {
                 CHECK_MSTATUS_AND_RETURN_IT(stat);
-                int sizeInV = numCVsInV_;
-                int vertInd;
-                int u, v;
-                float influence;
-
-                for (int i = 0; i < indicesU_.length(); ++i) {
-                    influence = weightVertices_[i];
-                    u = indicesU_[i];
-                    v = indicesV_[i];
-                    vertInd = sizeInV * u + v;
-                    indicesVertices_.append(vertInd);
-                    weightVertices_.append(influence);
+                for (unsigned int i = 0; i < indicesU_.length(); ++i) {
+                    indicesVertices_.append(numCVsInV_ * indicesU_[i] + indicesV_[i]);
                 }
             }
             else {
@@ -1144,6 +1139,9 @@ MStatus blurSkinCmd::executeAction()
         MDoubleArray averageWeights;
         int index;
         int nbVertices = indicesVertices_.length();
+        if (nbVertices == 0) {
+            return MS::kSuccess;
+        }
         for (int j = 0; j < nbJoints; j++) {
             double sumJointWeights = 0;
             for (int i = 0; i < nbVertices; ++i) {
@@ -1335,27 +1333,7 @@ MStatus blurSkinCmd::redoIt()
         );
     }
     else {
-        MDoubleArray wts;
-        int index, storedU, storedV;
-        for (int i = 0; i < indicesVertices_.length(); ++i) {
-            MFnDoubleIndexedComponent doubleFn;
-            MObject tmpComponent = doubleFn.create(MFn::kSurfaceCVComponent);
-            MDoubleArray tmpWeightsUndo;
-
-            index = indicesVertices_[i];
-            storedU = indicesU_[i];
-            storedV = indicesV_[i];
-            doubleFn.addElement(storedU, storedV);
-            //------- build array -----------
-            wts.clear();
-            for (int j = 0; j < nbJoints; j++) {
-                int posiToSet = index * nbJoints + j;
-                wts.append(newWeights[posiToSet]);
-            }
-            stat = theSkinCluster.setWeights(
-                meshPath_, tmpComponent, influenceIndices, wts, false, &tmpWeightsUndo
-            );
-        }
+        setNurbsWeights(newWeights);
     }
     return MS::kSuccess;
 }
@@ -1375,29 +1353,31 @@ MStatus blurSkinCmd::undoIt()
         );
     }
     else if (isNurbsSurface_) {
-        MDoubleArray wts;
-        int index, storedU, storedV;
-        for (int i = 0; i < indicesVertices_.length(); ++i) {
-            MFnDoubleIndexedComponent doubleFn;
-            MObject tmpComponent = doubleFn.create(MFn::kSurfaceCVComponent);
-            MDoubleArray tmpWeightsUndo;
-
-            index = indicesVertices_[i];
-            storedU = indicesU_[i];
-            storedV = indicesV_[i];
-            doubleFn.addElement(storedU, storedV);
-            //------- build array -----------
-            wts.clear();
-            for (int j = 0; j < nbJoints; j++) {
-                int posiToSet = index * nbJoints + j;
-                wts.append(fullOrigWeights[posiToSet]);
-            }
-            stat = theSkinCluster.setWeights(
-                meshPath_, tmpComponent, influenceIndices, wts, false, &tmpWeightsUndo
-            );
-        }
+        setNurbsWeights(fullOrigWeights);
     }
     return MS::kSuccess;
+}
+
+MStatus blurSkinCmd::setNurbsWeights(const MDoubleArray &sourceWeights)
+{
+    // Set the weights of all the edited CVs in a single call rather than one call per CV
+    MIntArray influenceIndices;
+    for (int i = 0; i < nbJoints; i++) {
+        influenceIndices.append(i);
+    }
+    MFnDoubleIndexedComponent doubleFn;
+    MObject cvComponent = doubleFn.create(MFn::kSurfaceCVComponent);
+    MDoubleArray wts;
+    wts.setSizeIncrement(indicesVertices_.length() * nbJoints);
+    for (unsigned int i = 0; i < indicesVertices_.length(); ++i) {
+        doubleFn.addElement(indicesU_[i], indicesV_[i]);
+        int index = indicesVertices_[i];
+        for (int j = 0; j < nbJoints; j++) {
+            wts.append(sourceWeights[index * nbJoints + j]);
+        }
+    }
+    MFnSkinCluster theSkinCluster(skinCluster_);
+    return theSkinCluster.setWeights(meshPath_, cvComponent, influenceIndices, wts, false);
 }
 
 void *blurSkinCmd::creator() { return new blurSkinCmd(); }

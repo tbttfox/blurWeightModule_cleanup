@@ -17,68 +17,29 @@ void CVsAround(
     MIntArray &vertices
 )
 {
-    int resCV;
-    // plus U
-    int UNext = storedU + 1;
-    if (UNext < numCVsInU) {
-        resCV = numCVsInV * UNext + storedV;
+    // Wrap an index into [0, count) if periodic. Returns -1 if it falls off a non-periodic edge
+    auto wrap = [](int idx, int count, bool periodic) {
+        if (idx >= 0 && idx < count) {
+            return idx;
+        }
+        if (!periodic) {
+            return -1;
+        }
+        return idx < 0 ? idx + count : idx - count;
+    };
+    auto addCV = [&](int u, int v) {
+        if (u == -1 || v == -1) {
+            return;
+        }
+        int resCV = numCVsInV * u + v; // vertInd = numCVsInV * indexU + indexV;
         if (getMIntArrayIndex(vertices, resCV) == -1) {
             vertices.append(resCV);
         }
-    }
-    else if (UIsPeriodic) {
-        UNext -= numCVsInU;
-        resCV = numCVsInV * UNext + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    // minus U
-    int UPrev = storedU - 1;
-    if (UPrev >= 0) {
-        resCV = numCVsInV * UPrev + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    else if (UIsPeriodic) {
-        UPrev += numCVsInU;
-        resCV = numCVsInV * UPrev + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    // plus V
-    int VNext = storedV + 1;
-    if (VNext < numCVsInV) {
-        resCV = numCVsInV * storedU + VNext;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    else if (VIsPeriodic) {
-        VNext -= numCVsInV;
-        resCV = numCVsInV * storedU + VNext;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    // minus V
-    int VPrev = storedV - 1;
-    if (VPrev >= 0) {
-        resCV = numCVsInV * storedU + VPrev;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    else if (VIsPeriodic) {
-        VPrev += numCVsInV;
-        resCV = numCVsInV * storedU + VPrev;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    // vertInd = numCVsInV * indexU + indexV;
+    };
+    addCV(wrap(storedU + 1, numCVsInU, UIsPeriodic), storedV);
+    addCV(wrap(storedU - 1, numCVsInU, UIsPeriodic), storedV);
+    addCV(storedU, wrap(storedV + 1, numCVsInV, VIsPeriodic));
+    addCV(storedU, wrap(storedV - 1, numCVsInV, VIsPeriodic));
 }
 
 // from the mesh retrieves the skinCluster
@@ -173,6 +134,9 @@ MStatus findOrigMesh(MObject &skinCluster, MObject &origMesh, bool verbose)
     MFnSkinCluster theSkinCluster(skinCluster);
     MObjectArray objectsDeformed;
     theSkinCluster.getInputGeometry(objectsDeformed);
+    if (objectsDeformed.length() == 0) {
+        return MS::kFailure;
+    }
     origMesh = objectsDeformed[0];
     if (verbose) {
         MFnDependencyNode deformedNameMesh(origMesh);
@@ -216,6 +180,9 @@ MStatus getListColorsJoints(MObject &skinCluster, MColorArray &jointsColors)
     jointsColors.clear();
     MIntArray plugIndices;
     influenceColor_plug.getExistingArrayAttributeIndices(plugIndices);
+    if (plugIndices.length() == 0) {
+        return stat;
+    }
     int nbJoints = plugIndices[plugIndices.length() - 1] + 1;
     jointsColors.setLength(nbJoints);
     float black[4] = {0, 0, 0, 1};
@@ -312,8 +279,11 @@ MStatus getListLockVertices(MObject &skinCluster, MIntArray &vertsLocks)
     MIntArray vertsLocksIndices = intData.array(&stat);
     vertsLocks.clear();
     vertsLocks = MIntArray(nbVertices, 0);
-    for (int i = 0; i < vertsLocksIndices.length(); ++i) {
-        vertsLocks[vertsLocksIndices[i]] = 1;
+    for (unsigned int i = 0; i < vertsLocksIndices.length(); ++i) {
+        int vtx = vertsLocksIndices[i];
+        if (vtx >= 0 && vtx < nbVertices) { // skip stale lock data from a previous topology
+            vertsLocks[vtx] = 1;
+        }
     }
     // MGlobal::displayInfo(MString(" getListLockVertices | ") + currentColorSet.name () + MString("
     // ") + vertsLocks.length());
@@ -347,7 +317,7 @@ MStatus getSymetryAttributes(MObject &skinCluster, MIntArray &symetryList)
 }
 
 MStatus getMirrorVertices(
-    MIntArray mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
+    const MIntArray &mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
     MIntArray &editAndMirrorVerts, MDoubleArray &editVertsWeights, MDoubleArray &mirrorVertsWeights,
     MDoubleArray &editAndMirrorWeights, bool doMerge
 )
@@ -450,7 +420,7 @@ MStatus getListColors(MObject &skinCluster, int nbVertices, MColorArray &currCol
 
     if (!useMPlug) {
         MFnSkinCluster theSkinCluster(skinCluster);
-        int nbJoints = jointsColors.length();
+        int nbColors = jointsColors.length();
 
         // now get the weights ----------------------------------------
         MObject allVerticesObj;
@@ -467,38 +437,36 @@ MStatus getListColors(MObject &skinCluster, int nbVertices, MColorArray &currCol
         theSkinCluster.getWeights(path, allVerticesObj, fullOrigWeights, infCount);
 
         // now get the colors per vertices ----------------------------------------
-        int currentWeightsLength = fullOrigWeights.length();
-        int indexInfluence, i, indexWeight;
-        double theWeight, maxWeight;
-
+        int nbInfluences = std::min((int)infCount, nbColors);
         currColors.clear();
         currColors.setLength(nbVertices);
 
-        for (i = 0; i < nbVertices; ++i) {
+        for (int i = 0; i < nbVertices; ++i) {
             MColor theColor;
-            maxWeight = 0.;
-            for (indexInfluence = 0; indexInfluence < nbJoints; indexInfluence++) {
-                indexWeight = i * nbJoints + indexInfluence;
-                theWeight = fullOrigWeights[indexWeight];
+            for (int indexInfluence = 0; indexInfluence < nbInfluences; indexInfluence++) {
+                double theWeight = fullOrigWeights[i * infCount + indexInfluence];
                 if (theWeight > 0.) {
                     theColor += jointsColors[indexInfluence] * theWeight;
                 }
-                currColors[i] = theColor;
             }
+            currColors[i] = theColor;
         }
     }
     else {
         MPlug weight_list_plug = skinClusterDep.findPlug("weightList", false);
         // MGlobal::displayInfo(weight_list_plug.name());
         int nbElements = weight_list_plug.numElements();
+        int nbColors = jointsColors.length();
         currColors.clear();
         currColors.setLength(nbVertices);
 
-        for (int i = 0; i < nbVertices; ++i) {
+        for (int i = 0; i < nbElements; ++i) {
             // weightList[i]
-            // if (i > 50) break;
             MPlug ith_weights_plug = weight_list_plug.elementByPhysicalIndex(i);
             int vertexIndex = ith_weights_plug.logicalIndex();
+            if (vertexIndex >= nbVertices) {
+                continue;
+            }
             // MGlobal::displayInfo(ith_weights_plug.name());
 
             // weightList[i].weight
@@ -511,9 +479,7 @@ MStatus getListColors(MObject &skinCluster, int nbVertices, MColorArray &currCol
                 // weightList[i].weight[j]
                 int indexInfluence = weight_plug.logicalIndex();
                 double theWeight = weight_plug.asDouble();
-                // MGlobal::displayInfo(weight_plug.name() + " " + indexInfluence + " " +
-                // theWeight);
-                if (theWeight > 0.01) {
+                if (theWeight > 0.01 && indexInfluence < nbColors) {
                     theColor += jointsColors[indexInfluence] * theWeight;
                 }
             }
@@ -549,7 +515,7 @@ MStatus editArray(
                 }
             }
             // now normalize
-            if ((normalize) && (sum != 1.0)) {
+            if (normalize && sum > 0.0 && sum != 1.0) {
                 for (int j = 0; j < nbJoints; ++j) {
                     theWeights[i * nbJoints + j] /= sum;
                 }
@@ -627,15 +593,12 @@ MStatus editArray(
 }
 
 MStatus setAverageWeight(
-    MIntArray &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
+    const MIntArray &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray, MDoubleArray &theWeights
 )
 {
-    MStatus stat;
     int sizeVertices = verticesAround.length();
     int i, j, posi;
-    // MGlobal::displayInfo(MString(" paint smooth vtx [")+ currentVertex+ MString("] index - ") +
-    // indexCurrVert + MString(" aroundCount ") + sizeVertices);
 
     MDoubleArray sumWeigths(nbJoints, 0.0);
     // compute sum weights
@@ -654,12 +617,17 @@ MStatus setAverageWeight(
         total += sumWeigths[j];
         totalBaseVtx += fullWeightArray[posi];
     }
-    if (total > 0. && totalBaseVtx > 0.) {
+    if (sizeVertices > 0 && total > 0. && totalBaseVtx > 0.) {
         double mult = totalBaseVtx / total;
         for (j = 0; j < nbJoints; j++) {
             int posiToSet = indexCurrVert * nbJoints + j;
             sumWeigths[j] *= mult; // normalement divide par 1
             theWeights[posiToSet] = sumWeigths[j];
+        }
+    }
+    else { // nothing to average with, keep the current weights instead of writing zeros
+        for (j = 0; j < nbJoints; j++) {
+            theWeights[indexCurrVert * nbJoints + j] = fullWeightArray[currentVertex * nbJoints + j];
         }
     }
     return MS::kSuccess;
@@ -696,4 +664,4 @@ MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWei
         }
     }
     return MS::kSuccess;
-};
+}

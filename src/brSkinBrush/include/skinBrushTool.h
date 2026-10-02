@@ -274,9 +274,6 @@ class SkinBrushContext : public MPxContext {
     void refreshTheseVertices(MIntArray &verticesIndices);
     void refreshMirrorInfluences(MIntArray &inputMirrorInfluences);
 
-    void mergeMirrorArray(
-        std::unordered_map<int, float> &valuesBase, std::unordered_map<int, float> &valuesMirrored
-    );
     MStatus applyCommand(int influence, std::unordered_map<int, float> &valuesToSet);
     MStatus applyCommandMirror();
     MStatus refreshColors(
