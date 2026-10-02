@@ -1083,14 +1083,11 @@ MStatus SkinBrushContext::doPtrMoved(
         int backgroundSize[] = {60, 20};
         if (interPersist.biggestInfluence != -1) {
             text = this->influence.inflNames[interPersist.biggestInfluence];
-            backgroundSize[0] =
-                this->influence.inflNamePixelSize[2 * interPersist.biggestInfluence];
-            backgroundSize[1] =
-                this->influence.inflNamePixelSize[2 * interPersist.biggestInfluence + 1];
             interFrame.worldPoint = interFrame.worldPoint + .1 * interFrame.worldVector.normal();
+            // A null background size lets Maya fit the background to the text
             drawManager.text(
                 interFrame.worldPoint, text, MHWRender::MUIDrawManager::TextAlignment::kCenter,
-                backgroundSize, &Yellow
+                nullptr, &Yellow
             );
             // drawing full front camera
         }
@@ -2780,11 +2777,9 @@ MIntArray SkinBrushContext::getInfluenceIndices()
     int lent = this->influence.inflDagPaths.length();
     // first clear --------------------------
     this->influence.inflNames.clear();
-    this->influence.inflNamePixelSize.clear();
     this->influence.indicesForInfluenceObjects.clear();
 
     this->influence.inflNames.setLength(lent);
-    this->influence.inflNamePixelSize.setLength(2 * lent);
     MStatus stat;
     this->influence.nbJoints = lent;
 
@@ -2798,8 +2793,6 @@ MIntArray SkinBrushContext::getInfluenceIndices()
     }
     this->influence.indicesForInfluenceObjects = MIntArray(lent ? maxLogical + 1 : 0, -1);
 
-    QFontMetrics fontMetrics(QFont("MS Shell Dlg 2", 14));
-
     for (unsigned i = 0; i < lent; i++) {
         influence.influenceIndices.append((int)i);
         MFnDependencyNode influenceFn(this->influence.inflDagPaths[i].node(), &stat);
@@ -2808,16 +2801,6 @@ MIntArray SkinBrushContext::getInfluenceIndices()
         }
         MString iname = influenceFn.name();
         this->influence.inflNames[i] = iname;
-
-        QRect sz = fontMetrics.boundingRect(iname.asChar());
-        int wid = sz.width() + 2;
-        int height = sz.height() + 2;
-
-        wid = wid > 5 ? wid : 5;
-        height = height > 5 ? height : 5;
-
-        this->influence.inflNamePixelSize[2 * i] = wid;
-        this->influence.inflNamePixelSize[2 * i + 1] = height;
 
         int indexLogical = skinFn.indexForInfluenceObject(this->influence.inflDagPaths[i]);
         this->influence.indicesForInfluenceObjects[indexLogical] = i;

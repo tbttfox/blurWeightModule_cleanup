@@ -115,8 +115,6 @@ struct InfluenceData {
 
     MIntArray influenceIndices;           // Just range(len(nbJoints)) ... so maybe unneeded
     MIntArray indicesForInfluenceObjects; // Map between logical and physical indices
-    MIntArray inflNamePixelSize; // A 2*N length array where adjacent pairs are the wid/height of
-                                 // the influence name in pixels
     MStringArray inflNames;      // The names of the influences
     MColorArray jointsColors;    // The color of each influence
 

@@ -62,11 +62,6 @@
 #include <maya/MUintArray.h>
 #include <maya/MUserEventMessage.h>
 
-#include <QtCore/QRect>
-#include <QtCore/QString>
-#include <QtGui/QFont>
-#include <QtGui/QFontMetrics>
-
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
