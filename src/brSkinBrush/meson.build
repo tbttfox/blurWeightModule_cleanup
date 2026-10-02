@@ -27,12 +27,11 @@ else
 endif
 
 skin_brush_inc = include_directories(['include'])
-install_dir = meson.global_source_root() / 'modules' / meson.project_name() / (maya_platform + '-' + maya_version) / 'plug-ins'
 skin_brush_lib = shared_library(
   'brSkinBrush',
   skin_brush_files,
   install: true,
-  install_dir : install_dir,
+  install_dir : plugin_install_dir,
   include_directories : skin_brush_inc,
   dependencies : [maya_dep, gl_dep, rapidjson_dep],
   name_prefix : '',

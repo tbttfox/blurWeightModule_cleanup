@@ -5,9 +5,21 @@ maya_dep = dependency('maya')
 maya_name_suffix = maya_dep.get_variable('name_suffix')
 maya_version = maya_dep.get_variable('maya_version')
 maya_platform = maya_dep.get_variable('maya_platform')
+ci_install = get_option('ci_install')
+
+if ci_install
+  plugin_install_dir = meson.global_source_root() / ('output_Maya' + maya_version)
+else
+  plugin_install_dir = meson.global_source_root() / 'modules' / meson.project_name() / (maya_platform + '-' + maya_version) / 'plug-ins'
+endif
 
 subdir('src/blurSkin')
 subdir('src/brSkinBrush')
+
+# The CI packaging step copies the scripts and writes the .mod file itself
+if ci_install
+  subdir_done()
+endif
 
 pyinstall_dir = meson.project_source_root() / 'modules' / meson.project_name()
 install_subdir(
