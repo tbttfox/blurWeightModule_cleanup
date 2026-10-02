@@ -539,8 +539,9 @@ using namespace std::chrono;
 void SkinBrushContext::catchTimeStamp() { startTimeStamp = high_resolution_clock::now(); }
 void SkinBrushContext::endTimeStamp(MString infos)
 {
-    auto stop = high_resolution_clock::now();
-    auto duration = duration_cast<microseconds>(stop - startTimeStamp);
-    float dura = float(duration.count() / 10000) * 0.01f;
+    if (!verbose) {
+        return;
+    }
+    float dura = duration<float>(high_resolution_clock::now() - startTimeStamp).count();
     MGlobal::displayInfo(infos + MString(" executed in ") + dura + MString(" seconds"));
 }

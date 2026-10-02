@@ -44,7 +44,7 @@ MStatus getListLockJoints(MObject &skinCluster, MIntArray &jointsLocks);
 MStatus getListLockVertices(MObject &skinCluster, MIntArray &vertsLocks);
 MStatus getSymetryAttributes(MObject &skinCluster, MIntArray &symetryList);
 MStatus getMirrorVertices(
-    MIntArray mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
+    const MIntArray &mirrorVertices, MIntArray &theEditVerts, MIntArray &theMirrorVerts,
     MIntArray &editAndMirrorVerts, MDoubleArray &editVertsWeights, MDoubleArray &mirrorVertsWeights,
     MDoubleArray &editAndMirrorWeights, bool doMerge = true
 );
@@ -56,7 +56,7 @@ MStatus editArray(
     bool normalize = true
 );
 MStatus setAverageWeight(
-    MIntArray &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
+    const MIntArray &verticesAround, int currentVertex, int indexCurrVert, int nbJoints,
     MIntArray &lockJoints, MDoubleArray &fullWeightArray, MDoubleArray &theWeights
 );
 MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWeight);

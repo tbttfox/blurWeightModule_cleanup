@@ -68,7 +68,7 @@ class blurSkinCmd : public MPxCommand {
     MStatus doIt(const MArgList &);
     MStatus undoIt();
     MStatus redoIt();
-    MStatus getAverageWeight(MIntArray vertices, int currentVertex);
+    MStatus getAverageWeight(const MIntArray &vertices, int currentVertex);
     MStatus addWeights(int currentVertex);
     void verboseSetWeights(int currentVertex);
     void getTypeOfSurface();
@@ -143,6 +143,7 @@ class blurSkinCmd : public MPxCommand {
 
   private:
     MStatus GatherCommandArguments(const MArgList &args);
+    MStatus setNurbsWeights(const MDoubleArray &sourceWeights);
 
     // MFnMesh meshFn; // the mesh
     MDagPath meshPath_;   // the mesh

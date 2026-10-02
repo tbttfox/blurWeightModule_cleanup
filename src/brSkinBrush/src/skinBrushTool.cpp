@@ -271,21 +271,19 @@ MStatus skinBrushTool::redoIt()
         MString("skinBrushTool::redoIt is CALLED !!!! input.commandIndex : ") +
         static_cast<int>(this->input.commandIndex)
     );
-    return setWeightsForDoit(true);
+    return setWeightsForDoit(false);
 }
 
 MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
 {
     MStatus status = MStatus::kSuccess;
 
-    int theWeightsLength;
-    if (isUndo) {
-        theWeightsLength = this->undoWeights.length();
-    }
-    else {
-        theWeightsLength = this->redoWeights.length();
-    }
-    if (theWeightsLength == 0) {
+    bool isLockCommand = this->input.commandIndex == ModifierCommands::LockVertices ||
+                         this->input.commandIndex == ModifierCommands::UnlockVertices;
+    int theWeightsLength = isUndo ? this->undoWeights.length() : this->redoWeights.length();
+    int theLocksLength = isUndo ? this->undoLocks.length() : this->redoLocks.length();
+    // Lock commands don't need weights, only the lock arrays
+    if (theWeightsLength == 0 && !(isLockCommand && theLocksLength > 0)) {
         return status;
     }
 
@@ -369,9 +367,10 @@ MStatus skinBrushTool::setWeightsForDoit(bool isUndo)
         // now set the value ---------------------------
         MFnIntArrayData tmpIntArray;
 
+        const MIntArray &locks = isUndo ? undoLocks : redoLocks;
         MIntArray theArrayValues;
-        for (unsigned int vtx = 0; vtx < undoLocks.length(); ++vtx) {
-            if (undoLocks[vtx] == 1) {
+        for (unsigned int vtx = 0; vtx < locks.length(); ++vtx) {
+            if (locks[vtx] == 1) {
                 theArrayValues.append(vtx);
             }
         }
@@ -653,21 +652,8 @@ void skinBrushTool::setInfluenceName(MString &name) { influenceName = name; }
 
 MStatus skinBrushTool::getSkinClusterObj()
 {
-    MStatus status = MS::kSuccess;
-
-    return status;
-    MSelectionList selList;
-    status = MGlobal::getSelectionListByName(skinName, selList);
-    if (status != MStatus::kSuccess) {
-        return status;
-    }
-    status = selList.getDependNode(0, weights.skinObj);
-
-    MFnDependencyNode nodeFn(weights.skinObj);
-    MGlobal::displayInfo(MString("    input skin name: ") + nodeFn.name());
-
-    status = findMesh(weights.skinObj, mesh.meshDag);
-    return status;
+    // The context hands us the skinCluster and mesh directly via setSkinCluster/setMesh
+    return weights.skinObj.isNull() ? MS::kFailure : MS::kSuccess;
 }
 
 void skinBrushTool::setMesh(MDagPath &dagPath) { mesh.meshDag = dagPath; }

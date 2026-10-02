@@ -8,9 +8,9 @@
 
 coord_t distance_sq(const point_t &a, const point_t &b)
 {
-    coord_t x = std::get<0>(a) - std::get<0>(b);
-    coord_t y = std::get<1>(a) - std::get<1>(b);
-    coord_t z = std::get<2>(a) - std::get<2>(b);
+    coord_t x = a[0] - b[0];
+    coord_t y = a[1] - b[1];
+    coord_t z = a[2] - b[2];
     return x * x + y * y + z * z;
 }
 coord_t distance(const point_t &a, const point_t &b)
@@ -35,67 +35,29 @@ void CVsAround(
     MIntArray &vertices
 )
 {
-    int resCV;
-    // plus U
-    int UNext = storedU + 1;
-    if (UNext < numCVsInU) {
-        resCV = numCVsInV * UNext + storedV;
+    // Wrap an index into [0, count) if periodic. Returns -1 if it falls off a non-periodic edge
+    auto wrap = [](int idx, int count, bool periodic) {
+        if (idx >= 0 && idx < count) {
+            return idx;
+        }
+        if (!periodic) {
+            return -1;
+        }
+        return idx < 0 ? idx + count : idx - count;
+    };
+    auto addCV = [&](int u, int v) {
+        if (u == -1 || v == -1) {
+            return;
+        }
+        int resCV = numCVsInV * u + v;
         if (getMIntArrayIndex(vertices, resCV) == -1) {
             vertices.append(resCV);
         }
-    }
-    else if (UIsPeriodic) {
-        UNext -= numCVsInU;
-        resCV = numCVsInV * UNext + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    // minus U
-    int UPrev = storedU - 1;
-    if (UPrev >= 0) {
-        resCV = numCVsInV * UPrev + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    else if (UIsPeriodic) {
-        UPrev += numCVsInU;
-        resCV = numCVsInV * UPrev + storedV;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    // plus V
-    int VNext = storedV + 1;
-    if (VNext < numCVsInV) {
-        resCV = numCVsInV * storedU + VNext;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    else if (VIsPeriodic) {
-        VNext -= numCVsInV;
-        resCV = numCVsInV * storedU + VNext;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    // minus V
-    int VPrev = storedV - 1;
-    if (VPrev >= 0) {
-        resCV = numCVsInV * storedU + VPrev;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
-    else if (VIsPeriodic) {
-        VPrev += numCVsInV;
-        resCV = numCVsInV * storedU + VPrev;
-        if (getMIntArrayIndex(vertices, resCV) == -1) {
-            vertices.append(resCV);
-        }
-    }
+    };
+    addCV(wrap(storedU + 1, numCVsInU, UIsPeriodic), storedV);
+    addCV(wrap(storedU - 1, numCVsInU, UIsPeriodic), storedV);
+    addCV(storedU, wrap(storedV + 1, numCVsInV, VIsPeriodic));
+    addCV(storedU, wrap(storedV - 1, numCVsInV, VIsPeriodic));
 }
 
 MStatus transferPointNurbsToMesh(MFnMesh &msh, MFnNurbsSurface &nurbsFn)
@@ -245,12 +207,25 @@ MStatus findOrigMesh(MObject &skinCluster, MObject &origMesh)
     MFnSkinCluster theSkinCluster(skinCluster);
     MObjectArray objectsDeformed;
     theSkinCluster.getInputGeometry(objectsDeformed);
+    if (objectsDeformed.length() == 0) {
+        return MS::kFailure;
+    }
     origMesh = objectsDeformed[0];
     return MS::kSuccess;
 }
 
+// Map a plug's logical influence index to the physical index used by our arrays.
+// Returns -1 if the logical index has no influence object.
+static int logicalToPhysical(const MIntArray &indicesForInfluenceObjects, unsigned int logicalInd)
+{
+    if (logicalInd >= indicesForInfluenceObjects.length()) {
+        return -1;
+    }
+    return indicesForInfluenceObjects[logicalInd];
+}
+
 MStatus getListColorsJoints(
-    MObject &skinCluster, int nbJoints, MIntArray indicesForInfluenceObjects,
+    MObject &skinCluster, int nbJoints, const MIntArray &indicesForInfluenceObjects,
     MColorArray &jointsColors
 )
 {
@@ -276,8 +251,7 @@ MStatus getListColorsJoints(
     for (int i = 0; i < nbElements; ++i) { // for each joint
 
         MPlug colorPlug = influenceColor_plug.elementByPhysicalIndex(i);
-        int logicalInd = colorPlug.logicalIndex();
-        logicalInd = indicesForInfluenceObjects[logicalInd];
+        int logicalInd = logicalToPhysical(indicesForInfluenceObjects, colorPlug.logicalIndex());
         if (logicalInd < 0 || logicalInd >= nbJoints) {
             MGlobal::displayError(
                 MString("CRASH i : ") + i + MString("logical Index: ") + colorPlug.logicalIndex() +
@@ -313,7 +287,8 @@ MStatus getListColorsJoints(
 }
 
 MStatus getListLockJoints(
-    MObject &skinCluster, int nbJoints, MIntArray indicesForInfluenceObjects, MIntArray &jointsLocks
+    MObject &skinCluster, int nbJoints, const MIntArray &indicesForInfluenceObjects,
+    MIntArray &jointsLocks
 )
 {
     MStatus stat;
@@ -342,8 +317,7 @@ MStatus getListLockJoints(
         else {
             isLocked = lockPlug.asInt();
         }
-        int logicalInd = lockPlug.logicalIndex();
-        logicalInd = indicesForInfluenceObjects[logicalInd];
+        int logicalInd = logicalToPhysical(indicesForInfluenceObjects, lockPlug.logicalIndex());
         if (logicalInd < 0 || logicalInd >= nbJoints) {
             MGlobal::displayError(
                 MString("CRASH i : ") + i + MString("logical Index: ") + lockPlug.logicalIndex() +
@@ -380,11 +354,14 @@ MStatus getListLockVertices(MObject &skinCluster, MIntArray &vertsLocks, MIntArr
 
     MFnIntArrayData intData(Data);
     MIntArray vertsLocksIndices = intData.array(&stat);
-    vertsLocks.clear();
     vertsLocks = MIntArray(nbVertices, 0);
     for (unsigned int i = 0; i < vertsLocksIndices.length(); ++i) {
-        vertsLocks[vertsLocksIndices[i]] = 1;
-        lockedIndices.append(vertsLocksIndices[i]);
+        int vtx = vertsLocksIndices[i];
+        if (vtx < 0 || vtx >= nbVertices) {
+            continue; // stale lock data from a previous topology
+        }
+        vertsLocks[vtx] = 1;
+        lockedIndices.append(vtx);
     }
     return stat;
 }
@@ -616,20 +593,20 @@ MStatus editArray(
                 int indexArray_theWeight = i * nbJoints + jnt;
                 int indexArray_fullWeightArray = theVert * nbJoints + jnt;
 
-                if (indexArray_theWeight > theWeights.length()) {
+                if (indexArray_theWeight >= (int)theWeights.length()) {
                     MGlobal::displayInfo(
                         MString(
-                            "-> editArray FAILED | indexArray_theWeight  > theWeights.length()"
+                            "-> editArray FAILED | indexArray_theWeight >= theWeights.length()"
                         ) +
                         indexArray_theWeight + MString(" > ") + theWeights.length()
                     );
                     return MStatus::kFailure;
                 }
-                if (indexArray_fullWeightArray > fullWeightArray.length()) {
+                if (indexArray_fullWeightArray >= (int)fullWeightArray.length()) {
                     MGlobal::displayInfo(
                         MString(
                             "-> editArray FAILED | indexArray_fullWeightArray "
-                            " > fullWeightArray.length()"
+                            " >= fullWeightArray.length()"
                         ) +
                         indexArray_fullWeightArray + MString(" > ") + fullWeightArray.length()
                     );
@@ -791,7 +768,11 @@ MStatus editArrayMirror(
             }
 
             double currentW = fullWeightArray[theVert * nbJoints + influence];
-            double currentWMirror = fullWeightArray[theVert * nbJoints + influenceMirror];
+            // When both sides paint the same influence, there is no separate mirror weight.
+            // Treat it as zero so the influence isn't counted twice in the rest computation
+            double currentWMirror = (influenceMirror == influence)
+                                        ? 0.0
+                                        : fullWeightArray[theVert * nbJoints + influenceMirror];
             // 1 Remove 3 Absolute
             double newW = currentW;
             double newWMirror = currentWMirror;
@@ -879,20 +860,25 @@ MStatus setAverageWeight(
     double strengthVal
 )
 {
-    MStatus stat;
-    int sizeVertices = verticesAround.size();
-    unsigned int i, jnt, posi;
+    int sizeVertices = (int)verticesAround.size();
+    int jnt;
+
+    if (sizeVertices == 0) { // nothing to average with, keep the current weights
+        for (jnt = 0; jnt < nbJoints; jnt++) {
+            theWeights[indexCurrVert * nbJoints + jnt] =
+                fullWeightArray[currentVertex * nbJoints + jnt];
+        }
+        return MS::kSuccess;
+    }
 
     MDoubleArray sumWeigths(nbJoints, 0.0);
     // compute sum weights
     for (int vertIndex : verticesAround) {
         for (jnt = 0; jnt < nbJoints; jnt++) {
-            posi = vertIndex * nbJoints + jnt;
-            sumWeigths[jnt] += fullWeightArray[posi];
+            sumWeigths[jnt] += fullWeightArray[vertIndex * nbJoints + jnt];
         }
     }
     double totalBaseVtxUnlock = 0.0, totalBaseVtxLock = 0.0;
-    ;
     double totalVtxUnlock = 0.0, totalVtxLock = 0.0;
 
     for (jnt = 0; jnt < nbJoints; jnt++) {
@@ -973,7 +959,7 @@ MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWei
             }
         }
         // now normalize
-        if (total != 1.0) {
+        if (total > 0.0 && total != 1.0) {
             for (jnt = 0; jnt < nbJoints; jnt++) {
                 posiInArray = vertIndex * nbJoints + jnt;
                 theWeights[posiInArray] /= total; // that should normalize
@@ -981,7 +967,7 @@ MStatus doPruneWeight(MDoubleArray &theWeights, int nbJoints, double pruneCutWei
         }
     }
     return MS::kSuccess;
-};
+}
 
 void lineC(short x0, short y0, short x1, short y1, std::vector<std::pair<short, short>> &posi)
 {
@@ -1008,62 +994,27 @@ void lineC(short x0, short y0, short x1, short y1, std::vector<std::pair<short, 
     }
 }
 
-bool RayIntersectsBBox(MPoint minPt, MPoint maxPt, MPoint orig, MVector direction)
+bool RayIntersectsBBox(
+    const MPoint &minPt, const MPoint &maxPt, const MPoint &orig, const MVector &direction
+)
 {
-    double tmin = (minPt.x - orig.x) / direction.x;
-    double tmax = (maxPt.x - orig.x) / direction.x;
-    double tmpSwap;
-
-    if (tmin > tmax) {
-        tmpSwap = tmin;
-        tmin = tmax;
-        tmax = tmpSwap;
+    // Slab test: intersect the ray's parameter range with each axis-aligned slab
+    double tmin = -std::numeric_limits<double>::infinity();
+    double tmax = std::numeric_limits<double>::infinity();
+    for (int axis = 0; axis < 3; ++axis) {
+        double t0 = (minPt[axis] - orig[axis]) / direction[axis];
+        double t1 = (maxPt[axis] - orig[axis]) / direction[axis];
+        if (t0 > t1) {
+            std::swap(t0, t1);
+        }
+        if (tmin > t1 || t0 > tmax) {
+            return false;
+        }
+        tmin = std::max(tmin, t0);
+        tmax = std::min(tmax, t1);
     }
-
-    double tymin = (minPt.y - orig.y) / direction.y;
-    double tymax = (maxPt.y - orig.y) / direction.y;
-
-    if (tymin > tymax) {
-        tmpSwap = tymin;
-        tymin = tymax;
-        tymax = tmpSwap;
-    }
-
-    if ((tmin > tymax) || (tymin > tmax)) {
-        return false;
-    }
-
-    if (tymin > tmin) {
-        tmin = tymin;
-    }
-
-    if (tymax < tmax) {
-        tmax = tymax;
-    }
-
-    double tzmin = (minPt.z - orig.z) / direction.z;
-    double tzmax = (maxPt.z - orig.z) / direction.z;
-
-    if (tzmin > tzmax) {
-        tmpSwap = tzmin;
-        tzmin = tzmax;
-        tzmax = tmpSwap;
-    }
-
-    if ((tmin > tzmax) || (tzmin > tmax)) {
-        return false;
-    }
-
-    if (tzmin > tmin) {
-        tmin = tzmin;
-    }
-
-    if (tzmax < tmax) {
-        tmax = tzmax;
-    }
-
     return true;
-};
+}
 
 MPoint
 offsetIntersection(const MPoint &rayPoint, const MVector &rayVector, const MVector &originNormal)
@@ -1157,7 +1108,7 @@ void getRawNeighbors(
             edgeNeighbors[rgt].insert(lft);
             edgeNeighbors[lft].insert(rgt);
             for (int x = 0; x < c; ++x) {
-                if (x == i) {
+                if (x == j) { // don't make a vertex its own neighbor
                     continue;
                 }
                 faceNeighbors[lft].insert(indices[ptr + x]);
@@ -1207,63 +1158,69 @@ bool areDagPathArraysEqual(const MDagPathArray &a, const MDagPathArray &b)
 }
 
 std::vector<int> findClosestWithinThreshold(
-    const std::vector<int> &indices, const float *pos,
-    const FlatCounts<int> &connVerts,
-    float threshold, int nbVertices, int mirrorVal
+    const std::vector<int> &indices, const float *pos, const FlatCounts<int> &connVerts,
+    float threshold, int nbVertices
 )
 {
+    // Pair up each vertex with its closest unconnected, unpaired vertex within the threshold.
+    // Sort by x so the search for each vertex can stop once dx exceeds the best distance
+    std::vector<int> sorted(indices);
+    std::sort(sorted.begin(), sorted.end());
+    sorted.erase(std::unique(sorted.begin(), sorted.end()), sorted.end());
+    std::sort(sorted.begin(), sorted.end(), [pos](int a, int b) {
+        return pos[a * 3] < pos[b * 3];
+    });
+
     std::vector<int> results(nbVertices, -1);
     const float thresholdSq = threshold * threshold;
-    float XMult = 1.0f;
-    float YMult = 1.0f;
-    float ZMult = 1.0f;
-    if (mirrorVal == 1) {
-        XMult = -1.0f;
-    }
-    else if (mirrorVal == 2) {
-        YMult = -1.0f;
-    }
-    else if (mirrorVal == 3) {
-        ZMult = -1.0f;
-    }
+    const int count = (int)sorted.size();
 
-    for (size_t i = 0; i < indices.size(); ++i) {
-        int idxA = indices[i];
+    for (int i = 0; i < count; ++i) {
+        int idxA = sorted[i];
         if (results[idxA] != -1) {
             continue;
         }
         float ax = pos[idxA * 3], ay = pos[idxA * 3 + 1], az = pos[idxA * 3 + 2];
-
-        float min_dist_sq = thresholdSq;
-        int best_neighbor = -1;
-
         auto neighbors = connVerts[idxA];
-        for (size_t j = i + 1; j < indices.size(); ++j) {
-            int idxB = indices[j];
-            if (idxA == idxB) {
-                continue;
+
+        float minDistSq = thresholdSq;
+        int bestNeighbor = -1;
+        auto consider = [&](int idxB) {
+            if (results[idxB] != -1) {
+                return;
             }
             if (std::find(neighbors.begin(), neighbors.end(), idxB) != neighbors.end()) {
-                continue;
+                return;
             }
-
             float dx = pos[idxB * 3] - ax;
-            if (dx * dx >= min_dist_sq) {
-                continue;
-            }
-
             float dy = pos[idxB * 3 + 1] - ay;
             float dz = pos[idxB * 3 + 2] - az;
-            float dist_sq = dx * dx + dy * dy + dz * dz;
-
-            if (dist_sq < min_dist_sq) {
-                min_dist_sq = dist_sq;
-                best_neighbor = idxB;
+            float distSq = dx * dx + dy * dy + dz * dz;
+            if (distSq < minDistSq) {
+                minDistSq = distSq;
+                bestNeighbor = idxB;
             }
+        };
+
+        // Walk outward in both directions until the x-distance alone rules out a better match
+        for (int j = i + 1; j < count; ++j) {
+            float dx = pos[sorted[j] * 3] - ax;
+            if (dx * dx >= minDistSq) {
+                break;
+            }
+            consider(sorted[j]);
         }
-        results[idxA] = best_neighbor;
-        if (best_neighbor != -1) {
-            results[best_neighbor] = idxA;
+        for (int j = i - 1; j >= 0; --j) {
+            float dx = pos[sorted[j] * 3] - ax;
+            if (dx * dx >= minDistSq) {
+                break;
+            }
+            consider(sorted[j]);
+        }
+
+        if (bestNeighbor != -1) {
+            results[idxA] = bestNeighbor;
+            results[bestNeighbor] = idxA;
         }
     }
     return results;

@@ -26,3 +26,33 @@ TEST_CASE("CVsAround respects grid edges when not periodic", "[blurSkin]") {
     CVsAround(0, 0, 5, 5, false, false, neighbors);
     REQUIRE(neighbors.length() == 2);
 }
+
+TEST_CASE("CVsAround wraps across the seam when periodic", "[blurSkin]") {
+    MIntArray neighbors;
+    // corner CV (0,0) on a grid periodic in U picks up the CV at the far end of U
+    CVsAround(0, 0, 5, 5, true, false, neighbors);
+    REQUIRE(neighbors.length() == 3);
+    REQUIRE(getMIntArrayIndex(neighbors, 5 * 4 + 0) != (unsigned int)-1);
+}
+
+TEST_CASE("setAverageWeight keeps the current weights when there are no neighbors", "[blurSkin]") {
+    MIntArray noNeighbors;
+    MIntArray locks(2, 0);
+    MDoubleArray full;
+    full.append(0.25);
+    full.append(0.75);
+    MDoubleArray out(2, 0.0);
+
+    setAverageWeight(noNeighbors, 0, 0, 2, locks, full, out);
+    REQUIRE(out[0] == 0.25);
+    REQUIRE(out[1] == 0.75);
+}
+
+TEST_CASE("doPruneWeight leaves an all-zero row at zero instead of NaN", "[blurSkin]") {
+    MDoubleArray weights(4, 0.0);
+    weights[2] = 0.00001; // below the threshold, gets pruned
+    doPruneWeight(weights, 2, 0.0001);
+    for (unsigned int i = 0; i < weights.length(); ++i) {
+        REQUIRE(weights[i] == 0.0);
+    }
+}

@@ -98,8 +98,7 @@ struct MeshState {
     FlatCounts<int> perVertexEdges;     // vert -> edges:           perVertexEdges[v]
     DoubleChunks<int> perFaceTriangles; // face -> triangles:       perFaceTriangles(f, t) -> span<int,3>
 
-    // first normal ID for each face (used for per-vertex normal lookup)
-    std::vector<int> normalIdPerFace;
+    FlatCounts<int> perFaceNormalIds;   // face -> normal id per face-vertex (parallel to perFaceVertices)
 };
 
 struct NurbsData {
@@ -167,7 +166,7 @@ struct UserInputData {
     bool ignoreLockVal; // -ignoreLock                  Whether to ignore the lock value when
                         // painting
     int lineWidthVal;   // -lineWidth                   The width of the line drawn to screen
-    bool messageVal; // -message                     Show the usage message at the top of the screen
+    int messageVal;  // -message                     Show the usage message at the top of the screen
     double oversamplingVal; // -oversampling                Value to scale the *effect* of the brush
                             // falloff by. Basically, make the falloffs quicker or slower
     double fractionOversamplingVal; // -fractionOversampling        Whether to take the oversampling
@@ -352,10 +351,3 @@ struct MirrorableData {
     bool successFullDragHit; // Whether the drag had a successful hit or not
 };
 
-struct ProvidedByMaya {
-    // Storage for the stuff provided by maya ... just a temp storage place, not really for *real*
-    // use later
-    MHWRender::MUIDrawManager drawManager;
-    M3dView view;
-    MEvent event;
-};

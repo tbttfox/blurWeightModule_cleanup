@@ -25,6 +25,7 @@
 #include <maya/MSelectionList.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
@@ -38,7 +39,7 @@ const float PI = 3.14159265359f;
 const float DEGTORAD = PI / 180.0f;
 
 typedef float coord_t;
-typedef std::tuple<coord_t, coord_t, coord_t> point_t;
+typedef std::array<coord_t, 3> point_t;
 coord_t distance_sq(const point_t &a, const point_t &b);
 coord_t distance(const point_t &a, const point_t &b);
 // FUNCTION DECLARATION:
@@ -53,11 +54,12 @@ MStatus findNurbsTesselate(MDagPath nurbsPath, MObject &meshObj, const char *plu
 MStatus findMesh(MObject &theSkinCluster, MDagPath &theMeshPath);
 MStatus findOrigMesh(MObject &theSkinCluster, MObject &origMesh);
 MStatus getListColorsJoints(
-    MObject &skinCluster, int nbJoints, MIntArray indicesForInfluenceObjects,
+    MObject &skinCluster, int nbJoints, const MIntArray &indicesForInfluenceObjects,
     MColorArray &jointsColors
 );
 MStatus getListLockJoints(
-    MObject &skinCluster, int nbJoints, MIntArray indicesForInfluenceObjects, MIntArray &jointsLocks
+    MObject &skinCluster, int nbJoints, const MIntArray &indicesForInfluenceObjects,
+    MIntArray &jointsLocks
 );
 MStatus getListLockVertices(MObject &skinCluster, MIntArray &vertsLocks, MIntArray &lockedIndices);
 MStatus getSymetryAttributes(MObject &skinCluster, MIntArray &symetryList);
@@ -91,7 +93,9 @@ MStatus transferPointNurbsToMesh(MFnMesh &msh, MFnNurbsSurface &nrbs);
 MStatus getDagPath(MString nodeName, MDagPath &dagPath);
 MStatus getMObject(MString nodeName, MObject &nodeObj);
 
-bool RayIntersectsBBox(MPoint minPt, MPoint maxPt, MPoint Orig, MVector dest);
+bool RayIntersectsBBox(
+    const MPoint &minPt, const MPoint &maxPt, const MPoint &orig, const MVector &direction
+);
 
 bool bboxIntersection(
     const MPoint &minPoint, const MPoint &maxPoint, const MMatrix &bbSpace, const MPoint &rayPoint,
@@ -106,9 +110,8 @@ void getRawNeighbors(
     std::vector<int> &edgeNeighborsFLAT, std::vector<int> &edgeNeighborsINDEX
 );
 std::vector<int> findClosestWithinThreshold(
-    const std::vector<int> &indices, const float *pos,
-    const FlatCounts<int> &connVerts,
-    float threshold, int nbVertices, int mirrorVal
+    const std::vector<int> &indices, const float *pos, const FlatCounts<int> &connVerts,
+    float threshold, int nbVertices
 );
 
 std::pair<unsigned int, unsigned int> infosSkinClusterPlugs(MObject skinCluster);
