@@ -88,7 +88,7 @@ class SkinWeightWin(Window):
         QtCompat.loadUi(uiPath, self)
 
         # Get the names of all the child objects recursively
-        allobjs = self.findChildren(QtWidgets.QWidget, QtCore.QRegExp(".*"))
+        allobjs = self.findChildren(QtWidgets.QWidget)
         self._allobjs = {c.objectName(): c for c in allobjs}
 
         if not cmds.pluginInfo("undoPlug", query=True, loaded=True):
@@ -135,7 +135,7 @@ class SkinWeightWin(Window):
         super(SkinWeightWin, self).closeEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.MouseButton.MidButton:
+        if event.button() == QtCore.Qt.MouseButton.MiddleButton:
             self.resizeToMinimum()
         elif event.button() == QtCore.Qt.MouseButton.LeftButton:
             self._tv.clearSelection()

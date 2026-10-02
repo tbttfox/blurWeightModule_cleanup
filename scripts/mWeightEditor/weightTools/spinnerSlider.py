@@ -77,7 +77,7 @@ class ButtonWithValue(QtWidgets.QPushButton):
         if self.addSpace:
             theText = " {0} ".format(theText)
         self.setText(theText)
-        self.setMinimumWidth(self._metrics.width(theText) + 6)
+        self.setMinimumWidth(self._metrics.horizontalAdvance(theText) + 6)
 
         if self.step == 1:
             cmds.optionVar(intValue=[self.optionVarName, self.precision])
@@ -87,7 +87,7 @@ class ButtonWithValue(QtWidgets.QPushButton):
     def mousePressEvent(self, e):
         if not self.clickable:
             return
-        if e.button() == QtCore.Qt.MouseButton.MidButton:
+        if e.button() == QtCore.Qt.MouseButton.MiddleButton:
             self.startDrag = True
             self.startPos = e.globalPos()
             self.startPrecision = self.precision
