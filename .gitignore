@@ -76,3 +76,6 @@ tests/cpp/cppbuild/
 **/subprojects/.wraplock
 **/subprojects/*/
 !**/subprojects/maya/
+
+# Screenshot capture log (tools/capture_screenshots.py)
+docs/images/capture_log.txt
