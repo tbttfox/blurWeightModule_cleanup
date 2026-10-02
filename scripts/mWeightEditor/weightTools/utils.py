@@ -696,7 +696,7 @@ def getMapForSelectedVertices(vertIter, normalize=True, opp=False, axis="uv"):
 # callBacks
 #
 def deleteTheJobs(toSearch="BrushFunctions.callAfterPaint"):
-    res = cmds.scriptJob(listJobs=True)
+    res = cmds.scriptJob(listJobs=True) or []
     for job in res:
         if toSearch in job:
             jobIndex = int(job.split(":")[0])

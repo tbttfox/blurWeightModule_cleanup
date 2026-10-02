@@ -375,7 +375,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
     def getColors(self):
         self._colors = []
         for i in range(1, 9):
-            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True)
+            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True) or (0.0, 0.0, 0.0)
             self._colors.append([int(el * 255) for el in col])
 
     def mouseDoubleClickEvent(self, event):
@@ -851,7 +851,7 @@ class ColorMenu(QtWidgets.QMenu):
     def getColors(self):
         self._colors = []
         for i in range(1, 9):
-            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True)
+            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True) or (0.0, 0.0, 0.0)
             self._colors.append([int(el * 255) for el in col])
 
     def pickColor(self, index):

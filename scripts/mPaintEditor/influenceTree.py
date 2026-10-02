@@ -77,7 +77,7 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
     def getColors(self):
         self._colors = []
         for i in range(1, 9):
-            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True)
+            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True) or (0.0, 0.0, 0.0)
             self._colors.append([int(el * 255) for el in col])
 
     def __init__(self, influence, index, col, skinCluster):
@@ -143,7 +143,7 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
             if objColor is not None:
                 wireColor = cmds.displayRGBColor(
                     "userDefined{0}".format(objColor + 1), query=True
-                )
+                ) or wireColor
 
         ret = [int(255 * el) for el in wireColor]
         return ret

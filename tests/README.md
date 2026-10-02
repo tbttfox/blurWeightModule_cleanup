@@ -86,11 +86,20 @@ To run a single test file or test:
 
 Functions like `CVsAround`, `getMIntArrayIndex`, `lineC`, `distance` in
 `src/blurSkin/src/functions.cpp` and `src/brSkinBrush/src/functions.cpp`
-only operate on simple Maya data types (`MIntArray`, `MDoubleArray`, tuples
+only operate on simple Maya data types (`MIntArray`, `MDoubleArray`, arrays
 of floats) that work fine without a running Maya session. `tests/cpp/`
 compiles those *exact same* `.cpp` files into small Catch2 test executables
 — nothing is copied or reimplemented, so there's no risk of the tests
 drifting out of sync with the real plugin code.
+
+- `test_*_functions.cpp` — small helpers (`CVsAround`, `lineC`, distances, ray tests).
+- `test_*_weights.cpp` — the weight math behind every paint mode (`editArray`,
+  `editArrayMirror`, `setAverageWeight`, `doPruneWeight`, `getMirrorVertices`),
+  including locks. The expected values are worked out by hand in the comments.
+- `test_brSkinBrush_geometry.cpp` — mesh neighbors, ray/box intersection, the CSR
+  containers in `csrFormat.h`, and the set operators in `setOverloads.h`.
+- `test_helpers.h` — `doubles({...})`/`ints({...})` to build Maya arrays, and
+  `requireWeights` to compare weights with a tolerance.
 
 ### `tests/mayapy` — real Maya behavior, via a headless Maya session
 
@@ -101,6 +110,20 @@ real, licensed-GUI-free Maya Python interpreter. `tests/mayapy/conftest.py`
 starts that session at import time (before pytest collects any test module),
 loads the compiled plugins, and gives every test function a fresh empty
 scene. `brSkinBrushCmd` is not covered here — see "out of scope" below.
+
+`conftest.py` also creates an offscreen `QApplication` *before* starting Maya.
+`maya.standalone` only makes a `QGuiApplication`, which can't host widgets, and only
+one Qt application can exist per process. With the `QApplication` in place, the real
+Weight Editor and Paint Editor windows can be built (never shown) in the tests.
+
+- `test_blurskin_cmd.py`, `test_blurskin_cmd_modes.py` — every `blurSkinCmd` mode
+  (smooth, add, absolute, percentage, average, prune, query, zero influences),
+  locks, undo/redo, meshes and NURBS.
+- `test_editor_windows.py` — builds both editor windows and checks they show the
+  scene's real skin data, and that typing a value into a weight cell sets the weight.
+- `test_display_nodes.py` — the `pointsDisplay` world-space bounding box and the
+  `blurSkinDisplay` node's attributes.
+- `test_mweighteditor_*.py`, `test_mpainteditor_*.py` — the tools' data layers.
 
 ### `helpers/scene_fixtures.py` — the reusable "build a test rig" helper
 
@@ -156,22 +179,18 @@ this to get something realistic to operate on.
   `OpenMayaUI.M3dView.active3dView()` directly, which requires a real
   viewport. Not feasible headlessly at all, so it's excluded rather than
   deferred.
-- **Qt widget tests** (`tableWidget.py`, `spinnerSlider.py`,
-  `catchEventsUI.py`, etc.) — testing Qt widgets needs a running
-  `QApplication` event loop, a materially heavier setup than anything else
-  here. Possible v2 using `pytest-qt` and Qt's `offscreen` platform plugin.
-- **`blurSkinDisplay`/`pointsDisplay` nodes** — paint-feedback display nodes
-  with custom viewport draw overrides. There's no scripted entry point like
-  `-flood` for these, and correctness is inherently visual.
+- **Interactive Qt behavior** — the editor windows are built and checked in
+  `test_editor_windows.py`, but mouse/keyboard interaction (dragging sliders,
+  the brush's event filter in `catchEventsUI.py`) isn't simulated. `pytest-qt`
+  could drive that later. Note that `evalDeferred` runs immediately without a UI
+  event loop, so code that defers work can run in a different order than in the GUI.
+- **Drawing of the `blurSkinDisplay`/`pointsDisplay` nodes** — their bounding
+  box and attributes are tested, but what they draw is inherently visual. The
+  README screenshots (`tools/capture_screenshots.bat`) are the closest check.
 - **`brushPythonFunctions.py`** (mPaintEditor) — mostly session/UI-state
   plumbing (undo contexts, optionVar toggling, nurbs-tessellate helpers)
   tied to a live tool context. Lower value than the four subsystems covered
   here; add later using the same `conftest.py` pattern if needed.
-- **Remaining pure-logic C++ functions** — `editArray`, `setAverageWeight`,
-  `doPruneWeight`, `getMirrorVertices`, `findClosestWithinThreshold`, the
-  bbox/ray geometry helpers, `getRawNeighbors`, `editArrayMirror`. Same
-  technique as the functions already covered, just more test-data setup per
-  function — add them the same way when you need more coverage.
 - **CI integration** — this suite is meant to run locally for now. Wiring it
   into `.github/workflows/main.yml` is a reasonable follow-up once it's
   proven out, but requires a CI image with a real Maya/mayapy install, which

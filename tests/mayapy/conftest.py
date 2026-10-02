@@ -28,7 +28,15 @@ SCRIPTS_DIR = os.path.join(REPO_ROOT, "scripts")
 if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
 
-import maya.standalone
+# The editor windows are QWidgets, which need a QApplication. maya.standalone only makes a
+# QGuiApplication, and only one Qt application can exist, so make the QApplication first.
+# The offscreen platform means no windows actually appear.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+from PySide6 import QtWidgets  # noqa: E402
+
+QT_APP = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv)
+
+import maya.standalone  # noqa: E402
 
 maya.standalone.initialize(name="python")
 atexit.register(maya.standalone.uninitialize)
