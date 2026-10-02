@@ -1,6 +1,7 @@
 from __future__ import annotations
 import os
 import sys
+import shutil
 import zipfile
 import logging
 import importlib.util
@@ -9,14 +10,14 @@ from pathlib import Path
 from maya import cmds, mel
 
 # Needs to be run as early as possible
-sys.dont_write_bytecode = False
+sys.dont_write_bytecode = True
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
 def pip_install(pyexe: str | Path, target: str | Path, modules: list[str]):
-    """Install numpy to a particular folder
+    """Install the given modules to a particular folder
 
     Arguments:
         pyexe (str|Path): A path to the current python executable
@@ -77,8 +78,16 @@ def get_latest_git_release(
     import urllib.request
 
     latest_link = f"https://api.github.com/repos/{user}/{repo}/releases/latest"
-    f = urllib.request.urlopen(latest_link)
-    latest_release_data = json.loads(f.read())
+    try:
+        with urllib.request.urlopen(latest_link) as f:
+            latest_release_data = json.loads(f.read())
+    except OSError:
+        cmds.confirmDialog(
+            title="Install Error",
+            message=f"Could not get the latest {user}/{repo} release from GitHub",
+            button=["OK"],
+        )
+        raise
     assets = latest_release_data.get("assets", [])
     download_url = None
     for a in assets:
@@ -105,48 +114,39 @@ def get_latest_git_release(
     logger.info("Downloading latest")
     logger.info(f"from: {download_url}")
     logger.info(f"to: {out_path}")
-    path, _headers = urllib.request.urlretrieve(download_url, filename=out_path)
+    try:
+        path, _headers = urllib.request.urlretrieve(download_url, filename=out_path)
+    except OSError:
+        cmds.confirmDialog(
+            title="Install Error",
+            message="Release Download Failed",
+            button=["OK"],
+        )
+        raise
     return Path(path)
 
 
 def get_mayapy_path() -> Path:
     """Get the path to the mayapy executable"""
-    binFolder = Path(sys.executable).parent
-    if sys.platform == "win32":
-        return binFolder / "mayapy.exe"
-    elif sys.platform == "darwin":
-        return binFolder / "mayapy"
-    elif sys.platform == "linux":
-        return binFolder / "mayapy"
-    cmds.confirmDialog(
-        title="Module Install Error",
-        message=f"Unsupported Platform: {sys.platform}",
-        button=["OK"],
-    )
-
-    raise RuntimeError(f"Current platform is unsupported: {sys.platform}")
-
-
-def get_pip_install_path(mod_folder: Path, name: str) -> Path:
-    """Get the target path for any pip installs"""
-
-    if sys.platform == "win32":
-        platform = "win64"
-    elif sys.platform == "darwin":
-        platform = "mac"
-    elif sys.platform == "linux":
-        platform = "linux"
-    else:
+    # MAYA_LOCATION is Maya.app/Contents on macOS, so mayapy is in its bin folder on every platform
+    exe = "mayapy.exe" if sys.platform == "win32" else "mayapy"
+    mayapy = Path(os.environ["MAYA_LOCATION"]) / "bin" / exe
+    if not mayapy.is_file():
         cmds.confirmDialog(
-            title=f"{name.capitalize()} Install Error",
-            message=f"Unsupported Platform: {sys.platform}",
+            title="Module Install Error",
+            message=f"Could not find mayapy at {mayapy}",
             button=["OK"],
         )
-        raise RuntimeError(f"Current platform is unsupported: {sys.platform}")
+        raise RuntimeError(f"Could not find mayapy at {mayapy}")
+    return mayapy
 
-    year = cmds.about(majorVersion=True)
-    nppath = mod_folder / name / f"{platform}-{year}" / "pyModules"
-    return nppath
+
+def get_pip_install_path() -> Path:
+    """Get the target path for any pip installs
+
+    Maya 2023+ adds this version-specific site-packages folder to sys.path at startup
+    """
+    return Path(cmds.internalVar(userScriptDir=True)) / "site-packages"
 
 
 def install_module(
@@ -181,7 +181,6 @@ def install_module(
         if module_zip.is_file():
             os.remove(module_zip)
 
-        # This will overwrite the existing install, but will leave any numpy installs alone
         module_zip = get_latest_git_release(
             orgname,
             reponame,
@@ -197,6 +196,20 @@ def install_module(
             )
             raise RuntimeError(f"Download of {toolname} zip failed")
 
+        # Remove the old install so files deleted in newer releases don't linger.
+        # Pip installs go to the user site-packages folder, so they aren't touched
+        if moddir.is_dir():
+            try:
+                shutil.rmtree(moddir)
+            except PermissionError:
+                msg = f"Could not remove the old {toolname} install at {moddir}\nRestart maya without loading its plugins and try again"
+                cmds.confirmDialog(
+                    title=f"{toolname.capitalize()} Install Error",
+                    message=msg,
+                    button=["OK"],
+                )
+                raise
+
         with zipfile.ZipFile(module_zip, "r") as zip_ref:
             members = [m for m in zip_ref.namelist() if m.startswith("modules/")]
             zip_ref.extractall(mod_folder.parent, members=members)
@@ -205,7 +218,7 @@ def install_module(
 
         if pip_reqs:
             mayapy = get_mayapy_path()
-            target = get_pip_install_path(mod_folder, toolname)
+            target = get_pip_install_path()
             missing = [
                 r for r, spec in pip_reqs if importlib.util.find_spec(spec) is None
             ]
@@ -217,7 +230,7 @@ def install_module(
 
     cmds.confirmDialog(
         title=f"{toolname.capitalize()} Installed",
-        message=f"{toolname.capitalize()} installation complete",
+        message=f"{toolname.capitalize()} installation complete. Restart maya to load the module",
         button=["OK"],
     )
 
