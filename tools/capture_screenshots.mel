@@ -1,0 +1,2 @@
+// Run by capture_screenshots.bat at Maya startup
+python("import os; p = os.environ['BLURWEIGHT_CAPTURE_SCRIPT']; exec(compile(open(p).read(), p, 'exec'), {'__file__': p, '__name__': '__main__'})");
