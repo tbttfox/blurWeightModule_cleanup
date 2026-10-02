@@ -212,12 +212,12 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
                 fgColor = view.zeroFG
                 hilightColor = view.zeroHI
 
-        pal.setColor(QtGui.QPalette.Background, bgColor)
-        pal.setColor(QtGui.QPalette.Foreground, fgColor)
+        pal.setColor(QtGui.QPalette.Window, bgColor)
+        pal.setColor(QtGui.QPalette.WindowText, fgColor)
         pal.setColor(QtGui.QPalette.Text, fgColor)
         pal.setColor(QtGui.QPalette.WindowText, fgColor)
         pal.setColor(QtGui.QPalette.ColorRole.Highlight, hilightColor)
-        option.backgroundBrush = QtGui.QBrush(pal.color(QtGui.QPalette.Background))
+        option.backgroundBrush = QtGui.QBrush(pal.color(QtGui.QPalette.Window))
 
 
 class VertHeaderView(QtWidgets.QHeaderView):
@@ -401,7 +401,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         index = self.visualIndexAt(event.pos().x())
         outClick = index == -1
         if outClick:
-            if event.button() == QtCore.Qt.MouseButton.MidButton:
+            if event.button() == QtCore.Qt.MouseButton.MiddleButton:
                 if self.mainWindow is not None:
                     self.mainWindow.resizeToMinimum()
             elif event.button() == QtCore.Qt.MouseButton.LeftButton:
@@ -673,7 +673,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
         ff = self.font()
         ff.setBold(True)
         metrics = QtGui.QFontMetrics(ff)
-        allMetrics = [metrics.width(colName) for colName in colNames]
+        allMetrics = [metrics.horizontalAdvance(colName) for colName in colNames]
         if allMetrics:
             return min(180, max(allMetrics)) + 15
         else:
@@ -750,12 +750,8 @@ class FastTableView(QtWidgets.QTableView):
         btn.installEventFilter(self)
         opt = QtWidgets.QStyleOptionHeader()
         opt.text = btn.text()
-        s = QtCore.QSize(
-            btn.style()
-            .sizeFromContents(
-                QtWidgets.QStyle.ContentsType.CT_HeaderSection, opt, QtCore.QSize(), btn
-            )
-            .expandedTo(QtWidgets.QApplication.globalStrut())
+        s = btn.style().sizeFromContents(
+            QtWidgets.QStyle.ContentsType.CT_HeaderSection, opt, QtCore.QSize(), btn
         )
 
         if s.isValid():
