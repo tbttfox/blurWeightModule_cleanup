@@ -132,8 +132,8 @@ MSyntax blurSkinCmd::newSyntax()
 }
 
 blurSkinCmd::blurSkinCmd()
-    : command_(kCommandSmooth), repeat_(1), depth_(1), percentMvt_(1.0), indSkinCluster_(0),
-      threshold_(0.0001), respectLocks_(true), verbose(false)
+    : nbJoints(0), command_(kCommandSmooth), repeat_(1), depth_(1), percentMvt_(1.0),
+      indSkinCluster_(0), threshold_(0.0001), respectLocks_(true), verbose(false)
 {
 }
 
@@ -629,6 +629,21 @@ MIntArray blurSkinCmd::getZeroInfluences()
     // This plug is an array (one element for each vertex in your mesh
     MFnDependencyNode skinClusterDep(skinCluster_);
 
+    // This runs before getListLockJoints, so get the influence count here. The weight plugs
+    // are indexed by logical influence index, which can be sparse, so map those to the
+    // physical index used for the result
+    MFnSkinCluster skinFn(skinCluster_);
+    MDagPathArray influences;
+    nbJoints = skinFn.influenceObjects(influences);
+    std::vector<int> logicalToPhysical;
+    for (int i = 0; i < nbJoints; ++i) {
+        unsigned int logical = skinFn.indexForInfluenceObject(influences[i]);
+        if (logical >= logicalToPhysical.size()) {
+            logicalToPhysical.resize(logical + 1, -1);
+        }
+        logicalToPhysical[logical] = i;
+    }
+
     MPlug weight_list_plug = skinClusterDep.findPlug("weightList", false);
     MIntArray jointUsed(nbJoints, 0);
     int nbAt1 = 0;
@@ -648,7 +663,11 @@ MIntArray blurSkinCmd::getZeroInfluences()
         for (int j = 0; j < nb_weights; j++) { // for each joint
             MPlug weight_plug = plug_weights.elementByPhysicalIndex(j);
             // weightList[i].weight[j]
-            int indexInfluence = weight_plug.logicalIndex();
+            unsigned int logical = weight_plug.logicalIndex();
+            if (logical >= logicalToPhysical.size() || logicalToPhysical[logical] == -1) {
+                continue;
+            }
+            int indexInfluence = logicalToPhysical[logical];
             if (jointUsed[indexInfluence] == 0) { // check the value if zero or not
                 double theWeight = weight_plug.asDouble();
                 if (theWeight != 0) {

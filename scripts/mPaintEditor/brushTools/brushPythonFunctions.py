@@ -71,7 +71,7 @@ def setColorsOnJoints():
     with UndoContext("setColorsOnJoints"):
         _colors = []
         for i in range(1, 9):
-            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True)
+            col = cmds.displayRGBColor("userDefined{0}".format(i), query=True) or (0.0, 0.0, 0.0)
             _colors.append(col)
 
         for jnt in cmds.ls(type="joint"):

@@ -289,7 +289,7 @@ class HandleEventsMaya:
     def getModelPanels():
         return [
             el
-            for el in cmds.getPanel(visiblePanels=True)
+            for el in (cmds.getPanel(visiblePanels=True) or [])
             if cmds.getPanel(typeOf=el) == "modelPanel"
         ]
 

@@ -6,7 +6,10 @@ so we check that cmds.undo() actually restores the prior weights.
 """
 from maya import cmds
 
-from helpers.scene_fixtures import build_sphere_with_skincluster
+from helpers.scene_fixtures import (
+    build_nurbs_plane_with_skincluster,
+    build_sphere_with_skincluster,
+)
 
 
 def test_blurskin_smooth_is_undoable():
@@ -62,19 +65,9 @@ def test_blurskin_smooth_redo_reapplies():
     assert redone == after
 
 
-def _build_nurbs_plane_with_skincluster():
-    cmds.select(clear=True)
-    joints = [cmds.joint(name="nurbsJoint{}".format(i), position=(i * 2, 0, 0)) for i in range(2)]
-    cmds.select(clear=True)
-    transform = cmds.nurbsPlane(name="testPlane", width=4, patchesU=2, patchesV=2)[0]
-    shape = cmds.listRelatives(transform, shapes=True)[0]
-    skin_cluster = cmds.skinCluster(joints, transform, toSelectedBones=True)[0]
-    cmds.addAttr(shape, longName="lockedVertices", dataType="Int32Array")
-    return shape, joints, skin_cluster
-
-
 def test_blurskin_nurbs_smooth_undo_redo():
-    shape, joints, skin_cluster = _build_nurbs_plane_with_skincluster()
+    plane = build_nurbs_plane_with_skincluster()
+    shape, joints, skin_cluster = plane["shape"], plane["joints"], plane["skinCluster"]
     cv = "{}.cv[2][2]".format(shape)
     cmds.skinPercent(skin_cluster, cv, transformValue=[(joints[0], 1.0), (joints[1], 0.0)])
     before = cmds.skinPercent(skin_cluster, cv, query=True, value=True)

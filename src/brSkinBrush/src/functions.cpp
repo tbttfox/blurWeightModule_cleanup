@@ -1019,11 +1019,11 @@ bool RayIntersectsBBox(
 MPoint
 offsetIntersection(const MPoint &rayPoint, const MVector &rayVector, const MVector &originNormal)
 {
-    // A little hack to shift the input ray point around to get the intersections with the offset
-    // planes
+    // Intersect the ray with the plane through `originNormal` that faces along `originNormal`.
+    // For the unit cube's faces, that point doubles as the plane's normal
     MVector diff = rayPoint - originNormal;
     double prod = (diff * originNormal) / (rayVector * originNormal);
-    return rayPoint - (rayVector * prod) + originNormal;
+    return rayPoint - (rayVector * prod);
 }
 
 MMatrix bboxMatrix(const MPoint &minPoint, const MPoint &maxPoint, const MMatrix &bbSpace)
@@ -1040,9 +1040,11 @@ MMatrix bboxMatrix(const MPoint &minPoint, const MPoint &maxPoint, const MMatrix
 
 inline bool inUnitPlane(const MPoint &inter)
 {
-    // Quickly check if the intersection happened in the unit plane
-    return (inter.x <= 1.0 && inter.x >= -1.0) && (inter.y <= 1.0 && inter.y >= -1.0) &&
-           (inter.z <= 1.0 && inter.z >= -1.0);
+    // Quickly check if the intersection happened in the unit plane.
+    // Points on a face can land a hair outside it from floating point error
+    const double lim = 1.0 + 1e-9;
+    return (inter.x <= lim && inter.x >= -lim) && (inter.y <= lim && inter.y >= -lim) &&
+           (inter.z <= lim && inter.z >= -lim);
 }
 
 bool bboxIntersection(

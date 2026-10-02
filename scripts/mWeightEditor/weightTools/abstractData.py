@@ -154,7 +154,7 @@ class DataAbstract(object):
             # that's added because the isolate doesnt work otherwise, it's dumb I know
         listModelPanels = [
             el
-            for el in cmds.getPanel(visiblePanels=True)
+            for el in (cmds.getPanel(visiblePanels=True) or [])
             if cmds.getPanel(typeOf=el) == "modelPanel"
         ]
         for thePanel in listModelPanels:

@@ -60,6 +60,8 @@ except ImportError:
 
 def isInPaint():
     currentContext = cmds.currentCtx()
+    if not currentContext or not cmds.contextInfo(currentContext, exists=True):
+        return False
     # Can't use full flag name "class" in python
     if cmds.contextInfo(currentContext, c=True) == "brSkinBrush":
         return currentContext
@@ -177,6 +179,9 @@ class SkinPaintWin(Window):
 
     def __init__(self, parent=None):
         self.doPrint = False
+        # buildRCMenu reads the real value from the optionVar. This default covers a refresh
+        # that runs before then (evalDeferred runs immediately when there's no UI loop)
+        self.showZeroDeformers = True
         super(SkinPaintWin, self).__init__(parent)
 
         if not cmds.pluginInfo("brSkinBrush", query=True, loaded=True):
@@ -585,7 +590,8 @@ class SkinPaintWin(Window):
             cmds.brSkinBrushContext(GET_CONTEXT.getLatest(), edit=True, commandIndex=newCommand)
 
     def closeEvent(self, event):
-        mel.eval("setToolTo $gMove;")
+        if isInPaint():
+            mel.eval("setToolTo $gMove;")
         try:
             self.deleteCallBacks()
         except RuntimeError:
@@ -654,10 +660,7 @@ class SkinPaintWin(Window):
             self.showLocks_btn.setIcon(ICONS["eye-half"])
 
     def isInPaint(self):
-        currentContext = cmds.currentCtx()
-        if cmds.contextInfo(currentContext, c=True) == "brSkinBrush":
-            return currentContext
-        return False
+        return isInPaint()
 
     def contextExists(self):
         context = GET_CONTEXT.getLatest()
@@ -719,7 +722,7 @@ class SkinPaintWin(Window):
 
     def setFocusToPanel(self):
         QtCore.QTimer.singleShot(10, self.parent().setFocus)
-        for panel in cmds.getPanel(visiblePanels=True):
+        for panel in (cmds.getPanel(visiblePanels=True) or []):
             if cmds.getPanel(typeOf=panel) == "modelPanel":
                 cmds.setFocus(panel)
 

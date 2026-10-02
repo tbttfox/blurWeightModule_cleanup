@@ -28,6 +28,7 @@ blurskin_test_exe = executable(
   'test_blurSkin_functions',
   [
     'test_blurSkin_functions.cpp',
+    'test_blurSkin_weights.cpp',
     '../../src/blurSkin/src/functions.cpp',
   ],
   include_directories: include_directories('../../src/blurSkin/include'),
@@ -39,6 +40,8 @@ brskinbrush_test_exe = executable(
   'test_brSkinBrush_functions',
   [
     'test_brSkinBrush_functions.cpp',
+    'test_brSkinBrush_geometry.cpp',
+    'test_brSkinBrush_weights.cpp',
     '../../src/brSkinBrush/src/functions.cpp',
   ],
   include_directories: include_directories('../../src/brSkinBrush/include'),
