@@ -1,0 +1,6 @@
+option(
+  'ci_install',
+  type: 'boolean',
+  value: false,
+  description: 'Install just the plugins into output_Maya<version>, where the CI artifact upload expects them',
+)
