@@ -7,6 +7,26 @@ from .utils import GlobalContext, getMapForSelectedVertices, orderMelListWithWei
 
 from maya import OpenMaya, cmds
 
+# In Maya 2026 the blendShape base weights moved to the standard deformer
+# weightList[].weights, and attributeQuery can't find that "weights" child
+IS_MAYA_2026 = cmds.about(apiVersion=True) >= 20260000
+BASE_WEIGHTS = "weights" if IS_MAYA_2026 else "baseWeights"
+BASE_WEIGHTS_PARENT = "weightList" if IS_MAYA_2026 else "inputTarget"
+
+
+def _attrExists(attr, node):
+    return attr == "weights" or cmds.attributeQuery(attr, node=node, exists=True)
+
+
+def _attrIsMulti(attr, node):
+    return attr == "weights" or cmds.attributeQuery(attr, node=node, multi=True)
+
+
+def _attrParents(attr, node):
+    if attr == "weights":
+        return ["weightList"]
+    return cmds.attributeQuery(attr, node=node, listParent=True)
+
 
 class DataOfOneDimensionalAttrs(DataAbstract):
     useAPI = False  # for setting values use API
@@ -111,7 +131,7 @@ class DataOfOneDimensionalAttrs(DataAbstract):
             nodeNameShort = nodeName.split("|")[-1]
             displayName = "-".join([nodeNameShort, attr])
 
-            if not cmds.attributeQuery(attr, node=nodeName, exists=True):
+            if not _attrExists(attr, nodeName):
                 continue
 
             if nodeType == "skinCluster":
@@ -149,7 +169,7 @@ class DataOfOneDimensionalAttrs(DataAbstract):
             self.fullAttributesArr = np.full((self.nbVertices, nbAttrs), 1.0)
             for indAtt, att in enumerate(self.listAttrs):
                 splAtt = att.split(".")
-                isMulti = cmds.attributeQuery(splAtt[-1], node=splAtt[0], multi=True)
+                isMulti = _attrIsMulti(splAtt[-1], splAtt[0])
                 if isMulti:
                     indicesAtt = cmds.getAttr(att, multiIndices=True)
                     if indicesAtt:
@@ -224,7 +244,7 @@ class DataOfOneDimensionalAttrs(DataAbstract):
                     plg2.elementByLogicalIndex(indVtx).setFloat(value)
         else:
             splAtt = att.split(".")
-            isMulti = cmds.attributeQuery(splAtt[-1], node=splAtt[0], multi=True)
+            isMulti = _attrIsMulti(splAtt[-1], splAtt[0])
             if isMulti:
                 # need an undo Context
                 listMelValueWeights = orderMelListWithWeights(vertsIndicesWeights)
@@ -414,9 +434,11 @@ class DataOfBlendShape(DataOfOneDimensionalAttrs):
                 # get the index of the node in the blendShape
                 inputTarget = lsGeomsIndicesOrig[lsGeomsOrig.index(theNodeShape)]
 
-                listAttrShortName.append("baseWeights")
+                listAttrShortName.append(BASE_WEIGHTS)
                 listAttrs.append(
-                    "{}.inputTarget[{}].baseWeights".format(BSnode, inputTarget)
+                    "{}.{}[{}].{}".format(
+                        BSnode, BASE_WEIGHTS_PARENT, inputTarget, BASE_WEIGHTS
+                    )
                 )
 
                 # get the alias
@@ -515,10 +537,10 @@ class DataOfDeformers(DataOfOneDimensionalAttrs):
         theList = lstQualoth if self.isQualoth else lstDeformers
         for dfmNm in theList:
             dfm, attName = dfmNm.split("-")
-            if not cmds.attributeQuery(attName, node=dfm, exists=True):
+            if not _attrExists(attName, dfm):
                 continue
             lstDeformersRtn.append(dfmNm)
-            isMulti = cmds.attributeQuery(attName, node=dfm, multi=True)
+            isMulti = _attrIsMulti(attName, dfm)
             if isMulti:
                 lsGeomsOrig = cmds.deformer(dfm, query=True, geometry=True)
                 lsGeomsIndicesOrig = cmds.deformer(
@@ -530,7 +552,7 @@ class DataOfDeformers(DataOfOneDimensionalAttrs):
                     ]
                 else:
                     inputTarget = 0
-                prtAtt = cmds.attributeQuery(attName, node=dfm, listParent=True)
+                prtAtt = _attrParents(attName, dfm)
                 prtAtt = ".".join(prtAtt)
                 theAtt = "{}.{}[{}].{}".format(dfm, prtAtt, inputTarget, attName)
                 listAttrs.append(theAtt)
