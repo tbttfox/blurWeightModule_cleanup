@@ -1727,6 +1727,7 @@ class SkinPaintWin(Window):
         sparseArray = (
             skn != ""
             and cmds.objExists(skn)
+            and cmds.nodeType(skn) == "skinCluster"
             and cmdSkinCluster.skinClusterHasSparceArray(skn)
         )
         self.WarningFixSkin_btn.setVisible(sparseArray)
