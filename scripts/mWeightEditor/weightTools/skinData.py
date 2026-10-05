@@ -4,7 +4,13 @@ from maya import OpenMaya, OpenMayaAnim, cmds
 
 import numpy as np
 import re
-from .utils import GlobalContext, getThreeIndices, orderMelList, ToggleIntermediateObject
+from .utils import (
+    GlobalContext,
+    getThreeIndices,
+    orderMelList,
+    ToggleIntermediateObject,
+    storeTimeStamp,
+)
 
 from .abstractData import DataAbstract
 from six.moves import range, zip
@@ -44,6 +50,9 @@ class DataOfSkin(DataAbstract):
         super(DataOfSkin, self).__init__(
             createDisplayLocator=createDisplayLocator, mainWindow=mainWindow
         )
+
+    def doStoreTimeStamp(self):
+        storeTimeStamp(self.theSkinCluster)
 
     #
     # MObject base function
@@ -97,6 +106,7 @@ class DataOfSkin(DataAbstract):
                 listVerticesIndices=selectedVertices,
                 skinClusterIndex=skinClusterIndex,
             )
+        self.doStoreTimeStamp()
 
     def fixAroundVertices(self, tolerance=3):
         with GlobalContext(message="fixAroundVertices", doPrint=True):
@@ -603,6 +613,7 @@ class DataOfSkin(DataAbstract):
             if sub2DArrayToSet is not None and sub2DArrayToSet.size != 0:
                 np.put(sub2DArrayToSet, range(sub2DArrayToSet.size), new2dArray)
                 self.computeSumArray()
+        self.doStoreTimeStamp()
 
     #
     # get data

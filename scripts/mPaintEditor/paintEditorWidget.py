@@ -50,6 +50,9 @@ from mWeightEditor.weightTools.utils import (
     orderMelList,
     Prefs,
     getListDeformersFromSel,
+    storeTimeStamp,
+    latestToolStampEdit,
+    timeSinceLastTimeStamp,
 )
 
 try:
@@ -1579,6 +1582,7 @@ class SkinPaintWin(Window):
     def changeDeformer(self, newVal):
         self.refresh(force=True, passedDeformer=newVal, calledFrom="changeDeformer")
         if self.isInPaint():
+            self.doStoreTimeStamp()
             selectedInfluences = self.selectedInfluences()
             influenceName = selectedInfluences[0] if selectedInfluences else ""
             ctx = GET_CONTEXT.getLatest()
@@ -1742,8 +1746,38 @@ class SkinPaintWin(Window):
             GET_CONTEXT.getLatest(), query=True, influenceName=True
         )
         self.enterPaint_btn.setEnabled(True)
+        self.doStoreTimeStamp()
+
+    def doStoreTimeStamp(self):
+        skn = cmds.brSkinBrushContext(
+            GET_CONTEXT.getLatest(), query=True, skinClusterName=True
+        )
+        storeTimeStamp(skn, "paintBrush")
 
     def paintStart(self):
+        context = GET_CONTEXT.getLatest()
+        skinClusterName = cmds.brSkinBrushContext(
+            context, query=True, skinClusterName=True
+        )
+        # If the brush kept its cached skin values, but another tool edited
+        # the skinCluster since, then force the brush to re-read the weights
+        lastEditPaintBrush = latestToolStampEdit(skinClusterName) == "paintBrush"
+        hasSkippedSkinValues = cmds.brSkinBrushContext(
+            context, query=True, skipSkinValues=True
+        )
+        forceRefresh = hasSkippedSkinValues and not lastEditPaintBrush
+        if not forceRefresh:
+            # check time since last stamp in seconds
+            sinceLastStamp = timeSinceLastTimeStamp(
+                skinClusterName, toolName="paintBrush"
+            )
+            if sinceLastStamp > 7200.0:  # more than 2 hours
+                forceRefresh = True
+
+        if forceRefresh:
+            print("-- FORCE refresh skin values --")
+            cmds.brSkinBrushContext(context, edit=True, refresh=True)
+
         with UndoContext("paintstart"):
             for btnName in self.uiToActivateWithPaint:
                 thebtn = self.findChild(QtWidgets.QPushButton, btnName)

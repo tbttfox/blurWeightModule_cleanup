@@ -1,7 +1,9 @@
 from __future__ import print_function
 from __future__ import absolute_import
 
+import codecs
 import datetime
+import json
 import six
 import sys
 import time
@@ -729,6 +731,62 @@ def addUserEventCallback(eventName, callback):
 
 def removeUserEventCallback(callbackId):
     OpenMaya.MUserEventMessage.removeCallback(callbackId)
+
+
+#
+# infos on edit skin
+#
+SKINNING_STAMPS_KEY = "skinningTimeStamps"
+
+
+def _getSkinningStamps():
+    """Read the per-skinCluster tool timestamps stored in the scene fileInfo"""
+    res = cmds.fileInfo(SKINNING_STAMPS_KEY, query=True)
+    if not res:
+        return {}
+    raw = res[0]
+    try:
+        return json.loads(raw)
+    except ValueError:
+        pass
+    # fileInfo can hand back the string with its quotes still escaped
+    try:
+        return json.loads(codecs.decode(raw, "unicode_escape"))
+    except ValueError:
+        return {}
+
+
+def storeTimeStamp(skinClusterName, toolName="weightEditor"):
+    """Record that toolName just edited skinClusterName"""
+    if not skinClusterName:
+        return
+    skinningStamps = _getSkinningStamps()
+    toolStampSkn = skinningStamps.get(skinClusterName, {})
+    toolStampSkn[toolName] = time.time()
+    skinningStamps[skinClusterName] = toolStampSkn
+    cmds.fileInfo(SKINNING_STAMPS_KEY, json.dumps(skinningStamps))
+
+
+def latestToolStampEdit(skinClusterName):
+    """Get the name of the tool that last edited skinClusterName"""
+    toolStampSkn = _getSkinningStamps().get(skinClusterName, {})
+    latestTime = 0.0
+    latestTool = None
+    for toolName, timeStmp in toolStampSkn.items():
+        if timeStmp > latestTime:
+            latestTime = timeStmp
+            latestTool = toolName
+    return latestTool
+
+
+def timeSinceLastTimeStamp(skinClusterName, toolName=None):
+    """Seconds since skinClusterName was last edited by toolName, or by any tool if None"""
+    toolStampSkn = _getSkinningStamps().get(skinClusterName, {})
+    if toolName is None:
+        latestTime = max(list(toolStampSkn.values()) + [0.0])
+    else:
+        latestTime = toolStampSkn.get(toolName, 0.0)
+    return time.time() - latestTime
 
 
 class ToggleIntermediateObject(object):
