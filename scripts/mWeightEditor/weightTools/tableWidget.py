@@ -4,6 +4,7 @@ from maya import cmds, mel
 import numpy as np
 import string
 from .skinData import DataOfSkin
+from .utils import eventPos, eventGlobalPos
 
 TOL = 1e-5
 
@@ -71,7 +72,7 @@ class TableModel(QtCore.QAbstractTableModel):
         if role == QtCore.Qt.ItemDataRole.EditRole:
             par = self.parent()
             par.prepareToSetValue()
-            par.doAddValue(value / 100, forceAbsolute=True)
+            par.doAddValue(float(value) / 100, forceAbsolute=True)
             par.postSetValue()
             return True
         return False
@@ -163,20 +164,33 @@ class TableModel(QtCore.QAbstractTableModel):
                 | QtCore.Qt.ItemFlag.ItemIsSelectable
                 | QtCore.Qt.ItemFlag.ItemIsEditable
             )
-        return QtCore.Qt.ItemFlags(result)
+        return result
 
 
 class HighlightDelegate(QtWidgets.QStyledItemDelegate):
     def createEditor(self, parent, option, index):
-        editor = QtWidgets.QDoubleSpinBox(parent)
-        editor.setMaximum(100)
-        editor.setMinimum(0)
+        # A line edit that only accepts floats between 0 and 100
+        editor = QtWidgets.QLineEdit(parent)
         editor.setMinimumWidth(50)
-        editor.setButtonSymbols(QtWidgets.QAbstractSpinBox.ButtonSymbols.NoButtons)
+        validator = QtGui.QDoubleValidator(editor)
+        # Prevent scientific notation (like 1.0e+02)
+        validator.setNotation(QtGui.QDoubleValidator.Notation.StandardNotation)
+        validator.setRange(0.0, 100.0, 4)
+        editor.setValidator(validator)
         return editor
 
     def setEditorData(self, editor, index):
-        editor.setValue(index.data(role=QtCore.Qt.ItemDataRole.EditRole))
+        value = index.data(role=QtCore.Qt.ItemDataRole.EditRole)
+        if value is not None:
+            editor.setText("{0:.4f}".format(value).rstrip("0").rstrip("."))
+
+    def setModelData(self, editor, model, index):
+        try:
+            value = float(editor.text())
+        except ValueError:
+            # empty or incomplete entries
+            value = 0.0
+        model.setData(index, value, QtCore.Qt.ItemDataRole.EditRole)
 
     def initStyleOption(self, option, index):
         super(HighlightDelegate, self).initStyleOption(option, index)
@@ -376,10 +390,10 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             self._colors.append([int(el * 255) for el in col])
 
     def mouseDoubleClickEvent(self, event):
-        if self.height() - event.pos().y() < 20:
-            index = self.visualIndexAt(event.pos().x())
+        if self.height() - eventPos(event).y() < 20:
+            index = self.visualIndexAt(eventPos(event).x())
 
-            pos = event.globalPos() - QtCore.QPoint(355, 100)
+            pos = eventGlobalPos(event) - QtCore.QPoint(355, 100)
             theColor = [int(el / 255.0) for el in self.color(index)]
             cmds.colorEditor(mini=True, position=[pos.x(), pos.y()], rgbValue=theColor)
             if cmds.colorEditor(query=True, result=True, mini=True):
@@ -396,7 +410,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             super(HorizHeaderView, self).mouseDoubleClickEvent(event)
 
     def mousePressEvent(self, event):
-        index = self.visualIndexAt(event.pos().x())
+        index = self.visualIndexAt(eventPos(event).x())
         outClick = index == -1
         if outClick:
             if event.button() == QtCore.Qt.MouseButton.MiddleButton:

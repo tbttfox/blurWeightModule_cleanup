@@ -454,10 +454,10 @@ class DataOfBlendShape(DataOfOneDimensionalAttrs):
                     listAttrShortName.append(attrShortName)
                     listAttrs.append(attr)
 
-                # for paintable
+                # for paintable, each target paints its own weights
                 for shortName in listAttrShortName:
-                    self.attributesToPaint[shortName] = (
-                        "blendShape.{}.baseWeights".format(BSnode)
+                    self.attributesToPaint[shortName] = "blendShape.{}.{}".format(
+                        BSnode, shortName
                     )
 
                 return listAttrShortName, listAttrs

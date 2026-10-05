@@ -32,6 +32,7 @@ from .weightTools.utils import (
     ToggleHeaderVisibility,
     getListDeformersFromSel,
     orderMelList,
+    eventGlobalPos,
 )
 
 
@@ -563,7 +564,7 @@ class SkinWeightWin(Window):
         self.customContextMenuRequested.connect(self.showMenu)
 
     def showRightClickMenu(self, event):
-        self.popMenu.exec(event.globalPos())
+        self.popMenu.exec(eventGlobalPos(event))
 
     def showMenu(self, pos):
         child = self.childAt(pos)

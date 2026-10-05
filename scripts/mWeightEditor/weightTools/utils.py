@@ -729,6 +729,23 @@ def removeUserEventCallback(callbackId):
 
 
 #
+# Qt5/Qt6 mouse event compatibility
+#
+def eventPos(event):
+    """Get the local QPoint of a mouse event (pos() is deprecated in Qt6)"""
+    if hasattr(event, "position"):
+        return event.position().toPoint()
+    return event.pos()
+
+
+def eventGlobalPos(event):
+    """Get the global QPoint of a mouse event (globalPos() is deprecated in Qt6)"""
+    if hasattr(event, "globalPosition"):
+        return event.globalPosition().toPoint()
+    return event.globalPos()
+
+
+#
 # infos on edit skin
 #
 SKINNING_STAMPS_KEY = "skinningTimeStamps"
