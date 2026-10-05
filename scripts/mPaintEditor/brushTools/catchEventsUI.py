@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
-
 from Qt import QtCore, QtGui, QtWidgets, QtCompat
 
 from maya import OpenMayaUI, cmds, mel
@@ -11,7 +8,6 @@ from .brushPythonFunctions import (
 )
 from . import meshFnIntersection
 from .hotkeys import HOTKEYS
-from past.builtins import long
 
 EVENTCATCHER = None
 ROOTWINDOW = None
@@ -417,7 +413,7 @@ class CatchEventsWidget(QtWidgets.QWidget):
     def installFilters(self):
         self.eventFilterWidgetReceiver = [
             QtCompat.wrapInstance(
-                long(OpenMayaUI.MQtUtil.findControl(el)),
+                int(OpenMayaUI.MQtUtil.findControl(el)),
                 QtWidgets.QWidget,
             )
             for el in cmds.getPanel(type="modelPanel")

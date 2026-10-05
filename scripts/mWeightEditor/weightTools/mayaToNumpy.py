@@ -1,7 +1,6 @@
 from maya import OpenMaya as om
 import numpy as np
 from ctypes import c_float, c_double, c_int, c_uint
-import six
 
 _CONVERT_DICT = {
     om.MPointArray: (float, 4, c_double, om.MScriptUtil.asDouble4Ptr),
@@ -163,7 +162,7 @@ def getNumpyAttr(attrName):
         The numerical data from the provided plug. A np.array, float, int, or tuple
 
     """
-    if isinstance(attrName, six.string_types):
+    if isinstance(attrName, str):
         sl = om.MSelectionList()
         sl.add(attrName)
         plug = om.MPlug()
@@ -240,7 +239,7 @@ def setNumpyAttr(attrName, value):
     value : int, float, tuple, np.array
             The correctly typed value to set on the attribute
     """
-    if isinstance(attrName, six.string_types):
+    if isinstance(attrName, str):
         sl = om.MSelectionList()
         sl.add(attrName)
         plug = om.MPlug()

@@ -1,4 +1,3 @@
-from __future__ import absolute_import
 import os
 from Qt.QtWidgets import QApplication, QSplashScreen, QDialog, QMainWindow
 

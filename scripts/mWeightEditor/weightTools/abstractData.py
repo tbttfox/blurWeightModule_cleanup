@@ -1,6 +1,4 @@
 # https://github.com/chadmv/cmt/blob/master/scripts/cmt/deform/skinio.py
-from __future__ import print_function
-from __future__ import absolute_import
 from maya import OpenMaya
 import maya.api.OpenMaya as OpenMaya2
 from maya import cmds
@@ -15,8 +13,6 @@ from .utils import (
     getListDeformersFromSel,
     orderMelList,
 )
-import six
-from six.moves import range, map, zip
 
 
 # GLOBAL FUNCTIONS
@@ -502,7 +498,7 @@ class DataAbstract(object):
             sumVerts += nbVertsInFace
         theMax = 0
         self.nbNeighbors = {}
-        for vtx, lst in six.iteritems(self.vertNeighbors):
+        for vtx, lst in self.vertNeighbors.items():
             self.vertNeighbors[vtx] = list(set(lst))
             newMax = len(self.vertNeighbors[vtx])
             self.nbNeighbors[vtx] = newMax

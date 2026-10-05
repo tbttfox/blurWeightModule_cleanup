@@ -1,12 +1,9 @@
-from __future__ import absolute_import, division
-
 from Qt import QtGui, QtCore, QtWidgets
 from functools import partial
 from maya import cmds, mel
 import numpy as np
 import string
 from .skinData import DataOfSkin
-from six.moves import range
 
 TOL = 1e-5
 

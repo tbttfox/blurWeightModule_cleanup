@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
-
 from maya import cmds
 from Qt import QtGui, QtWidgets
 

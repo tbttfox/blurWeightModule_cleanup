@@ -1,5 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
 from maya import OpenMaya, OpenMayaAnim, cmds
 
 import numpy as np
@@ -13,7 +11,6 @@ from .utils import (
 )
 
 from .abstractData import DataAbstract
-from six.moves import range, zip
 
 from .mayaToNumpy import mayaToNumpy, numpyToMaya
 

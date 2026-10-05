@@ -1,16 +1,11 @@
-from __future__ import print_function
-from __future__ import absolute_import
-
 import codecs
 import datetime
 import json
-import six
 import sys
 import time
 
 from contextlib import contextmanager
 from maya import cmds, OpenMaya
-from six.moves import range, zip
 from Qt.QtCore import QSettings
 
 #
@@ -203,7 +198,7 @@ def orderMelList(listInd, onlyStr=True):
     ret.append(tup(start, listInd[-1]))
 
     if onlyStr:
-        return [":".join(map(six.text_type, x)) for x in ret]
+        return [":".join(map(str, x)) for x in ret]
     return ret
 
 
@@ -530,7 +525,7 @@ def getComponentIndexList(componentList=None):
     if componentList is None:
         componentList = []
 
-    if isinstance(componentList, six.string_types):
+    if isinstance(componentList, str):
         componentList = [componentList]
 
     # Get selection if componentList is empty

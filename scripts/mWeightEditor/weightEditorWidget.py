@@ -1,5 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
 from Qt import QtGui, QtCore, QtWidgets, QtCompat
 
 from functools import partial
@@ -7,7 +5,6 @@ from maya import cmds, OpenMaya
 import os
 import re
 import difflib
-from six.moves import zip, range
 
 try:
     from blurdev.gui import Window

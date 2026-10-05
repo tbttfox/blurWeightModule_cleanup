@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import print_function
-
 import maya.api.OpenMaya as OpenMaya2
 import numpy as np
 import re
@@ -9,7 +6,6 @@ from .abstractData import DataAbstract
 from .utils import GlobalContext, getMapForSelectedVertices, orderMelListWithWeights
 
 from maya import OpenMaya, cmds
-from six.moves import range, zip
 
 
 class DataOfOneDimensionalAttrs(DataAbstract):
