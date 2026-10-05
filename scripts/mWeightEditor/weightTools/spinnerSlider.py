@@ -340,8 +340,8 @@ class ProgressItem(QtWidgets.QProgressBar):
     def mousePressEvent(self, event):
         self.currentValue = self.value() / 100.0
         shiftControl = event.modifiers() == (
-            QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ControlModifier)
-            | QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ShiftModifier)
+            QtCore.Qt.KeyboardModifier.ControlModifier
+            | QtCore.Qt.KeyboardModifier.ShiftModifier
         )
         self.shiftHold = shiftControl or (event.modifiers() == QtCore.Qt.KeyboardModifier.ShiftModifier)
 
@@ -376,8 +376,8 @@ class ProgressItem(QtWidgets.QProgressBar):
 
     def applyTheEvent(self, e):
         shiftControl = e.modifiers() == (
-            QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ControlModifier)
-            | QtCore.Qt.KeyboardModifiers(QtCore.Qt.KeyboardModifier.ShiftModifier)
+            QtCore.Qt.KeyboardModifier.ControlModifier
+            | QtCore.Qt.KeyboardModifier.ShiftModifier
         )
 
         shitIsHold = shiftControl or (e.modifiers() == QtCore.Qt.KeyboardModifier.ShiftModifier)
