@@ -728,21 +728,14 @@ def removeUserEventCallback(callbackId):
     OpenMaya.MUserEventMessage.removeCallback(callbackId)
 
 
-#
-# Qt5/Qt6 mouse event compatibility
-#
-def eventPos(event):
-    """Get the local QPoint of a mouse event (pos() is deprecated in Qt6)"""
-    if hasattr(event, "position"):
-        return event.position().toPoint()
-    return event.pos()
+def execMenu(menu, pos):
+    """Run a QMenu blocking at pos, and return the triggered action
 
-
-def eventGlobalPos(event):
-    """Get the global QPoint of a mouse event (globalPos() is deprecated in Qt6)"""
-    if hasattr(event, "globalPosition"):
-        return event.globalPosition().toPoint()
-    return event.globalPos()
+    Qt6 renamed exec_ to exec, Qt5 only has exec_, and Qt.py has no QtCompat
+    wrapper for QMenu
+    """
+    execFn = getattr(menu, "exec", None) or getattr(menu, "exec_")
+    return execFn(pos)
 
 
 #

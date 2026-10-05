@@ -50,6 +50,7 @@ from mWeightEditor.weightTools.utils import (
     storeTimeStamp,
     latestToolStampEdit,
     timeSinceLastTimeStamp,
+    execMenu,
 )
 
 try:
@@ -377,10 +378,10 @@ class SkinPaintWin(Window):
         self.uiInfluenceTREE.customContextMenuRequested.connect(self.showMenu)
 
     def showMenu(self, pos):
-        self.popMenu.exec(self.uiInfluenceTREE.mapToGlobal(pos))
+        execMenu(self.popMenu, self.uiInfluenceTREE.mapToGlobal(pos))
 
     def showMainMenu(self, pos):
-        self.mainPopMenu.exec(self.mapToGlobal(pos))
+        execMenu(self.mainPopMenu, self.mapToGlobal(pos))
 
     def updateSoloColor(self, ind):
         self.soloColor_cb.setCurrentIndex(ind)
@@ -756,12 +757,12 @@ class SkinPaintWin(Window):
         for i, influenceIndex in enumerate(orderOfJoints):
             allItems[influenceIndex].setText(4, "{:09d}".format(i))
         if self.orderType_cb.currentIndex() == 3:
-            self.uiInfluenceTREE.sortByColumn(4, QtCore.Qt.AscendingOrder)  # 0
+            self.uiInfluenceTREE.sortByColumn(4, QtCore.Qt.SortOrder.AscendingOrder)  # 0
 
     def sortByColumn(self, ind):
         dicColumnCorrespondance = {0: 3, 1: 1, 2: 2, 3: 4}
         self.uiInfluenceTREE.sortByColumn(
-            dicColumnCorrespondance[ind], QtCore.Qt.AscendingOrder
+            dicColumnCorrespondance[ind], QtCore.Qt.SortOrder.AscendingOrder
         )
         selItems = self.uiInfluenceTREE.selectedItems()
         if selItems:
@@ -1792,7 +1793,7 @@ class SkinPaintWin(Window):
                 "commandIndex": self.getCommandIndex(),
                 "useColorSetsWhilePainting": self.colorSets_rb.isChecked(),
                 "smoothRepeat": self.smoothRepeat_spn.value(),
-                "shiftSmooths": HOTKEYS.SMOOTH_KEY == QtCore.Qt.Key_Shift,
+                "shiftSmooths": HOTKEYS.SMOOTH_KEY == QtCore.Qt.Key.Key_Shift,
                 "maxColor": self.maxColor_sb.value(),
                 "minColor": self.minColor_sb.value(),
             }
@@ -1830,7 +1831,7 @@ class SkinPaintWin(Window):
     def setSmoothKey(self):
         """Switch betwen XSI and Maya smooth key settings"""
         names = ["smooth_key", "remove_key"]
-        mods = [QtCore.Qt.Key_Shift, QtCore.Qt.Key_Control]
+        mods = [QtCore.Qt.Key.Key_Shift, QtCore.Qt.Key.Key_Control]
         if self.ctrlSmooths_rb.isChecked():
             mods.reverse()
 

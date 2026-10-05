@@ -1,10 +1,10 @@
-from Qt import QtGui, QtCore, QtWidgets
+from Qt import QtGui, QtCore, QtWidgets, QtCompat
 from functools import partial
 from maya import cmds, mel
 import numpy as np
 import string
 from .skinData import DataOfSkin
-from .utils import eventPos, eventGlobalPos
+from .utils import execMenu
 
 TOL = 1e-5
 
@@ -223,12 +223,12 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
                 fgColor = view.zeroFG
                 hilightColor = view.zeroHI
 
-        pal.setColor(QtGui.QPalette.Window, bgColor)
-        pal.setColor(QtGui.QPalette.WindowText, fgColor)
-        pal.setColor(QtGui.QPalette.Text, fgColor)
-        pal.setColor(QtGui.QPalette.WindowText, fgColor)
+        pal.setColor(QtGui.QPalette.ColorRole.Window, bgColor)
+        pal.setColor(QtGui.QPalette.ColorRole.WindowText, fgColor)
+        pal.setColor(QtGui.QPalette.ColorRole.Text, fgColor)
+        pal.setColor(QtGui.QPalette.ColorRole.WindowText, fgColor)
         pal.setColor(QtGui.QPalette.ColorRole.Highlight, hilightColor)
-        option.backgroundBrush = QtGui.QBrush(pal.color(QtGui.QPalette.Window))
+        option.backgroundBrush = QtGui.QBrush(pal.color(QtGui.QPalette.ColorRole.Window))
 
 
 class VertHeaderView(QtWidgets.QHeaderView):
@@ -275,7 +275,7 @@ class VertHeaderView(QtWidgets.QHeaderView):
 
         clearLocksAction = popMenu.addAction("Clear All Locks")
         clearLocksAction.triggered.connect(self.clearLocks)
-        popMenu.exec(self.mapToGlobal(pos))
+        execMenu(popMenu, self.mapToGlobal(pos))
 
     def paintSection(self, painter, rect, index):
         if not rect.isValid():
@@ -390,10 +390,10 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             self._colors.append([int(el * 255) for el in col])
 
     def mouseDoubleClickEvent(self, event):
-        if self.height() - eventPos(event).y() < 20:
-            index = self.visualIndexAt(eventPos(event).x())
+        if self.height() - QtCompat.QMouseEvent.position(event).toPoint().y() < 20:
+            index = self.visualIndexAt(QtCompat.QMouseEvent.position(event).toPoint().x())
 
-            pos = eventGlobalPos(event) - QtCore.QPoint(355, 100)
+            pos = QtCompat.QMouseEvent.globalPosition(event).toPoint() - QtCore.QPoint(355, 100)
             theColor = [int(el / 255.0) for el in self.color(index)]
             cmds.colorEditor(mini=True, position=[pos.x(), pos.y()], rgbValue=theColor)
             if cmds.colorEditor(query=True, result=True, mini=True):
@@ -410,7 +410,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             super(HorizHeaderView, self).mouseDoubleClickEvent(event)
 
     def mousePressEvent(self, event):
-        index = self.visualIndexAt(eventPos(event).x())
+        index = self.visualIndexAt(QtCompat.QMouseEvent.position(event).toPoint().x())
         outClick = index == -1
         if outClick:
             if event.button() == QtCore.Qt.MouseButton.MiddleButton:
@@ -451,7 +451,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
     def setColor(self, pos, index):
         menu = ColorMenu(self)
         pos = self.mapToGlobal(pos)
-        menu.exec(pos)
+        execMenu(menu, pos)
         color = menu.color()
         if color is None:
             return
@@ -584,7 +584,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             paintAttr.triggered.connect(self.enterPaintAttribute)
             paintAttr.setEnabled(not selectionIsEmpty)
 
-        popMenu.exec(self.mapToGlobal(pos))
+        execMenu(popMenu, self.mapToGlobal(pos))
 
     def toggledColumn(self, ind, ColumnName, checked):
         par = self.parent()
@@ -673,7 +673,7 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             rotRect = rotRect.adjusted(self._margin, -descent, 0, 0)
 
             # paint the text
-            textOpt = QtGui.QTextOption(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+            textOpt = QtGui.QTextOption(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
             painter.drawText(rotRect, data, textOpt)
 
     def sizeHint(self):
@@ -817,7 +817,7 @@ class FastTableView(QtWidgets.QTableView):
 
         # paint the text
         painter.setFont(self.font())
-        textOpt = QtGui.QTextOption(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        textOpt = QtGui.QTextOption(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
         painter.drawText(rotRect, data, textOpt)
 
         painter.end()

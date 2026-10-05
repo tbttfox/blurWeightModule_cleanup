@@ -32,7 +32,7 @@ from .weightTools.utils import (
     ToggleHeaderVisibility,
     getListDeformersFromSel,
     orderMelList,
-    eventGlobalPos,
+    execMenu,
 )
 
 
@@ -564,7 +564,7 @@ class SkinWeightWin(Window):
         self.customContextMenuRequested.connect(self.showMenu)
 
     def showRightClickMenu(self, event):
-        self.popMenu.exec(eventGlobalPos(event))
+        execMenu(self.popMenu, QtCompat.QMouseEvent.globalPosition(event).toPoint())
 
     def showMenu(self, pos):
         child = self.childAt(pos)
@@ -578,7 +578,7 @@ class SkinWeightWin(Window):
             "widgetAdd",
             "widgetAbs",
         ]:
-            self.popMenu.exec(self.mapToGlobal(pos))
+            execMenu(self.popMenu, self.mapToGlobal(pos))
 
     #
     # optionVars

@@ -1,6 +1,6 @@
-from Qt import QtGui, QtCore, QtWidgets
+from Qt import QtGui, QtCore, QtWidgets, QtCompat
 from maya import cmds
-from .utils import toggleBlockSignals, eventPos, eventGlobalPos
+from .utils import toggleBlockSignals
 import math
 
 
@@ -87,7 +87,7 @@ class ButtonWithValue(QtWidgets.QPushButton):
             return
         if e.button() == QtCore.Qt.MouseButton.MiddleButton:
             self.startDrag = True
-            self.startPos = eventGlobalPos(e)
+            self.startPos = QtCompat.QMouseEvent.globalPosition(e).toPoint()
             self.startPrecision = self.precision
         else:
             self.startDrag = False
@@ -100,7 +100,7 @@ class ButtonWithValue(QtWidgets.QPushButton):
     def mouseMoveEvent(self, e):
         if self.startDrag:
             assert self.startPos is not None
-            offset = eventGlobalPos(e) - self.startPos
+            offset = QtCompat.QMouseEvent.globalPosition(e).toPoint() - self.startPos
             xVal = offset.x()
             intVal = int(xVal * 0.04) * self.step
             if self.precision != self.startPrecision + intVal:
@@ -388,7 +388,7 @@ class ProgressItem(QtWidgets.QProgressBar):
         self.shiftHold = shitIsHold
 
         theWdth = self.width()
-        val = eventPos(e).x() / float(theWdth)
+        val = QtCompat.QMouseEvent.position(e).x() / float(theWdth)
         if self.shiftHold:
             diff = val - self.shiftKeyValue
             val = self.shiftKeyValue + 0.05 * diff
