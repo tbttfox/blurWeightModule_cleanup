@@ -535,6 +535,9 @@ class SkinWeightWin(Window):
         reverseAction = self.popMenu.addAction("Reverse Value")
         reverseAction.triggered.connect(self.doReverse)
 
+        roundAction = self.popMenu.addAction("Round to Closest Integer")
+        roundAction.triggered.connect(self.doRound)
+
         chbox = QtWidgets.QCheckBox("Auto Prune", self.popMenu)
         chbox.setChecked(self.autoPrune)
         chbox.toggled.connect(self.autoPruneChecked)
@@ -955,6 +958,13 @@ class SkinWeightWin(Window):
         self.prepareToSetValue(selectAllIfNothing=True)
         self.dataOfDeformer.doReverse()
         self.postSetValue()
+
+    def doRound(self):
+        """Round the weights to whole percentages, preserving each vertex's sum"""
+        with SettingWithRedraw(self):
+            self.prepareToSetValue(selectAllIfNothing=True)
+            self.dataOfDeformer.doRound(target_sum=100.0)
+            self.postSetValue()
 
     def smooth(self):
         with SettingWithRedraw(self):

@@ -387,10 +387,11 @@ class HorizHeaderView(QtWidgets.QHeaderView):
                 model = self.model()
                 assert isinstance(model, TableModel)
                 influence = model.fullColumnNames()[index]
-                cmds.setAttr(influence + ".wireColorRGB", *col)
-                self.repaint()
-                if self.mainWindow is not None:
-                    self.mainWindow.refreshPaintEditor()
+                if cmds.objExists(influence + ".wireColorRGB"):
+                    cmds.setAttr(influence + ".wireColorRGB", *col)
+                    self.repaint()
+                    if self.mainWindow is not None:
+                        self.mainWindow.refreshPaintEditor()
         else:
             super(HorizHeaderView, self).mouseDoubleClickEvent(event)
 
@@ -420,6 +421,9 @@ class HorizHeaderView(QtWidgets.QHeaderView):
             return [255, 155, 55]
 
         obj = model.fullColumnNames()[ind]
+        if not cmds.objExists(obj + ".wireColorRGB"):
+            return [255, 155, 55]
+
         if cmds.getAttr(obj + ".useObjectColor"):
             ocAttr = obj + ".objectColor"
             colorIdx = cmds.getAttr(ocAttr)

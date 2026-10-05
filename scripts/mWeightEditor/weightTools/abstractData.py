@@ -16,6 +16,38 @@ from .utils import (
 
 
 # GLOBAL FUNCTIONS
+def round_preserve_sum_2d(arr, target_sum=100.0, axis=-1):
+    """Round each row so its values are multiples of 1/target_sum, while
+    keeping the row sum (rounded the same way) intact (largest remainder method)
+
+    So a full row of skin weights still sums to exactly 1.0, and a partial
+    row (only some influences selected) keeps the share it had
+    """
+    arr = np.asarray(arr, dtype=float) * target_sum
+
+    # Rescale rows so they sum to a whole number before flooring
+    current_sums = arr.sum(axis=axis, keepdims=True)
+    row_targets = np.round(current_sums)
+    scaled = arr * (row_targets / np.where(current_sums == 0, 1.0, current_sums))
+
+    # Base floored values
+    integers = np.floor(scaled)
+
+    # Deficit needed per row to reach its target
+    remainder = np.round(row_targets - integers.sum(axis=axis, keepdims=True))
+    remainder = remainder.astype(int)
+
+    # Rank indices by largest fractional part descending along the axis
+    fractions = scaled - integers
+    sorted_indices = np.argsort(-fractions, axis=axis)
+    ranks = np.argsort(sorted_indices, axis=axis)
+
+    # Add 1.0 to the elements with the largest fractional remainders
+    mask = ranks < remainder
+    toReturn = integers + mask.astype(float)
+    return toReturn / target_sum
+
+
 class DataAbstract(object):
     """An abstract base class for holding data for the weight editor"""
 
@@ -748,6 +780,21 @@ class DataAbstract(object):
                     + self.orig2dArray * (1.0 - self.indicesWeights)[:, np.newaxis]
                 )
 
+            self.commandForDoIt(new2dArray)
+
+    def doRound(self, target_sum=100.0):
+        with GlobalContext(message="round", doPrint=self.verbose):
+            new2dArray = np.copy(self.orig2dArray)
+            selectArr = np.copy(self.orig2dArray)
+
+            roundValues = round_preserve_sum_2d(selectArr, target_sum=target_sum)
+            np.copyto(new2dArray, roundValues)
+
+            if self.softOn:
+                new2dArray = (
+                    new2dArray * self.indicesWeights[:, np.newaxis]
+                    + self.orig2dArray * (1.0 - self.indicesWeights)[:, np.newaxis]
+                )
             self.commandForDoIt(new2dArray)
 
     def preSettingValuesFn(self, chunks, actualyVisibleColumns):

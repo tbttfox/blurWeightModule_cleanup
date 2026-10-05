@@ -163,6 +163,17 @@ class DataOfSkin(DataAbstract):
             self.sknFn,
         )
 
+    def commandForDoIt(self, new2dArray):
+        # Override DataAbstract, skins set their values through actuallySetValue
+        self.actuallySetValue(
+            new2dArray,
+            self.sub2DArrayToSet,
+            self.userComponents,
+            self.influenceIndices,
+            self.shapePath,
+            self.sknFn,
+        )
+
     @staticmethod
     def pruneSkinArray(theArray, theMask, arraySumNormalize, pruneValue):
         unLock = np.ma.array(theArray.copy(), mask=theMask, fill_value=0)

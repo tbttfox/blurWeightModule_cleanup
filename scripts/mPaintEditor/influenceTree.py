@@ -154,7 +154,10 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
         return QtGui.QIcon(pixmap)
 
     def setLocked(self, locked, autoHide=False):
-        cmds.setAttr(self._influence + ".lockInfluenceWeights", locked)
+        lockIW = self._influence + ".lockInfluenceWeights"
+        if not cmds.objExists(lockIW):
+            return
+        cmds.setAttr(lockIW, locked)
         if locked:
             self.setSelected(False)
         if autoHide and locked:
@@ -162,7 +165,10 @@ class InfluenceTreeWidgetItem(QtWidgets.QTreeWidgetItem):
         self.setDisplay()
 
     def isLocked(self):
-        return cmds.getAttr(self._influence + ".lockInfluenceWeights")
+        lockIW = self._influence + ".lockInfluenceWeights"
+        if cmds.objExists(lockIW):
+            return cmds.getAttr(lockIW)
+        return False
 
     def influence(self):
         return self._influence
